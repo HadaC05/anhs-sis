@@ -1,0 +1,338 @@
+﻿@extends('users.guidance.layout')
+
+@section('title', 'Enrollment Details')
+
+@section('content')
+@if (session('status'))
+<div class="mb-6 rounded-lg bg-green-100 border border-green-400 text-green-700 px-4 py-3">
+    {{ session('status') }}
+</div>
+@endif
+
+@if (session('success'))
+<div class="mb-6 rounded-lg bg-green-100 border border-green-400 text-green-700 px-4 py-3">
+    {{ session('success') }}
+</div>
+@endif
+
+@if ($errors->any())
+<div class="mb-6 rounded-lg bg-red-100 border border-red-400 text-red-700 px-4 py-3">
+    {{ $errors->first() }}
+</div>
+@endif
+
+<div class="mb-6">
+    <a href="{{ route('guidance.enrollments.index') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        Back to Enrollment Management
+    </a>
+</div>
+
+<div class="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">Enrollment Details</h1>
+        <p class="text-gray-600 text-sm md:text-base">Submitted {{ $enrollment->created_at?->format('F d, Y \a\t H:i') ?? '-' }}</p>
+    </div>
+    <div class="flex flex-wrap gap-3 shrink-0 items-center">
+        <a href="{{ route('guidance.enrollments.print', $enrollment) }}" target="_blank" class="rounded-lg px-6 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity bg-slate-600">Print / Download</a>
+        @if(($enrollment->enrollment_status ?? '') === 'pending')
+        <form action="{{ route('guidance.enrollments.approve', $enrollment) }}" method="POST" class="inline">
+            @csrf
+            <input type="hidden" name="status" value="enrolled">
+            <button type="submit" class="rounded-lg px-6 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">Enroll</button>
+        </form>
+        <form action="{{ route('guidance.enrollments.approve', $enrollment) }}" method="POST" class="inline">
+            @csrf
+            <input type="hidden" name="status" value="temporarily_enrolled">
+            <button type="submit" class="rounded-lg px-6 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity bg-amber-500 hover:bg-amber-600">Temporarily Enroll</button>
+        </form>
+        @endif
+    </div>
+</div>
+
+@php
+$student = $enrollment->student;
+$application = $student?->application;
+$profile = $student?->profile;
+$gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $enrollment->grade_level));
+$documentLabels = [
+    'birth_certificate' => 'Birth Certificate',
+    'form_137' => 'Form 137 / SF9',
+    'good_moral' => 'Good Moral Certificate',
+    'id_photo' => '2x2 ID Photo',
+    'other' => 'Other Supporting Document',
+];
+@endphp
+
+<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 p-8 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h2 class="text-xs font-bold text-[#296374] uppercase tracking-wider">Enrollment Information</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+            <p class="text-xs font-semibold text-gray-500">LRN</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $student?->lrn ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Grade Level</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $gradeLabel }}</p>
+        </div>
+        @if(!empty($enrollment->semester))
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Semester</p>
+            <p class="text-sm font-semibold text-gray-800">{{ ucfirst($enrollment->semester) }} Semester</p>
+        </div>
+        @endif
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Learner Type</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $enrollment->learner_type ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Status</p>
+            <p class="text-sm">
+                @if(($enrollment->enrollment_status ?? '') === 'pending')
+                <span class="font-bold text-amber-600">Pending</span>
+                @elseif(($enrollment->enrollment_status ?? '') === 'enrolled')
+                <span class="font-bold" style="color: #296374;">Enrolled</span>
+                @elseif(($enrollment->enrollment_status ?? '') === 'temporarily_enrolled')
+                <span class="font-bold text-blue-600">Temporarily Enrolled</span>
+                @else
+                <span class="font-bold text-gray-600">{{ ucfirst(str_replace('_', ' ', $enrollment->enrollment_status ?? '-')) }}</span>
+                @endif
+            </p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">School Year</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $enrollment->academicYear?->school_year ?? '-' }}</p>
+        </div>
+        @if($enrollment->section)
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Section</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $enrollment->section->name ?? '-' }}</p>
+        </div>
+        @endif
+        @if($enrollment->cluster)
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Cluster</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $enrollment->cluster->name ?? '-' }}</p>
+        </div>
+        @endif
+        @if($enrollment->preferredCourse)
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Preferred Course</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $enrollment->preferredCourse->name ?? '-' }}</p>
+        </div>
+        @endif
+    </div>
+</div>
+
+@if($student)
+<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 p-8 mb-6">
+    <h2 class="text-xs font-bold text-[#296374] uppercase tracking-wider mb-4">Personal Information</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Last Name</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $application?->last_name ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">First Name</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $application?->first_name ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Middle Name</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $application?->middle_name ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Suffix</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $application?->suffix ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Birthdate</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $application?->birthdate?->format('M d, Y') ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Sex</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $student->sex ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Contact</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $application?->contact_no ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Religion</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $student->religion ?? '-' }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500">Mother Tongue</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $student->mother_tongue ?? '-' }}</p>
+        </div>
+    </div>
+    @if($profile && ($profile->is_4ps || $profile->is_ip || $profile->has_disability))
+    <div class="mt-6 pt-4 border-t border-gray-200">
+        <p class="text-xs font-bold text-[#296374] uppercase tracking-wider mb-3">4Ps / IP / PWD</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">4Ps Beneficiary</p>
+                <p class="text-sm font-semibold text-gray-800">{{ $profile->is_4ps ? 'Yes' : 'No' }}</p>
+                @if($profile->is_4ps && $profile->four_ps_household_id)
+                <p class="text-xs text-gray-600 mt-1">Household ID: {{ $profile->four_ps_household_id }}</p>
+                @endif
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Indigenous People (IP)</p>
+                <p class="text-sm font-semibold text-gray-800">{{ $profile->is_ip ? ($profile->ip_community ?: 'Yes') : 'No' }}</p>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Person with Disability (PWD)</p>
+                <p class="text-sm font-semibold text-gray-800">{{ $profile->has_disability ? ($profile->disability_name ?: 'Yes') : 'No' }}</p>
+            </div>
+        </div>
+    </div>
+    @endif
+</div>
+
+<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 p-8 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+            <h2 class="text-xs font-bold text-[#296374] uppercase tracking-wider">Supporting Enrollment Documents</h2>
+            <p class="text-sm text-gray-500 mt-1">Guidance can review, verify, or reject the student's uploaded requirements here.</p>
+        </div>
+        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold bg-slate-100 text-slate-700">
+            {{ isset($documents) ? $documents->count() : 0 }} uploaded
+        </span>
+    </div>
+
+    @if(isset($documents) && $documents->isNotEmpty())
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        @foreach($documents as $doc)
+        <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-5">
+            <div class="flex items-start justify-between gap-3 mb-3">
+                <div>
+                    <p class="text-xs font-bold text-[#296374] uppercase tracking-wider">
+                        {{ $documentLabels[$doc->doc_type] ?? ucwords(str_replace('_', ' ', $doc->doc_type ?? 'document')) }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">Uploaded {{ $doc->date_uploaded?->format('M d, Y h:i A') ?? '-' }}</p>
+                    @if($doc->date_verified)
+                    <p class="text-xs text-gray-500">Reviewed {{ $doc->date_verified->format('M d, Y h:i A') }}</p>
+                    @endif
+                </div>
+                @if(($doc->status ?? '') === 'verified')
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800">Verified</span>
+                @elseif(($doc->status ?? '') === 'rejected')
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800">Rejected</span>
+                @else
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-800">Pending</span>
+                @endif
+            </div>
+
+            @if($doc->file_path)
+            <a href="{{ route('guidance.documents.view', $doc) }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                View document
+            </a>
+            @else
+            <p class="text-sm text-gray-500">No file attached.</p>
+            @endif
+
+            @if(($doc->status ?? '') === 'pending')
+            <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
+                <form action="{{ route('guidance.documents.verify', $doc) }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white bg-green-600 hover:bg-green-700 transition-colors">
+                        Verify
+                    </button>
+                </form>
+                <form action="{{ route('guidance.documents.reject', $doc) }}" method="POST" class="inline" onsubmit="return confirm('Reject this uploaded document?')">
+                    @csrf
+                    <button type="submit" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white bg-red-600 hover:bg-red-700 transition-colors">
+                        Reject
+                    </button>
+                </form>
+            </div>
+            @endif
+        </div>
+        @endforeach
+    </div>
+    @else
+    <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50/70 px-6 py-8 text-center">
+        <p class="text-sm font-semibold text-gray-700">No supporting documents uploaded yet.</p>
+        <p class="text-xs text-gray-500 mt-1">The guidance office will see uploaded requirements here once the student submits them.</p>
+    </div>
+    @endif
+</div>
+
+@if($student->addresses && $student->addresses->isNotEmpty())
+<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 p-8 mb-6">
+    <h2 class="text-xs font-bold text-[#296374] uppercase tracking-wider mb-4">Addresses</h2>
+    @foreach($student->addresses as $addr)
+    <div class="mb-4 last:mb-0">
+        <p class="text-xs font-semibold text-gray-500 capitalize">{{ $addr->address_type ?? 'Address' }}</p>
+        <p class="text-sm text-gray-800">
+            {{ implode(', ', array_filter([$addr->house_no, $addr->street_name, $addr->barangay, $addr->municipality, $addr->province, $addr->country, $addr->zip_code])) ?: '-' }}
+        </p>
+    </div>
+    @endforeach
+</div>
+@endif
+
+@if($student->guardians && $student->guardians->isNotEmpty())
+<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 p-8 mb-6">
+    <h2 class="text-xs font-bold text-[#296374] uppercase tracking-wider mb-4">Parents / Guardians</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        @foreach($student->guardians as $g)
+        @php
+            $fullName = trim(implode(' ', array_filter([$g->first_name, $g->middle_name, $g->last_name, $g->suffix])));
+        @endphp
+        <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-5 flex flex-col">
+            <p class="text-xs font-bold text-[#296374] uppercase tracking-wider mb-2">{{ $g->relationship }}</p>
+            <p class="text-sm font-semibold text-gray-800 mb-1">{{ $fullName ?: '-' }}</p>
+            @if($g->contact_no)
+            <p class="text-sm text-gray-600 flex items-center gap-1.5 mt-auto pt-2 border-t border-gray-200/80">
+                <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.894.553l3.384 6.764a1 1 0 00.894.553H20a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"></path>
+                </svg>
+                {{ $g->contact_no }}
+            </p>
+            @endif
+        </div>
+        @endforeach
+    </div>
+</div>
+@endif
+@endif
+
+<div class="flex justify-end">
+    <a href="{{ route('guidance.enrollments.index') }}" class="rounded-lg px-6 py-3 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">Back to List</a>
+</div>
+<button type="button" id="scroll-to-top" class="fixed bottom-8 right-8 z-50 hidden w-12 h-12 rounded-full shadow-lg text-white flex items-center justify-center transition-opacity hover:opacity-90" style="background-color: #296374;" aria-label="Scroll to top">
+    <svg class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+</button>
+<script>
+    (function() {
+        var btn = document.getElementById('scroll-to-top');
+        if (!btn) return;
+
+        function toggle() {
+            btn.classList.toggle('hidden', window.scrollY < 300);
+        }
+        window.addEventListener('scroll', toggle);
+        toggle();
+        btn.addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    })();
+</script>
+@endsection
+
