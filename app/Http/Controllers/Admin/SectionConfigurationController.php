@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreSectionRequest;
 use App\Models\AcademicYear;
 use App\Models\Cluster;
 use App\Models\Curriculum;
@@ -11,7 +12,6 @@ use App\Models\Section;
 use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SectionConfigurationController extends Controller
@@ -28,6 +28,10 @@ class SectionConfigurationController extends Controller
         $gradeLevel = $request->string('grade_level')->toString();
         $syId = $request->integer('SY_ID');
         $curriculumId = $request->integer('curriculum_ID');
+        $status = $request->string('status')->toString();
+        if ($status === '') {
+            $status = 'active';
+        }
 
         $gradeId = GradeLevel::idForValue($gradeLevel);
 
@@ -51,6 +55,13 @@ class SectionConfigurationController extends Controller
             ->when($curriculumId > 0, function ($query) use ($curriculumId): void {
                 $query->where('curriculum_ID', $curriculumId);
             })
+            ->when($status === 'active', function ($query): void {
+                $query->where('status', true);
+            })
+            ->when($status === 'inactive', function ($query): void {
+                $query->where('status', false);
+            })
+            ->orderByDesc('status')
             ->orderByDesc('section_ID')
             ->paginate($perPage)
             ->withQueryString();
@@ -72,85 +83,49 @@ class SectionConfigurationController extends Controller
             'staffs' => $staffs,
             'gradeLevels' => GradeLevel::options(),
             'perPage' => $perPage,
+            'status' => $status,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreSectionRequest $request): RedirectResponse
     {
-        $syId = $request->integer('SY_ID');
-
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('sections', 'name')->where(fn ($query) => $query->where('SY_ID', $syId)),
-            ],
-            'cluster_ID' => ['nullable', 'integer', Rule::exists('clusters', 'cluster_ID')],
-            'grade_level' => ['required', Rule::in(['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12'])],
-            'staff_ID' => ['nullable', 'integer', Rule::exists('staffs', 'staff_id')],
-            'SY_ID' => ['required', 'integer', Rule::exists('academic_years', 'SY_ID')],
-            'curriculum_ID' => ['required', 'integer', Rule::exists('curriculum', 'curriculum_ID')],
-            'room' => ['nullable', 'string', 'max:255'],
-            'capacity' => ['required', 'integer', 'min:1'],
-        ]);
-
-        $validated['grade_ID'] = GradeLevel::idForValue($validated['grade_level']);
-        $isSeniorHigh = in_array($validated['grade_level'], ['grade_11', 'grade_12'], true);
-        if ($isSeniorHigh && empty($validated['cluster_ID'])) {
-            return back()->withErrors(['cluster_ID' => 'Cluster is required for senior high school sections.'])->withInput();
-        }
-        if (! $isSeniorHigh) {
-            $validated['cluster_ID'] = null;
-        }
-        unset($validated['grade_level']);
+        $validated = $this->sectionAttributes($request->validated());
+        $validated['status'] = true;
 
         Section::query()->create($validated);
 
         return back()->with('success', 'Section created successfully.');
     }
 
-    public function update(Request $request, Section $section): RedirectResponse
+    public function update(StoreSectionRequest $request, Section $section): RedirectResponse
     {
-        $syId = $request->integer('SY_ID');
-
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('sections', 'name')
-                    ->where(fn ($query) => $query->where('SY_ID', $syId))
-                    ->ignore($section->section_ID, 'section_ID'),
-            ],
-            'cluster_ID' => ['nullable', 'integer', Rule::exists('clusters', 'cluster_ID')],
-            'grade_level' => ['required', Rule::in(['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12'])],
-            'staff_ID' => ['nullable', 'integer', Rule::exists('staffs', 'staff_id')],
-            'SY_ID' => ['required', 'integer', Rule::exists('academic_years', 'SY_ID')],
-            'curriculum_ID' => ['required', 'integer', Rule::exists('curriculum', 'curriculum_ID')],
-            'room' => ['nullable', 'string', 'max:255'],
-            'capacity' => ['required', 'integer', 'min:1'],
-        ]);
-
-        $validated['grade_ID'] = GradeLevel::idForValue($validated['grade_level']);
-        $isSeniorHigh = in_array($validated['grade_level'], ['grade_11', 'grade_12'], true);
-        if ($isSeniorHigh && empty($validated['cluster_ID'])) {
-            return back()->withErrors(['cluster_ID' => 'Cluster is required for senior high school sections.'])->withInput();
-        }
-        if (! $isSeniorHigh) {
-            $validated['cluster_ID'] = null;
-        }
-        unset($validated['grade_level']);
-
-        $section->update($validated);
+        $section->update($this->sectionAttributes($request->validated()));
 
         return back()->with('success', 'Section updated successfully.');
     }
 
-    public function destroy(Section $section): RedirectResponse
+    public function toggleStatus(Section $section): RedirectResponse
     {
-        $section->delete();
+        if ($section->status) {
+            $section->update(['status' => false]);
 
-        return back()->with('success', 'Section deleted successfully.');
+            return back()->with('success', 'Section archived successfully.');
+        }
+
+        $section->update(['status' => true]);
+
+        return back()->with('success', 'Section activated successfully.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function sectionAttributes(array $validated): array
+    {
+        $validated['grade_ID'] = GradeLevel::idForValue($validated['grade_level']);
+        unset($validated['grade_level']);
+
+        return $validated;
     }
 }

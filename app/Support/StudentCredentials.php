@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Enrollment;
 use Illuminate\Support\Str;
 
 class StudentCredentials
@@ -19,6 +20,18 @@ class StudentCredentials
             .$enrollmentYear
             .'anhs'
         );
+    }
+
+    public static function enrollmentYear(?Enrollment $enrollment): int
+    {
+        $enrollment?->loadMissing('academicYear');
+
+        return (int) ($enrollment?->academicYear?->start_date?->year ?? now()->year);
+    }
+
+    public static function passwordFormatExample(int $enrollmentYear): string
+    {
+        return 'jado'.$enrollmentYear.'anhs';
     }
 
     private static function nameSegment(string $value): string

@@ -108,16 +108,20 @@ return [
     | Rate Limiting
     |--------------------------------------------------------------------------
     |
-    | By default, Fortify will throttle logins to five requests per minute for
-    | every email and IP address combination. However, if you would like to
-    | specify a custom rate limiter to call then you may specify it here.
+    | Failed login attempts are tracked by Fortify's login pipeline rather than
+    | HTTP throttling. After login_max_attempts consecutive failures, the
+    | account is locked for login_lockout_minutes before it can try again.
     |
     */
 
     'limiters' => [
-        'login' => 'login',
+        'login' => null,
         'two-factor' => 'two-factor',
     ],
+
+    'login_max_attempts' => 5,
+
+    'login_lockout_minutes' => 15,
 
     /*
     |--------------------------------------------------------------------------
@@ -143,7 +147,7 @@ return [
     |
     */
 
-    'features' => [        Features::resetPasswords(),
+    'features' => [Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([
             'confirm' => true,
@@ -153,4 +157,3 @@ return [
     ],
 
 ];
-

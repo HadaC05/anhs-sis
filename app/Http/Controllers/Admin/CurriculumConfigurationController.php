@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreCurriculumSubjectRequest;
 use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
+use App\Models\GradeLevel;
 use App\Models\Subject;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,6 +37,8 @@ class CurriculumConfigurationController extends Controller
         $curriculumSubjectGradeLevel = $request->string('curriculum_subjects_grade_level')->toString();
         $curriculumSubjectSemester = $request->string('curriculum_subjects_semester')->toString();
         $overviewCurriculumId = $request->integer('overview_curriculum_ID');
+        $gradeLevelOptions = GradeLevel::options();
+        $gradeLevelValues = collect($gradeLevelOptions)->pluck('value')->all();
 
         $curriculums = Curriculum::query()
             ->when($curriculumSearch !== '', function ($query) use ($curriculumSearch): void {
@@ -64,7 +68,7 @@ class CurriculumConfigurationController extends Controller
             ->when($curriculumSubjectClusterId > 0, function ($query) use ($curriculumSubjectClusterId): void {
                 $query->where('cluster_ID', $curriculumSubjectClusterId);
             })
-            ->when(in_array($curriculumSubjectGradeLevel, ['grade_11', 'grade_12'], true), function ($query) use ($curriculumSubjectGradeLevel): void {
+            ->when(in_array($curriculumSubjectGradeLevel, $gradeLevelValues, true), function ($query) use ($curriculumSubjectGradeLevel): void {
                 $query->where('grade_level', $curriculumSubjectGradeLevel);
             })
             ->when(in_array($curriculumSubjectSemester, ['first', 'second'], true), function ($query) use ($curriculumSubjectSemester): void {
@@ -112,6 +116,11 @@ class CurriculumConfigurationController extends Controller
             'curriculumOverview' => $curriculumOverview,
             'curriculumPerPage' => $curriculumPerPage,
             'curriculumSubjectsPerPage' => $curriculumSubjectsPerPage,
+            'gradeLevelOptions' => $gradeLevelOptions,
+            'totalCurriculums' => Curriculum::query()->count(),
+            'activeCurriculumCount' => Curriculum::query()->where('status', true)->count(),
+            'inactiveCurriculumCount' => Curriculum::query()->where('status', false)->count(),
+            'curriculumSubjectCount' => CurriculumSubject::query()->count(),
         ]);
     }
 
@@ -155,79 +164,16 @@ class CurriculumConfigurationController extends Controller
             : 'Curriculum archived successfully.');
     }
 
-    public function storeCurriculumSubject(Request $request): RedirectResponse
+    public function storeCurriculumSubject(StoreCurriculumSubjectRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'curriculum_ID' => ['required', 'integer', Rule::exists('curriculum', 'curriculum_ID')->where('status', true)],
-            'subject_ID' => ['required', 'integer', Rule::exists('subjects', 'subject_ID')->where('status', 'active')],
-            'cluster_ID' => ['required', 'integer', Rule::exists('clusters', 'cluster_ID')],
-            'grade_level' => ['required', Rule::in(['grade_11', 'grade_12'])],
-            'semester' => ['required', Rule::in(['first', 'second'])],
-        ]);
-
-        $subjectClusterId = Subject::query()
-            ->where('subject_ID', $validated['subject_ID'])
-            ->value('cluster_ID');
-
-        if ((int) $subjectClusterId !== (int) $validated['cluster_ID']) {
-            return back()->withErrors([
-                'cluster_ID' => 'Selected cluster does not match the selected subject.',
-            ]);
-        }
-
-        $duplicate = CurriculumSubject::query()
-            ->where('curriculum_ID', $validated['curriculum_ID'])
-            ->where('subject_ID', $validated['subject_ID'])
-            ->where('grade_level', $validated['grade_level'])
-            ->where('semester', $validated['semester'])
-            ->exists();
-
-        if ($duplicate) {
-            return back()->withErrors([
-                'subject_ID' => 'This subject is already assigned to the selected curriculum, grade level, and semester.',
-            ]);
-        }
-
-        CurriculumSubject::query()->create($validated);
+        CurriculumSubject::query()->create($request->validated());
 
         return back()->with('success', 'Curriculum subject added successfully.');
     }
 
-    public function updateCurriculumSubject(Request $request, CurriculumSubject $curriculumSubject): RedirectResponse
+    public function updateCurriculumSubject(StoreCurriculumSubjectRequest $request, CurriculumSubject $curriculumSubject): RedirectResponse
     {
-        $validated = $request->validate([
-            'curriculum_ID' => ['required', 'integer', Rule::exists('curriculum', 'curriculum_ID')->where('status', true)],
-            'subject_ID' => ['required', 'integer', Rule::exists('subjects', 'subject_ID')->where('status', 'active')],
-            'cluster_ID' => ['required', 'integer', Rule::exists('clusters', 'cluster_ID')],
-            'grade_level' => ['required', Rule::in(['grade_11', 'grade_12'])],
-            'semester' => ['required', Rule::in(['first', 'second'])],
-        ]);
-
-        $subjectClusterId = Subject::query()
-            ->where('subject_ID', $validated['subject_ID'])
-            ->value('cluster_ID');
-
-        if ((int) $subjectClusterId !== (int) $validated['cluster_ID']) {
-            return back()->withErrors([
-                'cluster_ID' => 'Selected cluster does not match the selected subject.',
-            ]);
-        }
-
-        $duplicate = CurriculumSubject::query()
-            ->where('curriculum_ID', $validated['curriculum_ID'])
-            ->where('subject_ID', $validated['subject_ID'])
-            ->where('grade_level', $validated['grade_level'])
-            ->where('semester', $validated['semester'])
-            ->where('curr_subj_ID', '!=', $curriculumSubject->curr_subj_ID)
-            ->exists();
-
-        if ($duplicate) {
-            return back()->withErrors([
-                'subject_ID' => 'This subject is already assigned to the selected curriculum, grade level, and semester.',
-            ]);
-        }
-
-        $curriculumSubject->update($validated);
+        $curriculumSubject->update($request->validated());
 
         return back()->with('success', 'Curriculum subject updated successfully.');
     }

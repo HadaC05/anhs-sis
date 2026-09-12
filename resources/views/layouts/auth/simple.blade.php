@@ -18,5 +18,6 @@
             </div>
         </div>
         @fluxScripts
+        <x-auth-session-sync />
     </body>
 </html>

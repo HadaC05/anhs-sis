@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Guidance Dashboard') | Agusan National High School</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('users.partials.sidebar-behavior')
     <style>
         .sidebar-link {
             display: flex;
@@ -21,13 +22,13 @@
         }
 
         .sidebar-link.active {
-            color: white;
-            background-color: #296374 !important;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            color: #296374;
+            background-color: rgba(41, 99, 116, 0.10) !important;
+            box-shadow: none;
         }
 
         .sidebar-link.active::before {
-            content: '';
+            display: none;
             position: absolute;
             left: 0;
             top: 50%;
@@ -62,7 +63,7 @@
         }
 
         .sidebar-link.active span {
-            color: white !important;
+            color: #296374 !important;
         }
     </style>
 </head>
@@ -71,36 +72,31 @@
     <header class="fixed top-0 left-0 right-0 w-full backdrop-blur-sm shadow-sm border-b border-white/20 z-50" style="background-color: #296374;">
         <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center pl-6">
+                <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </button>
                 <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-12 w-auto">
             </div>
 
-            <nav class="flex items-center flex-wrap justify-center gap-6 sm:gap-8 pr-6">
-                <div class="text-right">
-                    <p class="text-[10px] font-bold text-white/80 uppercase tracking-widest leading-none">Logged in as</p>
-                    <p class="text-sm font-semibold text-white">{{ Auth::user()->username }}</p>
-                </div>
-                <form action="{{ route('logout') }}" method="POST" class="border-l pl-4 border-white/30">
-                    @csrf
-                    <button type="submit" class="text-white hover:text-white/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">
-                        Logout
-                    </button>
-                </form>
+            <nav class="flex items-center flex-wrap justify-center gap-4 sm:gap-6 pr-6">
+                @include('users.partials.staff-profile-menu')
             </nav>
         </div>
     </header>
 
     <div class="min-h-screen flex relative pt-20" style="background-image: url('{{ asset('images/student-dash-image.png') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;">
-        <aside class="fixed left-0 top-20 bottom-0 w-72 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
+        <aside class="app-sidebar fixed left-0 top-20 bottom-0 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
             <div class="p-6 border-b border-gray-200/50 bg-gradient-to-r from-[#296374]/5 to-transparent">
                 <div class="flex items-center gap-3 mb-1">
-                    <div class="h-10 w-10 rounded-lg flex items-center justify-center shadow-md" style="background-color: #296374;">
+                    <div class="sidebar-user-icon h-10 w-10 rounded-lg flex items-center justify-center shadow-md" style="background-color: #296374;">
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z"></path>
                         </svg>
                     </div>
-                    <div>
-                        <h2 class="text-sm font-bold text-[#296374] uppercase tracking-wider">Guidance</h2>
-                        <p class="text-xs text-gray-500">Enrollment Office</p>
+                    <div class="sidebar-user-details min-w-0">
+                        <p class="sidebar-user-label">Signed in</p>
+                        <h2 class="truncate text-sm font-bold text-[#296374]">{{ trim(implode(' ', array_filter([Auth::user()?->first_name, Auth::user()?->middle_name, Auth::user()?->last_name, Auth::user()?->suffix]))) ?: (Auth::user()?->username ?? 'Guidance Officer') }}</h2>
+                        <p class="text-xs text-gray-500">Guidance Officer</p>
                     </div>
                 </div>
             </div>
@@ -120,26 +116,42 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
                             </svg>
-                            <span class="font-semibold">Enrollment Management</span>
+                            <span class="font-semibold">Enrollment</span>
+                        </a>
+                        <a href="{{ route('guidance.promotions.index') }}" class="sidebar-link {{ request()->routeIs('guidance.promotions.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h6m0 0v6m0-6-8 8-4-4-4 4"></path></svg>
+                            <span class="font-semibold">Promotions</span>
                         </a>
                         <a href="{{ route('guidance.sections.index') }}" class="sidebar-link {{ request()->routeIs('guidance.sections.index') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
                             </svg>
-                            <span class="font-semibold">Sectioning</span>
+                            <span class="font-semibold">Sections</span>
+                        </a>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reports</p>
+                        <a href="{{ route('guidance.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('guidance.reports.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6m-8 0h8m-8 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3m11 12h2a2 2 0 002-2V7a2 2 0 00-2-2h-3m-4 0h-4m4 0a2 2 0 11-4 0"></path>
+                            </svg>
+                            <span class="font-semibold">Age Alignment</span>
                         </a>
                     </div>
                 </nav>
             </div>
         </aside>
 
-        <main class="flex-1 ml-72 relative z-10">
+        <main class="app-main flex-1 relative">
             <div class="max-w-7xl mx-auto py-12 px-4 md:px-8">
                 @yield('content')
             </div>
         </main>
     </div>
+
+    @stack('modals')
+    <x-idle-session-timeout />
 </body>
 
 </html>
-

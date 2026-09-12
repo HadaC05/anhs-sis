@@ -6,10 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\Cluster;
 use App\Models\CurriculumSubject;
+use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
+use App\Models\GradeStatus;
 use App\Models\Section;
 use App\Models\Staff;
+use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
+use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -28,8 +32,18 @@ class TeacherAssignmentController extends Controller
             $perPage = 15;
         }
 
+        $advisoryPerPage = (int) $request->integer('advisory_per_page', 10);
+        if (! in_array($advisoryPerPage, [10, 15, 25, 50], true)) {
+            $advisoryPerPage = 10;
+        }
+
         $assignments = TeacherSubjectAssignment::query()
-            ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff.user'])
+            ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff.role'])
+            ->withCount([
+                'grades as locked_grades_count' => function ($query): void {
+                    $query->whereStatus([GradeStatus::SUBMITTED, GradeStatus::APPROVED]);
+                },
+            ])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->whereHas('section', fn ($q) => $q->where('name', 'like', "%{$search}%"))
@@ -47,14 +61,26 @@ class TeacherAssignmentController extends Controller
             ->when($clusterId !== '', fn ($q) => $q->whereHas('section', fn ($s) => $s->where('cluster_ID', $clusterId)))
             ->when($schoolYearId !== '', fn ($q) => $q->where('SY_ID', $schoolYearId))
             ->orderByDesc('updated_at')
-            ->paginate($perPage)
+            ->paginate($perPage, ['*'], 'subject_page')
             ->withQueryString();
 
         $sections = Section::query()
-            ->with(['cluster', 'gradeLevel', 'academicYear'])
+            ->with(['cluster', 'gradeLevel', 'academicYear', 'adviser'])
             ->orderBy('grade_ID')
             ->orderBy('name')
             ->get();
+
+        $advisorySections = Section::query()
+            ->with(['cluster', 'gradeLevel', 'academicYear', 'adviser'])
+            ->withCount(['enrollments as active_enrollments_count' => function ($query): void {
+                $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
+            }])
+            ->whereNotNull('staff_ID')
+            ->orderByDesc('SY_ID')
+            ->orderBy('grade_ID')
+            ->orderBy('name')
+            ->paginate($advisoryPerPage, ['*'], 'advisory_page')
+            ->withQueryString();
 
         $curriculumSubjects = CurriculumSubject::query()
             ->with('subject')
@@ -63,7 +89,7 @@ class TeacherAssignmentController extends Controller
             ->get();
 
         $teachers = Staff::query()
-            ->whereHas('user.role', fn ($q) => $q->where('role_name', 'teacher'))
+            ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
@@ -74,11 +100,18 @@ class TeacherAssignmentController extends Controller
         return view('users.admin.teacher-assignments', [
             'assignments' => $assignments,
             'sections' => $sections,
+            'advisorySections' => $advisorySections,
             'curriculumSubjects' => $curriculumSubjects,
             'teachers' => $teachers,
             'academicYears' => $academicYears,
             'clusters' => $clusters,
             'gradeLevels' => GradeLevel::options(),
+            'perPage' => $perPage,
+            'advisoryPerPage' => $advisoryPerPage,
+            'advisoryCount' => Section::query()->whereNotNull('staff_ID')->count(),
+            'unassignedSectionCount' => Section::query()->whereNull('staff_ID')->count(),
+            'assignmentCount' => TeacherSubjectAssignment::query()->count(),
+            'teacherCount' => $teachers->count(),
         ]);
     }
 
@@ -94,7 +127,7 @@ class TeacherAssignmentController extends Controller
         $curriculumSubject = CurriculumSubject::query()->findOrFail($validated['curr_subj_ID']);
         $teacher = Staff::query()
             ->where('staff_id', $validated['staff_ID'])
-            ->whereHas('user.role', fn ($q) => $q->where('role_name', 'teacher'))
+            ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
             ->first();
 
         if (! $teacher) {
@@ -137,7 +170,7 @@ class TeacherAssignmentController extends Controller
 
         $teacher = Staff::query()
             ->where('staff_id', $validated['staff_ID'])
-            ->whereHas('user.role', fn ($q) => $q->where('role_name', 'teacher'))
+            ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
             ->first();
 
         if (! $teacher) {
@@ -186,6 +219,7 @@ class TeacherAssignmentController extends Controller
             foreach ($subjects as $subject) {
                 if (! $this->curriculumSubjectMatchesSection($section, $subject)) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -225,7 +259,7 @@ class TeacherAssignmentController extends Controller
 
         $teacher = Staff::query()
             ->where('staff_id', $validated['staff_ID'])
-            ->whereHas('user.role', fn ($q) => $q->where('role_name', 'teacher'))
+            ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
             ->first();
 
         if (! $teacher) {
@@ -239,6 +273,74 @@ class TeacherAssignmentController extends Controller
         ]);
 
         return back()->with('status', 'Assignment updated successfully.');
+    }
+
+    public function assignAdvisory(Request $request)
+    {
+        $validated = $request->validate([
+            'section_ID' => ['required', 'integer', 'exists:sections,section_ID'],
+            'staff_ID' => ['required', 'integer', 'exists:staffs,staff_id'],
+        ]);
+
+        $section = Section::query()->findOrFail($validated['section_ID']);
+        $teacher = Staff::query()
+            ->where('staff_id', $validated['staff_ID'])
+            ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
+            ->first();
+
+        if (! $teacher) {
+            throw ValidationException::withMessages([
+                'staff_ID' => 'Selected staff is not a teacher.',
+            ]);
+        }
+
+        $existingAdvisory = Section::query()
+            ->where('staff_ID', $teacher->staff_id)
+            ->where('SY_ID', $section->SY_ID)
+            ->where('section_ID', '!=', $section->section_ID)
+            ->first();
+
+        if ($existingAdvisory) {
+            throw ValidationException::withMessages([
+                'staff_ID' => "This teacher is already adviser of {$existingAdvisory->name} for the same school year.",
+            ]);
+        }
+
+        $section->update([
+            'staff_ID' => $teacher->staff_id,
+        ]);
+
+        return back()->with('status', 'Advisory section assigned successfully.');
+    }
+
+    public function removeAdvisory(Section $section)
+    {
+        $section->update([
+            'staff_ID' => null,
+        ]);
+
+        return back()->with('status', 'Advisory assignment removed.');
+    }
+
+    public function unlockGrades(TeacherSubjectAssignment $assignment)
+    {
+        $updated = StudentSubjectGrade::query()
+            ->where('assignment_ID', $assignment->assignment_ID)
+            ->whereStatus(GradeStatus::teacherLockedSlugs())
+            ->update([
+                'grade_status_ID' => GradeStatus::idFor(GradeStatus::DRAFT),
+                'submitted_at' => null,
+                'reviewed_by' => null,
+                'reviewed_at' => null,
+            ]);
+
+        if ($updated === 0) {
+            return back()->with('status', 'No locked grades were found for this assignment.');
+        }
+
+        TeacherGradeNotifier::unlocked($assignment);
+
+        return back()->with('status', "{$updated} grade record(s) unlocked. The teacher can now update and resubmit them.");
     }
 
     public function destroy(TeacherSubjectAssignment $assignment)

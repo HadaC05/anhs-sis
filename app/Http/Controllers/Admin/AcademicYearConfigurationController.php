@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreAcademicYearRequest;
 use App\Models\AcademicYear;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AcademicYearConfigurationController extends Controller
@@ -28,53 +28,66 @@ class AcademicYearConfigurationController extends Controller
             ->when(in_array($status, ['active', 'inactive'], true), function ($query) use ($status): void {
                 $query->where('status', $status === 'active');
             })
+            ->orderByDesc('status')
+            ->orderByDesc('start_date')
             ->orderByDesc('SY_ID')
             ->paginate($perPage)
             ->withQueryString();
 
+        $totalYears = AcademicYear::query()->count();
+        $activeCount = AcademicYear::query()->where('status', true)->count();
+
         return view('users.admin.academic-year-config', [
             'academicYears' => $academicYears,
             'perPage' => $perPage,
+            'totalYears' => $totalYears,
+            'activeCount' => $activeCount,
+            'inactiveCount' => $totalYears - $activeCount,
+            'currentYear' => AcademicYear::query()
+                ->where('status', true)
+                ->orderByDesc('start_date')
+                ->orderByDesc('SY_ID')
+                ->first(),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreAcademicYearRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'school_year' => ['required', 'string', 'max:255', 'unique:academic_years,school_year'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after:start_date'],
-        ]);
+        $validated = $request->validated();
 
         AcademicYear::query()->create([
             'school_year' => $validated['school_year'],
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
-            'status' => true,
+            'status' => false,
         ]);
 
         return back()->with('success', 'Academic year created successfully.');
     }
 
-    public function update(Request $request, AcademicYear $academicYear): RedirectResponse
+    public function update(StoreAcademicYearRequest $request, AcademicYear $academicYear): RedirectResponse
     {
-        $validated = $request->validate([
-            'school_year' => ['required', 'string', 'max:255', Rule::unique('academic_years', 'school_year')->ignore($academicYear->SY_ID, 'SY_ID')],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after:start_date'],
-        ]);
+        $validated = $request->validated();
 
-        $academicYear->update($validated);
+        $academicYear->update([
+            'school_year' => $validated['school_year'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+        ]);
 
         return back()->with('success', 'Academic year updated successfully.');
     }
 
     public function toggleStatus(AcademicYear $academicYear): RedirectResponse
     {
-        $academicYear->update(['status' => ! $academicYear->status]);
+        if ($academicYear->status) {
+            $academicYear->update(['status' => false]);
 
-        return back()->with('success', $academicYear->status
-            ? 'Academic year activated successfully.'
-            : 'Academic year archived successfully.');
+            return back()->with('success', 'Academic year archived successfully.');
+        }
+
+        $academicYear->makeActive();
+
+        return back()->with('success', 'Academic year activated successfully.');
     }
 }

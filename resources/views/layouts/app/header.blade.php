@@ -73,6 +73,7 @@
 
         {{ $slot }}
 
+        <x-idle-session-timeout />
         @fluxScripts
     </body>
 </html>

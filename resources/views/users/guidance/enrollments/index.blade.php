@@ -3,198 +3,265 @@
 @section('title', 'Enrollment Management')
 
 @section('content')
-<div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">Enrollment Management</h1>
-    <p class="text-gray-600 text-sm md:text-base">Manage and review student enrollment applications for the current school year</p>
-    @if (!isset($activeYear) || !$activeYear)
-        <p class="mt-2 text-amber-600 text-sm font-medium">No active school year set. Enrollments will appear here once an admin sets the current school year.</p>
-    @endif
+@php
+    $statusParam = request('status');
+    $showAll = !request()->has('status') ? false : ($statusParam === '' || $statusParam === 'all');
+    $statusOptions = ['all' => 'All status'] + \App\Models\EnrollmentStatus::options();
+    $learnerOptions = ['' => 'All learners'] + \App\Models\LearnerType::options();
+@endphp
+
+<div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+        <h1 class="mt-1 text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Enrollment Management</h1>
+        @if (!isset($activeYear) || !$activeYear)
+            <p class="mt-2 text-sm font-medium text-amber-600">No active school year set. Enrollments will appear once an admin sets the current school year.</p>
+        @endif
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <a href="{{ route('guidance.enrollments.create') }}" class="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Register Student
+        </a>
+        <div class="rounded-lg border border-gray-200 bg-white/90 px-4 py-3 shadow-sm">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Showing</p>
+            <p class="text-sm font-semibold text-gray-700">{{ $enrollments?->total() ?? 0 }} enrollment records</p>
+        </div>
+    </div>
 </div>
 
-@if (session('status'))
-    <div class="mb-6 rounded-lg bg-green-100 border border-green-400 text-green-700 px-4 py-3">
+@if (session('status') && ! session('enrollment_result'))
+    <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
         {{ session('status') }}
     </div>
 @endif
 
 @if ($errors->any())
-    <div class="mb-6 rounded-lg bg-red-100 border border-red-400 text-red-700 px-4 py-3">
+    <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
         {{ $errors->first() }}
     </div>
 @endif
 
-<form method="GET" action="{{ route('guidance.enrollments.index') }}" class="mb-6 rounded-xl border border-gray-200 bg-white/80 p-8 shadow-sm">
+<form method="GET" action="{{ route('guidance.enrollments.index') }}" class="mb-5">
     <input type="hidden" name="per_page" value="{{ request('per_page', 15) }}">
 
-    <div class="mb-6">
-        <label for="search" class="block text-xs font-semibold text-gray-500 mb-1.5">Search</label>
-        <input type="text" name="search" id="search" value="{{ request('search') }}"
-               placeholder="Student name or LRN..."
-               class="w-full max-w-md border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-    </div>
+    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+        <div class="relative min-w-[220px] flex-1">
+            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
+            </svg>
+            <input type="search" name="search" id="search" value="{{ request('search') }}" placeholder="Search name or LRN"
+                class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
+        </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-x-12 gap-y-6">
-        <div class="px-2 sm:px-3">
-            <label for="status" class="block text-xs font-semibold text-gray-500 mb-1.5">Status</label>
-            <select name="status" id="status" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                @php $statusParam = request('status'); $showAll = !request()->has('status') ? false : ($statusParam === '' || $statusParam === 'all'); @endphp
-                <option value="all" {{ $showAll ? 'selected' : '' }}>All</option>
-                <option value="pending" {{ (!$showAll && ($statusParam === null || $statusParam === 'pending')) ? 'selected' : '' }}>Pending</option>
-                <option value="enrolled" {{ $statusParam === 'enrolled' ? 'selected' : '' }}>Enrolled</option>
-                <option value="temporarily_enrolled" {{ $statusParam === 'temporarily_enrolled' ? 'selected' : '' }}>Temporarily Enrolled</option>
-                <option value="completed" {{ $statusParam === 'completed' ? 'selected' : '' }}>Completed</option>
-                <option value="withdrawn" {{ $statusParam === 'withdrawn' ? 'selected' : '' }}>Withdrawn</option>
-                <option value="cancelled" {{ $statusParam === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-            </select>
-        </div>
-        <div class="px-2 sm:px-3">
-            <label for="learner_type" class="block text-xs font-semibold text-gray-500 mb-1.5">Learner Type</label>
-            <select name="learner_type" id="learner_type" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                <option value="">All</option>
-                <option value="regular" {{ request('learner_type') === 'regular' ? 'selected' : '' }}>Regular</option>
-                <option value="transferee" {{ request('learner_type') === 'transferee' ? 'selected' : '' }}>Transferee</option>
-                <option value="returnee" {{ request('learner_type') === 'returnee' ? 'selected' : '' }}>Returning Learner</option>
-            </select>
-        </div>
-        <div class="px-2 sm:px-3">
-            <label for="grade_level" class="block text-xs font-semibold text-gray-500 mb-1.5">Grade Level</label>
-            <select name="grade_level" id="grade_level" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                <option value="">All</option>
-                @foreach ($gradeLevels ?? [] as $level)
-                    <option value="{{ $level['value'] }}" {{ request('grade_level') === $level['value'] ? 'selected' : '' }}>{{ $level['label'] }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="px-2 sm:px-3">
-            <label for="academic_year_id" class="block text-xs font-semibold text-gray-500 mb-1.5">School Year</label>
-            <select name="academic_year_id" id="academic_year_id" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                <option value="">Current</option>
-                <option value="all" {{ request('academic_year_id') === 'all' ? 'selected' : '' }}>All years</option>
-                @foreach ($academicYears ?? [] as $ay)
-                    <option value="{{ $ay->SY_ID }}" {{ request('academic_year_id') == $ay->SY_ID ? 'selected' : '' }}>{{ $ay->school_year }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="px-2 sm:px-3">
-            <label for="date_from" class="block text-xs font-semibold text-gray-500 mb-1.5">Date From</label>
-            <input type="date" name="date_from" id="date_from" value="{{ request('date_from') }}"
-                   class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-        </div>
-        <div class="px-2 sm:px-3">
-            <label for="date_to" class="block text-xs font-semibold text-gray-500 mb-1.5">Date To</label>
-            <input type="date" name="date_to" id="date_to" value="{{ request('date_to') }}"
-                   class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-        </div>
-    </div>
+        <select name="status" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            @foreach ($statusOptions as $value => $label)
+                @php
+                    $selected = $value === 'all'
+                        ? $showAll
+                        : (!$showAll && ($statusParam === $value || ($statusParam === null && $value === 'temporarily_enrolled')));
+                @endphp
+                <option value="{{ $value }}" {{ $selected ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
 
-    <div class="mt-8 pt-6 border-t border-gray-200">
-        <button type="submit" class="rounded-lg px-6 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">Apply filters</button>
+        <select name="learner_type" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            @foreach ($learnerOptions as $value => $label)
+                <option value="{{ $value }}" {{ request('learner_type') === $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
+
+        <select name="grade_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <option value="">All grades</option>
+            @foreach ($gradeLevels ?? [] as $level)
+                <option value="{{ $level['value'] }}" {{ request('grade_level') === $level['value'] ? 'selected' : '' }}>{{ $level['label'] }}</option>
+            @endforeach
+        </select>
+
+        <select name="academic_year_id" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <option value="">Current year</option>
+            <option value="all" {{ request('academic_year_id') === 'all' ? 'selected' : '' }}>All years</option>
+            @foreach ($academicYears ?? [] as $ay)
+                <option value="{{ $ay->SY_ID }}" {{ request('academic_year_id') == $ay->SY_ID ? 'selected' : '' }}>{{ $ay->school_year }}</option>
+            @endforeach
+        </select>
+
+        <details class="relative">
+            <summary class="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition hover:border-[#296374]/40">
+                <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10m-7 6h4"></path>
+                </svg>
+                Dates
+            </summary>
+            <div class="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-xl">
+                <div class="grid gap-3">
+                    <div>
+                        <label for="date_from" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Date from</label>
+                        <input type="date" name="date_from" id="date_from" value="{{ request('date_from') }}" class="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    </div>
+                    <div>
+                        <label for="date_to" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Date to</label>
+                        <input type="date" name="date_to" id="date_to" value="{{ request('date_to') }}" class="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12M10 20h4"></path>
+            </svg>
+            Apply
+        </button>
+        <a href="{{ route('guidance.enrollments.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
     </div>
 </form>
 
-<form method="POST" action="{{ route('guidance.enrollments.bulk-approve') }}" class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 overflow-hidden">
+<form method="POST" action="{{ route('guidance.enrollments.bulk-approve') }}" class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     @csrf
-    <div class="px-6 py-4 border-b border-white/20 bg-white/40 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+    <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div class="flex items-center gap-3">
             <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-600">
-                <input type="checkbox" id="select-all" class="h-4 w-4 rounded border-gray-300">
+                <input type="checkbox" id="select-all" class="h-4 w-4 rounded border-gray-300 text-[#296374] focus:ring-[#296374]">
                 Select all
             </label>
-            <span class="text-xs text-gray-500" id="selected-count">0 selected</span>
+            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500" id="selected-count">0 selected</span>
         </div>
         <div class="flex flex-wrap gap-2">
             <input type="hidden" name="status" id="bulk-status" value="enrolled">
-            <button type="submit" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">Enroll Selected</button>
-            <button type="submit" onclick="document.getElementById('bulk-status').value='temporarily_enrolled'" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md bg-amber-500 hover:bg-amber-600">Temporary Enroll</button>
-            <button type="submit" formaction="{{ route('guidance.enrollments.print-multiple') }}" formtarget="_blank" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md bg-slate-600 hover:bg-slate-700">Print Selected</button>
+            <button type="button" data-bulk-status="enrolled" class="bulk-enroll-trigger inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm" style="background-color: #296374;" title="Mark selected as enrolled">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"></path></svg>
+            </button>
+            <button type="button" data-bulk-status="temporarily_enrolled" class="bulk-enroll-trigger inline-flex h-9 items-center gap-2 rounded-lg bg-amber-500 px-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm hover:bg-amber-600" title="Mark selected as temporarily enrolled">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path></svg>
+            </button>
+            <select id="bulk-status-choice" class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">Set statusâ€¦</option>
+                @foreach (\App\Models\EnrollmentStatus::options() as $slug => $label)
+                    <option value="{{ $slug }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <button type="button" id="bulk-status-apply" class="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold uppercase tracking-wide text-gray-700 shadow-sm transition hover:bg-gray-50">
+                Apply
+            </button>
+            <button type="submit" formaction="{{ route('guidance.enrollments.print-multiple') }}" formtarget="_blank" class="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-600 px-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm hover:bg-slate-700">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2m-12 0h12v4H6v-4z"></path></svg>
+            </button>
         </div>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full text-left">
+        <table class="w-full min-w-[860px] border-collapse text-left">
             <thead>
-                <tr class="text-xs font-bold text-[#296374] uppercase tracking-wider border-b border-white/20 bg-white/30">
-                    <th class="px-6 py-4">
-                        <span class="sr-only">Select</span>
-                    </th>
-                    <th class="px-6 py-4">Student Name</th>
-                    <th class="px-6 py-4">Grade Level</th>
-                    <th class="px-6 py-4">Learner Type</th>
-                    <th class="px-6 py-4">LRN</th>
-                    <th class="px-6 py-4">Status</th>
-                    <th class="px-6 py-4">Date Submitted</th>
-                    <th class="px-6 py-4 text-right">Action</th>
+                <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                    <th class="w-12 border-r border-gray-200 px-4 py-4"><span class="sr-only">Select</span></th>
+                    <th class="border-r border-gray-200 px-5 py-4">Student</th>
+                    <th class="border-r border-gray-200 px-5 py-4">Grade</th>
+                    <th class="border-r border-gray-200 px-5 py-4">LRN</th>
+                    <th class="border-r border-gray-200 px-5 py-4">Status</th>
+                    <th class="border-r border-gray-200 px-5 py-4">Submitted</th>
+                    <th class="px-5 py-4 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-white/20">
+            <tbody class="divide-y divide-gray-200 text-sm">
                 @forelse($enrollments ?? [] as $enrollment)
                     @php
                         $student = $enrollment->student;
                         $application = $student?->application;
-                        $name = $application ? $application->last_name . ', ' . $application->first_name . ($application->middle_name ? ' ' . $application->middle_name : '') : ($student?->user?->name ?? '—');
+                        $firstName = $application?->first_name ?? $student?->first_name;
+                        $lastName = $application?->last_name ?? $student?->last_name;
+                        $middleName = $application?->middle_name ?? $student?->middle_name;
+                        $name = trim(($lastName ? $lastName.', ' : '').($firstName ?? '').($middleName ? ' '.$middleName : '')) ?: 'Unnamed student';
                         $gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $enrollment->grade_level));
+                        $status = $enrollment->enrollment_status ?? '';
+                        $statusClasses = match ($status) {
+                            'pending' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                            'enrolled' => 'bg-[#296374]/10 text-[#296374] ring-[#296374]/20',
+                            'temporarily_enrolled' => 'bg-blue-50 text-blue-700 ring-blue-200',
+                            'transferred_out' => 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+                            'dropped_out' => 'bg-red-50 text-red-700 ring-red-200',
+                            'withdrawn' => 'bg-orange-50 text-orange-700 ring-orange-200',
+                            'cancelled' => 'bg-gray-100 text-gray-600 ring-gray-200',
+                            'no_show' => 'bg-rose-50 text-rose-700 ring-rose-200',
+                            default => 'bg-gray-100 text-gray-700 ring-gray-200',
+                        };
+                        $placementRecommended = $enrollment->placementAssessmentRecommendation();
                     @endphp
-                    <tr class="hover:bg-white/30 transition-all bg-white/10">
-                        <td class="px-6 py-4">
-                            <input type="checkbox" name="enrollment_ids[]" value="{{ $enrollment->enrollment_ID }}" class="row-checkbox h-4 w-4 rounded border-gray-300">
+                    <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06] {{ $enrollment->hasPlacementStatusMark() ? 'ring-1 ring-inset ring-[#296374]/20' : '' }}">
+                        <td class="border-r border-gray-100 px-4 py-4">
+                            <input type="checkbox" name="enrollment_ids[]" value="{{ $enrollment->enrollment_ID }}" class="row-checkbox h-4 w-4 rounded border-gray-300 text-[#296374] focus:ring-[#296374]">
                         </td>
-                        <td class="px-6 py-4">
-                            <p class="text-sm font-bold text-gray-800">{{ $name }}</p>
+                        <td class="border-r border-gray-100 px-5 py-4">
+                            <p class="font-semibold text-gray-900">{{ $name }}</p>
+                            <div class="mt-1 flex flex-wrap gap-1.5">
+                                @if ($enrollment->hasPlacementStatusMark())
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 {{ \App\Models\PlacementStatus::badgeClasses($enrollment->placement_status) }}" title="Placement test: {{ $enrollment->placement_status_label }}">
+                                        {{ $enrollment->placement_status_label }}
+                                    </span>
+                                @elseif ($placementRecommended)
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200" title="{{ $placementRecommended['summary'] ?? $placementRecommended['message'] }}">
+                                        Age review
+                                    </span>
+                                @endif
+                            </div>
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="text-sm font-semibold text-gray-700">{{ $gradeLabel }}</span>
+                        <td class="border-r border-gray-100 px-5 py-4">
+                            <p class="font-semibold text-gray-700">{{ $gradeLabel }}</p>
                             @if(!empty($enrollment->semester))
-                                <span class="text-xs text-gray-500 block">Sem {{ ucfirst($enrollment->semester) }}</span>
+                                <p class="text-xs text-gray-400">Sem {{ ucfirst($enrollment->semester) }}</p>
                             @endif
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="text-sm text-gray-700">{{ $enrollment->learner_type ?? '—' }}</span>
+                        <td class="border-r border-gray-100 px-5 py-4 font-mono text-xs font-semibold text-gray-700">{{ $student?->lrn ?? '-' }}</td>
+                        <td class="border-r border-gray-100 px-5 py-4">
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusClasses }}">
+                                {{ $enrollment->enrollment_status_label ?: '-' }}
+                            </span>
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="text-sm text-gray-700 font-mono">{{ $student?->lrn ?? '—' }}</span>
-                        </td>
-                        <td class="px-6 py-4">
-                            @if(($enrollment->enrollment_status ?? '') === 'pending')
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-amber-700 bg-amber-100">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span> Pending
-                                </span>
-                            @elseif(($enrollment->enrollment_status ?? '') === 'enrolled')
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-white" style="background-color: #296374;">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-white/80"></span> Enrolled
-                                </span>
-                            @elseif(($enrollment->enrollment_status ?? '') === 'temporarily_enrolled')
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-100">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span> Temporarily Enrolled
-                                </span>
-                            @else
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-gray-700 bg-gray-100">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-gray-500"></span> {{ ucfirst(str_replace('_', ' ', $enrollment->enrollment_status ?? '—')) }}
-                                </span>
-                            @endif
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="text-sm text-gray-600">{{ $enrollment->created_at?->format('M d, Y') ?? '—' }}</span>
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex justify-end gap-2">
-                                <a href="{{ route('guidance.enrollments.show', $enrollment) }}" class="inline-block text-white text-xs font-bold uppercase tracking-wide px-4 py-2 rounded-lg shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">View</a>
-                                <a href="{{ route('guidance.enrollments.print', $enrollment) }}" target="_blank" class="inline-block text-xs font-bold uppercase tracking-wide px-4 py-2 rounded-lg shadow-md bg-slate-600 text-white hover:opacity-90 transition-opacity">Print</a>
+                        <td class="border-r border-gray-100 px-5 py-4 font-medium text-gray-700">{{ $enrollment->created_at?->format('M d, Y') ?? '-' }}</td>
+                        <td class="px-5 py-4">
+                            <div class="flex justify-end gap-1.5">
+                                <a href="{{ route('guidance.enrollments.show', $enrollment) }}" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.46 12C3.73 7.94 7.52 5 12 5s8.27 2.94 9.54 7c-1.27 4.06-5.06 7-9.54 7S3.73 16.06 2.46 12z"></path></svg>
+                                </a>
+                                <a href="{{ route('guidance.enrollments.edit', $enrollment) }}" title="Edit enrollment details" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </a>
+                                <a href="{{ route('guidance.enrollments.print', $enrollment) }}" target="_blank" title="Print enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2m-12 0h12v4H6v-4z"></path></svg>
+                                </a>
                             </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
-                            No enrollments found for this school year.
+                        <td colspan="7" class="px-6 py-16 text-center">
+                            <div class="mx-auto flex max-w-sm flex-col items-center gap-3 text-gray-500">
+                                <div class="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+                                    <svg class="h-7 w-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l3.414 3.414A1 1 0 0 1 17 7.414V19a2 2 0 0 1-2 2z"></path>
+                                    </svg>
+                                </div>
+                                <p class="font-semibold text-gray-700">No enrollments found</p>
+                                <p class="text-sm">Try adjusting the filters or search term, or register a student.</p>
+                                <a href="{{ route('guidance.enrollments.create') }}" class="mt-1 text-sm font-semibold text-[#296374] hover:underline">Register Student</a>
+                            </div>
                         </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
+
     @isset($enrollments)
-        <div class="px-6 py-4 border-t border-white/20 bg-white/20">
-            {{ $enrollments->links() }}
+        <div class="flex flex-col gap-3 border-t border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-500 md:flex-row md:items-center md:justify-between">
+            <span>
+                Showing {{ $enrollments->firstItem() ?? 0 }} to {{ $enrollments->lastItem() ?? 0 }} of {{ $enrollments->total() }} records
+            </span>
+            <div>
+                {{ $enrollments->links() }}
+            </div>
         </div>
     @endisset
 </form>
@@ -228,4 +295,8 @@
         updateCount();
     })();
 </script>
+
+@include('users.guidance.enrollments.partials.enrollment-flow-modals', [
+    'confirmContext' => 'bulk',
+])
 @endsection

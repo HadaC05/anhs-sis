@@ -1,5 +1,17 @@
 <?php
 
+$defaultMailer = env('MAIL_MAILER', 'log');
+$smtpUsername = env('MAIL_USERNAME');
+$fromAddress = env('MAIL_FROM_ADDRESS');
+
+if ($defaultMailer === 'log' && filled($smtpUsername) && filled(env('MAIL_PASSWORD'))) {
+    $defaultMailer = 'smtp';
+}
+
+if (! filled($fromAddress) && filter_var((string) $smtpUsername, FILTER_VALIDATE_EMAIL)) {
+    $fromAddress = $smtpUsername;
+}
+
 return [
 
     /*
@@ -12,9 +24,12 @@ return [
     | the message. All additional mailers can be configured within the
     | "mailers" array. Examples of each type of mailer are provided.
     |
+    | When SMTP credentials are present, log is upgraded to smtp so password
+    | reset emails can be delivered through the free Brevo mailer.
+    |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    'default' => $defaultMailer,
 
     /*
     |--------------------------------------------------------------------------
@@ -111,8 +126,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => filled($fromAddress) ? $fromAddress : 'hello@example.com',
+        'name' => filled(env('MAIL_FROM_NAME')) ? env('MAIL_FROM_NAME') : 'Agusan National High School',
     ],
 
 ];

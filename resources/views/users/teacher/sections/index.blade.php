@@ -1,115 +1,250 @@
-@extends('users.teacher.layout')
+ï»¿@extends('users.teacher.layout')
 
 @section('title', 'Sections')
 
 @section('content')
 <div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">My Sections & Subjects</h1>
-    <p class="text-gray-600 text-sm md:text-base">View subjects grouped by section for faster grading.</p>
+    <div class="flex items-center gap-3 mb-2">
+        <div class="h-12 w-12 rounded-xl flex items-center justify-center shadow-lg" style="background: linear-gradient(135deg, #296374 0%, #1e4d5c 100%);">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+        </div>
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Sections</h1>
+        </div>
+    </div>
 </div>
 
-<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 overflow-hidden">
-    <div class="px-8 py-5 border-b border-white/20 bg-white/50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-            <h3 class="font-bold text-[#296374] text-lg">Assigned Sections</h3>
-            <p class="text-xs text-gray-600 mt-1">Open a section and choose a subject to input grades.</p>
-        </div>
-        <form method="GET" class="flex flex-wrap items-end gap-3">
-            <div>
-                <label for="search" class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Search</label>
-                <input type="text" id="search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Section or subject" class="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-            </div>
-            <div>
-                <label for="grade_level" class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Grade</label>
-                <select name="grade_level" id="grade_level" class="w-36 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                    <option value="">All</option>
-                    @foreach ($gradeLevels ?? [] as $level)
-                        <option value="{{ $level['value'] }}" {{ ($filters['grade_level'] ?? '') === $level['value'] ? 'selected' : '' }}>{{ $level['label'] }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label for="cluster_ID" class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Cluster</label>
-                <select name="cluster_ID" id="cluster_ID" class="w-56 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                    <option value="">All</option>
-                    @foreach ($clusters ?? [] as $cluster)
-                        <option value="{{ $cluster->cluster_ID }}" {{ ($filters['cluster_ID'] ?? '') == $cluster->cluster_ID ? 'selected' : '' }}>{{ $cluster->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label for="SY_ID" class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">School Year</label>
-                <select name="SY_ID" id="SY_ID" class="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                    <option value="">All</option>
-                    @foreach ($academicYears ?? [] as $year)
-                        <option value="{{ $year->SY_ID }}" {{ ($filters['SY_ID'] ?? '') == $year->SY_ID ? 'selected' : '' }}>{{ $year->school_year }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label for="per_page" class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Per Page</label>
-                <select name="per_page" id="per_page" class="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none bg-white shadow-sm">
-                    @foreach ([10, 20, 50] as $size)
-                        <option value="{{ $size }}" {{ ($filters['per_page'] ?? 10) == $size ? 'selected' : '' }}>{{ $size }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg text-xs font-bold text-white uppercase tracking-wide shadow-md transition-all hover:-translate-y-0.5" style="background-color: #296374;">
+@if (session('status'))
+<div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+    {{ session('status') }}
+</div>
+@endif
+
+@if ($errors->has('class_list'))
+<div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+    {{ $errors->first('class_list') }}
+</div>
+@endif
+
+@php
+$sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator ? $sections->getCollection() : $sections;
+$importWarnings = session('class_list_import_warnings', []);
+@endphp
+
+@if (! empty($importWarnings))
+<div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+    <p class="font-semibold">Some learners were skipped:</p>
+    <ul class="mt-2 list-disc pl-5 space-y-1">
+        @foreach ($importWarnings as $warning)
+        <li>{{ $warning }}</li>
+        @endforeach
+    </ul>
+</div>
+@endif
+
+<div class="mb-6">
+    <form method="GET" action="{{ route('teacher.sections.index') }}">
+        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+            <input
+                type="text"
+                id="search"
+                name="search"
+                value="{{ $filters['search'] ?? '' }}"
+                placeholder="Section or subject"
+                class="h-10 w-44 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+
+            <select name="grade_level" id="grade_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All levels</option>
+                @foreach ($gradeLevels ?? [] as $level)
+                <option value="{{ $level['value'] }}" {{ ($filters['grade_level'] ?? '') === $level['value'] ? 'selected' : '' }}>{{ $level['label'] }}</option>
+                @endforeach
+            </select>
+
+            <select name="cluster_ID" id="cluster_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All clusters</option>
+                @foreach ($clusters ?? [] as $cluster)
+                <option value="{{ $cluster->cluster_ID }}" {{ ($filters['cluster_ID'] ?? '') == $cluster->cluster_ID ? 'selected' : '' }}>{{ $cluster->name }}</option>
+                @endforeach
+            </select>
+
+            <select name="SY_ID" id="SY_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All school years</option>
+                @foreach ($academicYears ?? [] as $year)
+                <option value="{{ $year->SY_ID }}" {{ ($filters['SY_ID'] ?? '') == $year->SY_ID ? 'selected' : '' }}>{{ $year->school_year }}</option>
+                @endforeach
+            </select>
+
+            <select name="per_page" id="per_page" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                @foreach ([10, 20, 50] as $size)
+                <option value="{{ $size }}" {{ ($filters['per_page'] ?? 10) == $size ? 'selected' : '' }}>{{ $size }} per page</option>
+                @endforeach
+            </select>
+
+            <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12M10 20h4"></path>
+                </svg>
                 Apply
             </button>
-            <a href="{{ route('teacher.sections.index') }}" class="inline-flex items-center px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide text-gray-600 border border-gray-300 bg-white hover:text-[#296374]">
-                Reset
-            </a>
-        </form>
-    </div>
+            <a href="{{ route('teacher.sections.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+        </div>
+    </form>
+</div>
 
+@if ($sectionList->isNotEmpty())
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    @foreach ($sectionList as $section)
     @php
-        $grouped = $assignments instanceof \Illuminate\Pagination\LengthAwarePaginator
-            ? $assignments->getCollection()->groupBy('section_ID')
-            : $assignments->groupBy('section_ID');
+    $assignments = $section->teacherSubjectAssignments ?? collect();
+    $importAssignment = $assignments->first();
+    $cap = (int) ($section->capacity ?? 0);
+    $count = (int) ($section->active_enrollments_count ?? 0);
+    $pct = $cap > 0 ? min(100, (int) round(100 * $count / $cap)) : 0;
+    $barColor = $pct >= 100 ? 'bg-red-500' : ($pct >= 80 ? 'bg-amber-500' : 'bg-[#296374]');
+    $badgeColor = $pct >= 100 ? 'bg-red-500' : ($pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500');
+    $statusLabel = $pct >= 100 ? 'full' : ($pct >= 80 ? 'near full' : 'open');
+    $gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $section->grade_level));
+    $gradeInitial = strtoupper(str_replace('grade_', 'G', $section->grade_level));
+    $schoolYear = $section->academicYear?->school_year ?? 'N/A';
     @endphp
 
-    <div class="divide-y divide-white/20">
-        @forelse($grouped as $sectionId => $items)
-            @php
-                $section = $items->first()?->section;
-                $gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $section?->grade_level));
-                $clusterName = $section?->cluster?->name;
-            @endphp
-            <div class="p-6">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                    <div>
-                        <h4 class="text-lg font-bold text-gray-800">{{ $section?->name ?? 'Section' }}</h4>
-                        <p class="text-xs text-gray-500">{{ $gradeLabel }} {{ $clusterName ? '• ' . $clusterName : '' }} • {{ $section?->academicYear?->school_year ?? 'N/A' }}</p>
-                    </div>
-                    <div class="text-xs text-gray-600">Students: {{ $section?->active_enrollments_count ?? 0 }} | Capacity: {{ $section?->capacity ?? 0 }}</div>
-                </div>
+    <div class="relative flex min-h-[190px] flex-col rounded-lg border border-gray-200/80 bg-white p-5 shadow-md shadow-slate-200/70">
+        <span class="absolute right-0 top-4 rounded-l-sm {{ $badgeColor }} px-3 py-1 text-[11px] font-bold lowercase text-white shadow-sm">{{ $statusLabel }}</span>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    @foreach($items as $assignment)
-                        @php
-                            $subject = $assignment->curriculumSubject?->subject;
-                            $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
-                        @endphp
-                        <div class="rounded-xl border border-gray-200 bg-white/80 p-4 shadow-sm">
-                            <div class="text-sm font-semibold text-gray-800">{{ $subjectLabel }}</div>
-                            @if($assignment->curriculumSubject?->semester)
-                                <div class="text-xs text-gray-500 mt-1">Semester: {{ ucfirst($assignment->curriculumSubject->semester) }}</div>
-                            @endif
-                            <a href="{{ route('teacher.sections.show', $assignment) }}" class="inline-flex items-center mt-3 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">
-                                Input Grades
-                            </a>
-                        </div>
-                    @endforeach
-                </div>
+        <div class="flex items-start gap-4 pr-16">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-md" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);">
+                {{ $gradeInitial }}
+            </span>
+            <div class="min-w-0">
+                <h2 class="truncate text-base font-bold text-gray-800">{{ $section->name }}</h2>
+                <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $gradeLabel }}</p>
             </div>
-        @empty
-            <div class="px-8 py-8 text-center text-gray-500">No subjects assigned yet.</div>
-        @endforelse
-    </div>
+        </div>
 
-    <div class="px-8 py-5 border-t border-white/20 bg-white/50">
-        {{ $assignments->links() }}
+        <div class="mt-5 space-y-2 text-sm text-gray-600">
+            <div class="flex items-center gap-2">
+                <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="truncate">{{ $schoolYear }}</span>
+            </div>
+            @if ($section->cluster?->name)
+            <div class="flex items-center gap-2">
+                <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+                </svg>
+                <span class="truncate">{{ $section->cluster->name }}</span>
+            </div>
+            @endif
+            @if ($section->room)
+            <div class="flex items-center gap-2">
+                <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"></path>
+                </svg>
+                <span class="truncate font-mono">{{ $section->room }}</span>
+            </div>
+            @endif
+            <div class="flex items-center gap-2">
+                <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-5a4 4 0 11-8 0 4 4 0 018 0zm8 0a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span class="font-semibold text-gray-700">{{ $count }}</span>
+                <span>of {{ $cap ?: 'unlimited' }} students</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                <span>{{ $assignments->count() }} {{ Str::plural('subject', $assignments->count()) }} assigned</span>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <div class="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                <span>Capacity</span>
+                <span>{{ $pct }}%</span>
+            </div>
+            <div class="h-2 rounded-full bg-gray-200">
+                <div class="h-full rounded-full {{ $barColor }} transition-all" style="width: {{ $pct }}%;"></div>
+            </div>
+        </div>
+
+        <details class="group mt-5 border-t border-gray-100 pt-4">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 [&::-webkit-details-marker]:hidden">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                    Subjects
+                    <span class="ml-1 normal-case tracking-normal text-gray-500">({{ $assignments->count() }})</span>
+                </span>
+                <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </summary>
+
+            <div class="mt-3 space-y-2">
+                @forelse ($assignments as $assignment)
+                @php
+                $subject = $assignment->curriculumSubject?->subject;
+                $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
+                $semester = $assignment->curriculumSubject?->semester;
+                @endphp
+                <div class="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                    <div class="min-w-0">
+                        <p class="truncate text-xs font-semibold text-gray-800">{{ $subjectLabel }}</p>
+                        <p class="text-[10px] text-gray-500">{{ $semester ? ucfirst($semester) . ' semester' : 'Full year' }}</p>
+                    </div>
+                    <a href="{{ route('teacher.sections.show', $assignment) }}" class="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+                        Grades
+                    </a>
+                </div>
+                @empty
+                <p class="text-xs text-gray-500">No subjects assigned for this section.</p>
+                @endforelse
+            </div>
+
+            <details class="group/import mt-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2 transition hover:border-emerald-300 hover:bg-emerald-50/50 [&::-webkit-details-marker]:hidden">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Class List Import</span>
+                    <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open/import:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </summary>
+                <div class="mt-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                    <p class="text-[10px] text-gray-500">Upload XLSX, CSV, or TXT with LRN and learner name columns.</p>
+                    @if ($importAssignment)
+                    <form action="{{ route('teacher.sections.class-list.import', $importAssignment) }}" method="POST" enctype="multipart/form-data" class="mt-3 space-y-2">
+                        @csrf
+                        <label class="sr-only" for="class_list_{{ $section->section_ID }}">Class List File</label>
+                        <input id="class_list_{{ $section->section_ID }}" type="file" name="class_list" accept=".xlsx,.csv,.txt" required class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-700 file:mr-2 file:rounded-md file:border-0 file:bg-[#296374] file:px-2 file:py-1 file:text-[10px] file:font-bold file:text-white">
+                        <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-700">
+                            Import Class List
+                        </button>
+                    </form>
+                    @else
+                    <p class="mt-2 rounded-lg bg-white px-3 py-2 text-[10px] text-gray-500">Import becomes available when a subject is assigned.</p>
+                    @endif
+                </div>
+            </details>
+        </details>
     </div>
+    @endforeach
 </div>
+
+@if ($sections instanceof \Illuminate\Pagination\LengthAwarePaginator && $sections->hasPages())
+<div class="mt-6 rounded-lg border border-gray-200/80 bg-white/90 px-6 py-4 shadow-sm">
+    {{ $sections->links() }}
+</div>
+@endif
+@else
+<div class="rounded-lg border border-gray-200/80 bg-white/95 px-6 py-16 text-center shadow-md">
+    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
+    </div>
+    <p class="mt-4 font-medium text-gray-600">No sections assigned yet</p>
+    <p class="mt-1 text-sm text-gray-500">Sections will appear here once you are assigned to teach subjects for the current school year.</p>
+</div>
+@endif
 @endsection

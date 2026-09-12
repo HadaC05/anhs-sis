@@ -45,9 +45,24 @@
 
                 <div class="w-full max-w-md justify-self-center">
                     <div class="bg-white shadow-xl rounded-lg px-8 pt-8 pb-10">
-                        @if ($errors->has('username') || $errors->has('password') || $errors->has('captcha_answer'))
-                        <div class="mb-4 p-3 rounded bg-red-50 border-l-4 border-red-500 text-red-700 text-sm">
-                            {{ $errors->first('username') ?: $errors->first('password') ?: $errors->first('captcha_answer') }}
+                        @if (session('status'))
+                        <div class="mb-4 p-3 rounded bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-sm" data-test="login-status">
+                            {{ session('status') }}
+                        </div>
+                        @endif
+
+                        @if (! empty($loginLockoutMinutes))
+                        <div class="mb-4 p-3 rounded bg-red-50 border-l-4 border-red-500 text-red-700 text-sm" data-test="login-error">
+                            {{ trans('auth.throttle', ['seconds' => $loginLockoutMinutes * 60, 'minutes' => $loginLockoutMinutes]) }}
+                        </div>
+                        @elseif ($errors->has('username') || $errors->has('password') || $errors->has('captcha_answer'))
+                        <div class="mb-4 p-3 rounded bg-red-50 border-l-4 border-red-500 text-red-700 text-sm" data-test="login-error">
+                            <p>{{ $errors->first('username') ?: $errors->first('password') ?: $errors->first('captcha_answer') }}</p>
+                            @if ($loginAttemptsRemaining !== null)
+                            <p class="mt-1 font-semibold" data-test="login-attempts-remaining">
+                                {{ trans_choice('auth.attempts_remaining', $loginAttemptsRemaining, ['count' => $loginAttemptsRemaining]) }}
+                            </p>
+                            @endif
                         </div>
                         @endif
 
@@ -70,7 +85,7 @@
                                     autofocus>
                             </div>
 
-                            <div class="mb-8">
+                            <div class="mb-3">
                                 <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
                                     Password
                                 </label>
@@ -91,6 +106,11 @@
                                         </svg>
                                     </button>
                                 </div>
+                                <div class="mt-2 text-right">
+                                    <a href="{{ route('password.request') }}" class="text-sm text-blue-700 font-semibold hover:underline" data-test="forgot-password-link">
+                                        Forgot password?
+                                    </a>
+                                </div>
                             </div>
 
                             <div class="mb-8">
@@ -110,7 +130,9 @@
                                         name="captcha_answer"
                                         type="text"
                                         inputmode="numeric"
-                                        pattern="\d*"
+                                        pattern="\d{1,3}"
+                                        maxlength="3"
+                                        autocomplete="off"
                                         required>
                                     <button type="button"
                                         onclick="window.location.reload()"
@@ -128,10 +150,10 @@
                                 Sign In
                             </button>
                             <div class="mt-6 text-center">
-                                <p class="text-xs text-gray-400">
+                                <p class="text-s text-gray-400">
                                     Don't have an account?
                                     <a href="{{ route('register') }}" class="text-[#76A08D] font-bold hover:underline">
-                                        Submit Application
+                                        Enroll Now
                                     </a>
                                 </p>
                             </div>
@@ -144,7 +166,7 @@
         <button type="button"
             @click="showStatusModal = true"
             class="fixed bottom-6 left-6 z-50 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-3 rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
-            Check Application Status
+            Check Enrollment Status
         </button>
     </main>
 
@@ -155,7 +177,7 @@
         x-cloak>
         <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-[#0C2C55]">Application Status</h3>
+                <h3 class="text-xl font-bold text-[#0C2C55]">Enrollment Status</h3>
                 <button type="button" @click="showStatusModal = false" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
             </div>
 
@@ -191,13 +213,13 @@
                 @csrf
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2" for="status_lrn">LRN</label>
-                    <input id="status_lrn" name="status_lrn" type="text" minlength="12" maxlength="12" inputmode="numeric" pattern="\d{12}" required
+                    <input id="status_lrn" name="status_lrn" type="text" minlength="12" maxlength="12" inputmode="numeric" pattern="\d{12}" autocomplete="off" required
                         value="{{ old('status_lrn') }}"
                         class="shadow-sm appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
                 </div>
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2" for="status_birthdate">Birthdate</label>
-                    <input id="status_birthdate" name="status_birthdate" type="date" required
+                    <input id="status_birthdate" name="status_birthdate" type="date" min="{{ \App\Models\StudentApplication::EARLIEST_BIRTHDATE }}" max="{{ \App\Models\StudentApplication::LATEST_BIRTHDATE }}" required
                         value="{{ old('status_birthdate') }}"
                         class="shadow-sm appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
                 </div>
@@ -225,7 +247,16 @@
                 eyeSlashIcon.classList.add('hidden');
             }
         }
+
+        document.getElementById('captcha_answer')?.addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '').slice(0, 3);
+        });
+
+        document.getElementById('status_lrn')?.addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '').slice(0, 12);
+        });
     </script>
+    <x-auth-session-sync />
 </body>
 
 </html>

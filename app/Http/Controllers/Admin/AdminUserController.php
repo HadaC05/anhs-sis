@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreAdminUserRequest;
+use App\Http\Requests\Admin\UpdateAdminUserRequest;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentApplication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class AdminUserController extends Controller
@@ -22,19 +26,23 @@ class AdminUserController extends Controller
         }
 
         $activeTab = $request->string('tab')->toString() === 'students' ? 'students' : 'staff';
-        $staffRoles = Role::query()->where('role_name', '!=', 'student')->orderBy('role_name')->get();
-        $roleCounts = Role::query()
-            ->get()
-            ->mapWithKeys(function (Role $role) {
-                $count = $role->role_name === 'student'
-                    ? Student::query()->where('role_id', $role->id)->count()
-                    : Staff::query()->where('role_id', $role->id)->count();
-
-                return [$role->role_name => $count];
-            });
+        $staffRoles = Role::query()->orderBy('role_name')->get();
+        $roleCounts = $staffRoles
+            ->mapWithKeys(fn (Role $role) => [
+                $role->role_name => Staff::query()->where('role_id', $role->id)->count(),
+            ]);
+        $roleCounts['student'] = Student::query()
+            ->whereNotNull('username')
+            ->where('username', '!=', '')
+            ->count();
 
         if ($activeTab === 'students') {
-            $query = Student::query()->with('role');
+            // Student portal accounts are provisioned with an "approved" status.
+            // Treat that as active in user management, while excluding student
+            // application records that do not have a portal account yet.
+            $query = Student::query()
+                ->whereNotNull('username')
+                ->where('username', '!=', '');
         } else {
             $query = Staff::query()->with('role');
 
@@ -43,18 +51,27 @@ class AdminUserController extends Controller
             }
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->string('status')->toString());
+        $status = $request->string('status')->toString();
+        if ($status === 'inactive') {
+            $query->where('status', 'inactive');
+        } elseif ($activeTab === 'students') {
+            $query->whereIn('status', ['active', 'approved']);
+        } else {
+            $query->where('status', 'active');
         }
 
         if ($request->filled('search')) {
             $search = $request->string('search')->toString();
-            $query->where(function ($inner) use ($search): void {
+            $query->where(function ($inner) use ($search, $activeTab): void {
                 $inner->where('username', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('middle_name', 'like', "%{$search}%");
+
+                if ($activeTab === 'students') {
+                    $inner->orWhere('lrn', 'like', "%{$search}%");
+                }
             });
         }
 
@@ -69,56 +86,39 @@ class AdminUserController extends Controller
             'staffCount' => Staff::query()->count(),
             'studentCount' => Student::query()->whereNotNull('username')->count(),
             'perPage' => $perPage,
+            'suffixOptions' => StudentApplication::suffixOptions(),
+            'earliestBirthdate' => Staff::EARLIEST_BIRTHDATE,
+            'latestBirthdate' => Staff::LATEST_BIRTHDATE,
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreAdminUserRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'middle_name' => ['nullable', 'string', 'max:255'],
-            'suffix' => ['nullable', 'string', 'max:255'],
-            'birthdate' => ['nullable', 'date'],
-            'username' => ['required', 'string', 'max:255', 'unique:staffs,username'],
-            'email' => ['required', 'email', 'max:255', 'unique:staffs,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::exists('roles', 'role_name')],
-        ]);
+        $validated = $request->validated();
 
         $role = Role::query()->where('role_name', $validated['role'])->firstOrFail();
 
         Staff::query()->create([
-                'username' => $validated['username'],
-                'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'role_id' => $role->id,
-                'status' => 'active',
-                'change_password' => true,
-                'first_name' => $validated['first_name'],
-                'middle_name' => $validated['middle_name'] ?? null,
-                'last_name' => $validated['last_name'],
-                'suffix' => $validated['suffix'] ?? null,
-                'birthdate' => $validated['birthdate'] ?? null,
+            'username' => $validated['username'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role_id' => $role->id,
+            'status' => 'active',
+            'change_password' => true,
+            'first_name' => $validated['first_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
+            'last_name' => $validated['last_name'],
+            'suffix' => $validated['suffix'] ?? null,
+            'birthdate' => $validated['birthdate'] ?? null,
         ]);
 
         return back()->with('success', 'User created successfully.');
     }
 
-    public function update(Request $request, string $user): RedirectResponse
+    public function update(UpdateAdminUserRequest $request): RedirectResponse
     {
-        $account = $request->boolean('is_student')
-            ? Student::query()->findOrFail($user)
-            : Staff::query()->findOrFail($user);
-        $table = $account instanceof Student ? 'students' : 'staffs';
-        $key = $account instanceof Student ? $account->getKey() : $account->staff_id;
-
-        $validated = $request->validate([
-            'username' => [$account instanceof Student ? 'nullable' : 'required', 'string', 'max:255', Rule::unique($table, 'username')->ignore($key)],
-            'email' => ['required', 'email', 'max:255', Rule::unique($table, 'email')->ignore($key)],
-            'role' => ['nullable', Rule::exists('roles', 'role_name')],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-        ]);
+        $account = $request->account();
+        $validated = $request->validated();
 
         $updates = [
             'email' => $validated['email'],
@@ -128,7 +128,7 @@ class AdminUserController extends Controller
             $updates['username'] = $validated['username'];
         }
 
-        if (! empty($validated['role'])) {
+        if (! $account instanceof Student && ! empty($validated['role'])) {
             $updates['role_id'] = Role::query()->where('role_name', $validated['role'])->value('id');
         }
 
@@ -155,21 +155,23 @@ class AdminUserController extends Controller
         $newStatus = $account->status === 'inactive' ? 'active' : 'inactive';
         $account->update(['status' => $newStatus]);
 
+        if ($newStatus === 'inactive') {
+            $this->invalidateAccountSessions($account);
+        }
+
         return back()->with('success', 'User status updated.');
     }
 
-    public function destroy(Request $request, string $user): RedirectResponse
+    private function invalidateAccountSessions(Staff|Student $account): void
     {
-        $account = $request->boolean('is_student')
-            ? Student::query()->findOrFail($user)
-            : Staff::query()->findOrFail($user);
+        $table = config('session.table', 'sessions');
 
-        if (! $account instanceof Student && auth()->user()?->staff_id === $account->staff_id) {
-            return back()->withErrors(['user' => 'You cannot delete your own account.']);
+        if (! Schema::hasTable($table)) {
+            return;
         }
 
-        $account->delete();
-
-        return back()->with('success', 'User deleted.');
+        DB::table($table)
+            ->where('user_id', $account->getAuthIdentifier())
+            ->delete();
     }
 }

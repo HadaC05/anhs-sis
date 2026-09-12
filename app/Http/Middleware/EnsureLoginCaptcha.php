@@ -23,9 +23,17 @@ class EnsureLoginCaptcha
             ]);
         }
 
-        $provided = $request->input('captcha_answer');
+        $provided = is_scalar($request->input('captcha_answer'))
+            ? (string) $request->input('captcha_answer')
+            : '';
 
-        if (! is_numeric($provided) || (int) $provided !== (int) $expected) {
+        if ($provided === '' || preg_match('/^\d{1,3}$/', $provided) !== 1) {
+            throw ValidationException::withMessages([
+                'captcha_answer' => 'Enter a number with up to 3 digits.',
+            ]);
+        }
+
+        if ((int) $provided !== (int) $expected) {
             throw ValidationException::withMessages([
                 'captcha_answer' => 'Incorrect answer to the security check.',
             ]);

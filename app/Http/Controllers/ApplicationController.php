@@ -2,59 +2,55 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CheckApplicationStatusRequest;
+use App\Http\Requests\StoreStudentEnrollmentRequest;
+use App\Models\EnrollmentStatus;
 use App\Models\StudentApplication;
+use App\Support\StudentCredentials;
+use App\Support\StudentEnrollmentForm;
+use App\Support\StudentEnrollmentRegistrar;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 class ApplicationController extends Controller
 {
     public function create(): View
     {
-        return view('applications.create');
+        return view('users.student.enrollment', StudentEnrollmentForm::viewData());
     }
 
-    public function store(Request $request): RedirectResponse
+    public function checkLrn(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'lrn' => ['required', 'digits:12'],
-            'first_name' => ['required', 'string', 'max:255'],
-            'middle_name' => ['nullable', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'suffix' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'contact_no' => ['nullable', 'string', 'max:20'],
-            'birthdate' => ['required', 'date'],
+            'LRN' => ['required', 'digits:12'],
         ]);
 
-        $existingPending = StudentApplication::query()
-            ->where('lrn', $validated['lrn'])
-            ->whereDate('birthdate', $validated['birthdate'])
-            ->where('status', 'pending')
-            ->exists();
-
-        if ($existingPending) {
-            return back()->withErrors([
-                'application' => 'An active application already exists for this LRN and birthdate.',
-            ])->withInput();
-        }
-
-        StudentApplication::create([
-            ...$validated,
-            'status' => 'pending',
-            'submitted_at' => now(),
-        ]);
-
-        return redirect()->route('login')->with('status', 'Application submitted. Please wait for admin verification before login credentials are issued.');
+        return response()->json(StudentEnrollmentForm::lrnAvailability($validated['LRN']));
     }
 
-    public function checkStatus(Request $request): RedirectResponse
+    public function checkEmail(Request $request): JsonResponse
     {
-        $validated = Validator::make($request->all(), [
-            'status_lrn' => ['required', 'digits:12'],
-            'status_birthdate' => ['required', 'date'],
-        ])->validateWithBag('statusCheck');
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
+
+        return response()->json(StudentEnrollmentForm::emailAvailability($validated['email']));
+    }
+
+    public function store(StoreStudentEnrollmentRequest $request): RedirectResponse
+    {
+        StudentEnrollmentRegistrar::register($request->validated());
+
+        return redirect()->route('register')
+            ->with('registration_submitted', true)
+            ->with('status', 'You are temporarily enrolled. Check your email for login instructions, then sign in to upload your required documents.');
+    }
+
+    public function checkStatus(CheckApplicationStatusRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
 
         $application = StudentApplication::query()
             ->where('lrn', $validated['status_lrn'])
@@ -69,19 +65,31 @@ class ApplicationController extends Controller
         }
 
         $status = strtolower((string) $application->status);
+        $enrollment = $application->enrollments()
+            ->with('academicYear')
+            ->latest('created_at')
+            ->first();
+        $enrollmentStatus = $enrollment?->enrollment_status;
 
-        $message = match ($status) {
-            'pending' => 'Your application is pending. Please wait for verification.',
-            'approved' => 'Your application is approved. Use the login details below and change your password after your first sign in.',
-            'rejected' => 'Your application was rejected. Please contact the school for guidance on re-application.',
+        $message = match (true) {
+            $enrollmentStatus === EnrollmentStatus::TEMPORARILY_ENROLLED => 'You are temporarily enrolled. Sign in to upload your required documents, then change your password after your first sign in.',
+            $enrollmentStatus === EnrollmentStatus::ENROLLED => 'You are enrolled. Use the login details below and change your password after your first sign in.',
+            $status === 'pending' => 'Your application is pending. Please wait for verification.',
+            $status === 'approved' => 'Your application is approved. Use the login details below and change your password after your first sign in.',
+            $status === 'rejected' => 'Your application was rejected. Please contact the school for guidance on re-application.',
             default => 'Your application status is currently under review.',
         };
 
-        if ($status !== 'approved') {
+        $showLogin = in_array($enrollmentStatus, [
+            EnrollmentStatus::TEMPORARILY_ENROLLED,
+            EnrollmentStatus::ENROLLED,
+        ], true) || $status === 'approved';
+
+        if (! $showLogin) {
             return back()->with('application_status_message', $message);
         }
 
-        $enrollmentYear = (int) ($application->activated_at?->year ?? now()->year);
+        $enrollmentYear = StudentCredentials::enrollmentYear($enrollment);
 
         return back()->with([
             'application_status_message' => $message,

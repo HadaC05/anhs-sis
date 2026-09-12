@@ -15,11 +15,18 @@ class CurriculumSubjectSeeder extends Seeder
      */
     public function run(): void
     {
+        $juniorHighNames = array_values(CurriculumSeeder::JUNIOR_HIGH_NAMES);
+        $clusterNames = [
+            'Arts, Social Sciences & Humanities',
+            'Business and Entrepreneurship',
+            'Science, Technology, Engineering and Mathematics',
+        ];
+
         $curriculumMap = Curriculum::query()
-            ->whereIn('name', ['DepEd SHS - ABM', 'DepEd SHS - STEM', 'DepEd SHS - HUMSS', 'DepEd SHS - GAS'])
+            ->whereIn('name', array_merge($juniorHighNames, $clusterNames))
             ->pluck('curriculum_ID', 'name');
 
-        foreach (['DepEd SHS - ABM', 'DepEd SHS - STEM', 'DepEd SHS - HUMSS', 'DepEd SHS - GAS'] as $curriculumName) {
+        foreach (array_merge($juniorHighNames, $clusterNames) as $curriculumName) {
             if (! isset($curriculumMap[$curriculumName])) {
                 throw new RuntimeException("Missing curriculum: {$curriculumName}. Run CurriculumSeeder first.");
             }
@@ -29,6 +36,20 @@ class CurriculumSubjectSeeder extends Seeder
             ->where('status', 'active')
             ->get(['subject_ID', 'code', 'cluster_ID'])
             ->keyBy('code');
+
+        foreach (CurriculumSeeder::JUNIOR_HIGH_NAMES as $gradeLevel => $curriculumName) {
+            $gradeNumber = str_replace('grade_', '', $gradeLevel);
+
+            foreach (array_keys(SubjectSeeder::JUNIOR_HIGH_AREAS) as $prefix) {
+                $this->assignSubject(
+                    $subjectMap,
+                    $curriculumMap[$curriculumName],
+                    $prefix.$gradeNumber,
+                    $gradeLevel,
+                    'first',
+                );
+            }
+        }
 
         $commonAssignments = [
             ['code' => 'ORALCOM', 'grade_level' => 'grade_11', 'semester' => 'first'],
@@ -54,21 +75,20 @@ class CurriculumSubjectSeeder extends Seeder
             ['code' => 'HOPE', 'grade_level' => 'grade_12', 'semester' => 'second'],
         ];
 
-        $juniorHighAssignments = [];
-        foreach (['grade_7', 'grade_8', 'grade_9', 'grade_10'] as $gradeLevel) {
-            foreach (['JH-MATH', 'JH-SCI', 'JH-ENG', 'JH-FIL', 'JH-AP', 'JH-MAPEH', 'JH-TLE', 'JH-ESP'] as $code) {
-                $juniorHighAssignments[] = ['code' => $code, 'grade_level' => $gradeLevel, 'semester' => 'first'];
-            }
-        }
-
         $specializedAssignments = [
-            'DepEd SHS - ABM' => [
+            'Arts, Social Sciences & Humanities' => [
+                ['code' => 'DISS', 'grade_level' => 'grade_11', 'semester' => 'first'],
+                ['code' => 'CREATIVEWRITING', 'grade_level' => 'grade_11', 'semester' => 'second'],
+                ['code' => 'DIASS', 'grade_level' => 'grade_12', 'semester' => 'first'],
+                ['code' => 'PPG', 'grade_level' => 'grade_12', 'semester' => 'second'],
+            ],
+            'Business and Entrepreneurship' => [
                 ['code' => 'BUSMATH', 'grade_level' => 'grade_11', 'semester' => 'first'],
                 ['code' => 'ACCOUNTING', 'grade_level' => 'grade_11', 'semester' => 'second'],
                 ['code' => 'ORGMGMT', 'grade_level' => 'grade_12', 'semester' => 'first'],
                 ['code' => 'APPECON', 'grade_level' => 'grade_12', 'semester' => 'second'],
             ],
-            'DepEd SHS - STEM' => [
+            'Science, Technology, Engineering and Mathematics' => [
                 ['code' => 'PRECALC', 'grade_level' => 'grade_11', 'semester' => 'first'],
                 ['code' => 'GENBIO1', 'grade_level' => 'grade_11', 'semester' => 'first'],
                 ['code' => 'GENCHEM1', 'grade_level' => 'grade_11', 'semester' => 'first'],
@@ -78,35 +98,44 @@ class CurriculumSubjectSeeder extends Seeder
                 ['code' => 'GENPHYS1', 'grade_level' => 'grade_12', 'semester' => 'first'],
                 ['code' => 'GENPHYS2', 'grade_level' => 'grade_12', 'semester' => 'second'],
             ],
-            'DepEd SHS - HUMSS' => [],
-            'DepEd SHS - GAS' => [],
         ];
 
-        foreach ($curriculumMap as $curriculumName => $curriculumId) {
+        foreach ($clusterNames as $curriculumName) {
             $assignments = array_merge($commonAssignments, $specializedAssignments[$curriculumName] ?? []);
 
-            if ($curriculumName === 'DepEd SHS - GAS') {
-                $assignments = array_merge($assignments, $juniorHighAssignments);
-            }
-
             foreach ($assignments as $assignment) {
-                $subject = $subjectMap[$assignment['code']] ?? null;
-                if (! $subject) {
-                    throw new RuntimeException("Missing subject code: {$assignment['code']}. Run SubjectSeeder first.");
-                }
-
-                CurriculumSubject::query()->updateOrCreate(
-                    [
-                        'curriculum_ID' => $curriculumId,
-                        'subject_ID' => $subject->subject_ID,
-                        'grade_level' => $assignment['grade_level'],
-                        'semester' => $assignment['semester'],
-                    ],
-                    [
-                        'cluster_ID' => $subject->cluster_ID,
-                    ],
+                $this->assignSubject(
+                    $subjectMap,
+                    $curriculumMap[$curriculumName],
+                    $assignment['code'],
+                    $assignment['grade_level'],
+                    $assignment['semester'],
                 );
             }
         }
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<string, Subject>  $subjectMap
+     */
+    private function assignSubject($subjectMap, int $curriculumId, string $code, string $gradeLevel, string $semester): void
+    {
+        $subject = $subjectMap[$code] ?? null;
+
+        if (! $subject) {
+            throw new RuntimeException("Missing subject code: {$code}. Run SubjectSeeder first.");
+        }
+
+        CurriculumSubject::query()->updateOrCreate(
+            [
+                'curriculum_ID' => $curriculumId,
+                'subject_ID' => $subject->subject_ID,
+                'grade_level' => $gradeLevel,
+                'semester' => $semester,
+            ],
+            [
+                'cluster_ID' => $subject->cluster_ID,
+            ],
+        );
     }
 }

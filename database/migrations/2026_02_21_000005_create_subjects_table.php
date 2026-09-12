@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('subjects', function (Blueprint $table) {
             $table->increments('subject_ID');
-            $table->unsignedInteger('cluster_ID');
+            $table->unsignedInteger('cluster_ID')->nullable();
             $table->string('code')->unique();
             $table->string('title');
             $table->enum('type', ['core', 'applied', 'specialized']);

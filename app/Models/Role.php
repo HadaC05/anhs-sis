@@ -18,9 +18,4 @@ class Role extends Model
     {
         return $this->hasMany(Staff::class);
     }
-
-    public function students(): HasMany
-    {
-        return $this->hasMany(Student::class);
-    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,9 +13,16 @@ class Section extends Model
     use HasFactory;
 
     protected $table = 'sections';
+
     protected $primaryKey = 'section_ID';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
+
+    protected $attributes = [
+        'status' => true,
+    ];
 
     protected $fillable = [
         'name',
@@ -26,11 +34,19 @@ class Section extends Model
         'curriculum_ID',
         'room',
         'capacity',
+        'status',
     ];
 
     protected $appends = [
         'grade_level',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'status' => 'boolean',
+        ];
+    }
 
     public function getRouteKeyName(): string
     {
@@ -79,5 +95,24 @@ class Section extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class, 'section_ID', 'section_ID');
+    }
+
+    public function teacherSubjectAssignments(): HasMany
+    {
+        return $this->hasMany(TeacherSubjectAssignment::class, 'section_ID', 'section_ID');
+    }
+
+    /**
+     * @param  Builder<Section>  $query
+     * @return Builder<Section>
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', true);
+    }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->status;
     }
 }

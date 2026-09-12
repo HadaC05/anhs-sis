@@ -15,8 +15,8 @@ return new class extends Migration
             $table->increments('curr_subj_ID');
             $table->unsignedInteger('curriculum_ID');
             $table->unsignedInteger('subject_ID');
-            $table->unsignedInteger('cluster_ID');
-            $table->enum('grade_level', ['grade_11', 'grade_12']);
+            $table->unsignedInteger('cluster_ID')->nullable();
+            $table->enum('grade_level', ['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12']);
             $table->enum('semester', ['first', 'second']);
             $table->timestamps();
 

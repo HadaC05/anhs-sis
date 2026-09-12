@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
-use Carbon\CarbonImmutable;
 use App\Auth\MergedUserProvider;
-use Illuminate\Support\Facades\Date;
+use App\Notifications\Channels\DatabaseChannel;
+use Carbon\CarbonImmutable;
+use Illuminate\Notifications\Channels\DatabaseChannel as LaravelDatabaseChannel;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -17,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LaravelDatabaseChannel::class, DatabaseChannel::class);
     }
 
     /**
@@ -25,9 +28,31 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Auth::provider('merged_users', fn () => new MergedUserProvider());
+        Auth::provider('merged_users', fn () => new MergedUserProvider);
 
         $this->configureDefaults();
+        $this->configureMail();
+    }
+
+    /**
+     * Always attach a From header so empty .env values cannot crash mail sending.
+     */
+    protected function configureMail(): void
+    {
+        $address = config('mail.from.address');
+        $name = config('mail.from.name');
+
+        if (! is_string($address) || $address === '') {
+            $address = 'hello@example.com';
+            config(['mail.from.address' => $address]);
+        }
+
+        if (! is_string($name) || $name === '') {
+            $name = 'Agusan National High School';
+            config(['mail.from.name' => $name]);
+        }
+
+        Mail::alwaysFrom($address, $name);
     }
 
     /**

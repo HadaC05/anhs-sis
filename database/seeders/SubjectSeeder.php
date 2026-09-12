@@ -10,6 +10,22 @@ use RuntimeException;
 class SubjectSeeder extends Seeder
 {
     /**
+     * Junior high learning areas keyed by subject code prefix.
+     *
+     * @var array<string, string>
+     */
+    public const JUNIOR_HIGH_AREAS = [
+        'MATH' => 'Mathematics',
+        'SCI' => 'Science',
+        'ENG' => 'English',
+        'FIL' => 'Filipino',
+        'AP' => 'Araling Panlipunan',
+        'MAPEH' => 'MAPEH',
+        'TLE' => 'TLE',
+        'ESP' => 'Edukasyon sa Pagpapakatao',
+    ];
+
+    /**
      * Seed the application's subjects table.
      */
     public function run(): void
@@ -32,7 +48,20 @@ class SubjectSeeder extends Seeder
             }
         }
 
-        $subjects = [
+        $subjects = [];
+
+        foreach ([7, 8, 9, 10] as $grade) {
+            foreach (self::JUNIOR_HIGH_AREAS as $prefix => $title) {
+                $subjects[] = [
+                    'cluster' => null,
+                    'code' => $prefix.$grade,
+                    'title' => $title.' '.$grade,
+                    'type' => 'core',
+                ];
+            }
+        }
+
+        $subjects = array_merge($subjects, [
             ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'ORALCOM', 'title' => 'Oral Communication', 'type' => 'core'],
             ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'KOMFIL', 'title' => 'Komunikasyon at Pananaliksik sa Wika at Kulturang Pilipino', 'type' => 'core'],
             ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENMAT', 'title' => 'General Mathematics', 'type' => 'core'],
@@ -63,21 +92,17 @@ class SubjectSeeder extends Seeder
             ['cluster' => 'Business and Entrepreneurship', 'code' => 'BUSMATH', 'title' => 'Business Mathematics', 'type' => 'specialized'],
             ['cluster' => 'Business and Entrepreneurship', 'code' => 'ORGMGMT', 'title' => 'Organization and Management', 'type' => 'specialized'],
             ['cluster' => 'Business and Entrepreneurship', 'code' => 'APPECON', 'title' => 'Applied Economics', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'JH-MATH', 'title' => 'Mathematics', 'type' => 'core'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'JH-SCI', 'title' => 'Science', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'JH-ENG', 'title' => 'English', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'JH-FIL', 'title' => 'Filipino', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'JH-AP', 'title' => 'Araling Panlipunan', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'JH-MAPEH', 'title' => 'MAPEH', 'type' => 'core'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'JH-TLE', 'title' => 'TLE', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'JH-ESP', 'title' => 'Edukasyon sa Pagpapakatao', 'type' => 'core'],
-        ];
+            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'DISS', 'title' => 'Disciplines and Ideas in the Social Sciences', 'type' => 'specialized'],
+            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'DIASS', 'title' => 'Disciplines and Ideas in the Applied Social Sciences', 'type' => 'specialized'],
+            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'CREATIVEWRITING', 'title' => 'Creative Writing', 'type' => 'specialized'],
+            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'PPG', 'title' => 'Philippine Politics and Governance', 'type' => 'specialized'],
+        ]);
 
         foreach ($subjects as $subject) {
             Subject::query()->updateOrCreate(
                 ['code' => $subject['code']],
                 [
-                    'cluster_ID' => $clusterMap[$subject['cluster']],
+                    'cluster_ID' => $subject['cluster'] ? $clusterMap[$subject['cluster']] : null,
                     'title' => $subject['title'],
                     'type' => $subject['type'],
                 ],

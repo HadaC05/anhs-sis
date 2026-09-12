@@ -5,17 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class StudentApplication extends Model
 {
     use HasFactory;
 
+    public const EARLIEST_BIRTHDATE = '1950-01-01';
+
+    public const LATEST_BIRTHDATE = '2016-12-31';
+
     protected $table = 'students';
 
     protected $fillable = [
         'lrn',
-        'role_id',
         'username',
         'password',
         'change_password',
@@ -62,5 +66,18 @@ class StudentApplication extends Model
     public function student(): HasOne
     {
         return $this->hasOne(Student::class, 'id', 'id');
+    }
+
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(Enrollment::class, 'student_ID', 'id');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function suffixOptions(): array
+    {
+        return ['Jr.', 'Sr.', 'I', 'II', 'III', 'IV', 'V'];
     }
 }

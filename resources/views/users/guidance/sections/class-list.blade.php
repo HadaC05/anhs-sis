@@ -45,7 +45,25 @@
         if ($startYear) {
             $firstFriday = \Carbon\Carbon::create($startYear, 6, 1)->next(\Carbon\Carbon::FRIDAY);
         }
-        $enrollments = $section->enrollments ?? collect();
+        $enrollments = ($section->enrollments ?? collect())
+            ->sortBy(function ($enrollment) {
+                $student = $enrollment->student;
+                $application = $student?->application;
+                $sexRank = match (strtolower((string) $student?->sex)) {
+                    'male' => 0,
+                    'female' => 1,
+                    default => 2,
+                };
+
+                return sprintf(
+                    '%d-%s-%s-%s',
+                    $sexRank,
+                    strtolower((string) ($application?->last_name ?? '')),
+                    strtolower((string) ($application?->first_name ?? '')),
+                    strtolower((string) ($student?->lrn ?? ''))
+                );
+            })
+            ->values();
         $adviser = $section->adviser ? trim($section->adviser->first_name . ' ' . $section->adviser->last_name) : '';
     @endphp
 
@@ -117,6 +135,9 @@
             </tr>
         </thead>
         <tbody>
+            @php
+                $currentSexGroup = null;
+            @endphp
             @forelse($enrollments as $enrollment)
                 @php
                     $student = $enrollment->student;
@@ -131,7 +152,16 @@
                     $fullName = $application ? trim($application->last_name . ', ' . $application->first_name . ' ' . ($application->middle_name ?? '')) : '';
                     $fatherName = $father ? trim($father->last_name . ', ' . $father->first_name . ' ' . ($father->middle_name ?? '')) : '';
                     $motherName = $mother ? trim($mother->last_name . ', ' . $mother->first_name . ' ' . ($mother->middle_name ?? '')) : '';
+                    $sexGroup = strtolower((string) $student?->sex) === 'female' ? 'Female' : (strtolower((string) $student?->sex) === 'male' ? 'Male' : 'Unspecified');
                 @endphp
+                @if($currentSexGroup !== $sexGroup)
+                    @php
+                        $currentSexGroup = $sexGroup;
+                    @endphp
+                    <tr>
+                        <td colspan="18" style="font-weight:bold; text-transform:uppercase; background:#e5e7eb;">{{ $sexGroup }}</td>
+                    </tr>
+                @endif
                 <tr>
                     <td>{{ $student?->lrn ?? '' }}</td>
                     <td>{{ $fullName }}</td>

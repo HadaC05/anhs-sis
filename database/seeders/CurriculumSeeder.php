@@ -2,43 +2,47 @@
 
 namespace Database\Seeders;
 
+use App\Models\Cluster;
 use App\Models\Curriculum;
 use Illuminate\Database\Seeder;
 
 class CurriculumSeeder extends Seeder
 {
     /**
+     * Junior high curricula keyed by grade level.
+     *
+     * @var array<string, string>
+     */
+    public const JUNIOR_HIGH_NAMES = [
+        'grade_7' => 'Grade 7',
+        'grade_8' => 'Grade 8',
+        'grade_9' => 'Grade 9',
+        'grade_10' => 'Grade 10',
+    ];
+
+    /**
      * Seed the application's curriculum table.
      */
     public function run(): void
     {
-        foreach ([
-            [
-                'name' => 'DepEd SHS - ABM',
-                'description' => 'Accountancy, Business, and Management strand curriculum for Senior High School.',
-                'status' => true,
-            ],
-            [
-                'name' => 'DepEd SHS - STEM',
-                'description' => 'Science, Technology, Engineering, and Mathematics strand curriculum for Senior High School.',
-                'status' => true,
-            ],
-            [
-                'name' => 'DepEd SHS - HUMSS',
-                'description' => 'Humanities and Social Sciences strand curriculum for Senior High School.',
-                'status' => true,
-            ],
-            [
-                'name' => 'DepEd SHS - GAS',
-                'description' => 'General Academic Strand curriculum for Senior High School.',
-                'status' => true,
-            ],
-        ] as $curriculum) {
+        foreach (self::JUNIOR_HIGH_NAMES as $gradeLevel => $name) {
+            $gradeNumber = str_replace('grade_', '', $gradeLevel);
+
             Curriculum::query()->updateOrCreate(
-                ['name' => $curriculum['name']],
+                ['name' => $name],
                 [
-                    'description' => $curriculum['description'],
-                    'status' => $curriculum['status'],
+                    'description' => "Junior High School Grade {$gradeNumber} subject offerings.",
+                    'status' => true,
+                ],
+            );
+        }
+
+        foreach (Cluster::query()->orderBy('name')->get(['name']) as $cluster) {
+            Curriculum::query()->updateOrCreate(
+                ['name' => $cluster->name],
+                [
+                    'description' => "Senior High School curriculum for the {$cluster->name} cluster.",
+                    'status' => true,
                 ],
             );
         }

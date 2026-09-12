@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -32,7 +32,7 @@ return new class extends Migration
             return;
         }
 
-        if (Schema::hasColumn('student_subject_grades', 'posted_by')) {
+        if (Schema::hasColumn('student_subject_grades', 'posted_by') && DB::getDriverName() === 'mysql') {
             DB::statement('ALTER TABLE student_subject_grades MODIFY posted_by INT UNSIGNED NOT NULL');
         }
 

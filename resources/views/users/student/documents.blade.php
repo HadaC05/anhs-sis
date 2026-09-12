@@ -4,168 +4,243 @@
 
 @section('content')
 @php
-    $studentName = optional($application)->last_name ? optional($application)->last_name . ', ' . optional($application)->first_name : Auth::user()->name;
-    $documentTypes = [
-        'birth_certificate' => ['title' => 'Birth Certificate', 'desc' => 'PSA or local civil registrar copy', 'required' => true],
-        'form_137' => ['title' => 'Form 137 / SF9', 'desc' => 'Latest report card or permanent record', 'required' => true],
-        'good_moral' => ['title' => 'Good Moral Certificate', 'desc' => 'Issued by previous school', 'required' => false],
-        'id_photo' => ['title' => '2x2 ID Photo', 'desc' => 'Recent photo with white background', 'required' => false],
-    ];
-    
-    $uploadedDocuments = $documents->keyBy('doc_type');
-    $requiredCount = 2; // birth_certificate, form_137
-    $uploadedRequiredCount = $documents->whereIn('doc_type', ['birth_certificate', 'form_137'])->count();
-    $progressPercentage = $requiredCount > 0 ? ($uploadedRequiredCount / $requiredCount) * 100 : 0;
+    $enrollment = $currentEnrollment ?? null;
+    $documentTypes = $documentTypes ?? [];
+    $uploadedDocuments = $documents->unique('doc_type')->keyBy('doc_type');
+    $requiredTypes = collect($documentTypes)->filter(fn (array $info): bool => $info['required'])->keys();
+    $requiredCount = $requiredTypes->count();
+    $uploadedRequiredCount = $requiredTypes->filter(fn (string $type): bool => $uploadedDocuments->has($type))->count();
+    $canUploadAny = collect($documentTypes)->keys()->contains(fn (string $type): bool => ! $uploadedDocuments->get($type)?->isVerified());
+    $fieldClass = 'w-full min-w-[12rem] rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-800 shadow-sm outline-none transition file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-gray-700 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
+    $iconButtonClass = 'inline-flex rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]';
+    $iconDeleteClass = 'inline-flex rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600';
 @endphp
-<div class="space-y-6">
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">Document Requirements</h1>
-        <p class="text-gray-600 text-sm md:text-base">Upload your required documents for enrollment verification.</p>
-    </div>
 
-    @if(session('success'))
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p class="text-sm font-medium text-green-800">{{ session('success') }}</p>
-            </div>
+<div class="space-y-5">
+    @if (session('success'))
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+            {{ session('success') }}
         </div>
     @endif
 
-    @if($errors->any())
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+    @if ($errors->any())
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {{ $errors->first() }}
+        </div>
+    @endif
+
+    <div id="student-documents-client-error" class="hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p id="student-documents-client-error-text"></p>
+    </div>
+
+    @include('users.student.partials.enrollment-summary', [
+        'student' => $student,
+        'application' => $application,
+        'enrollment' => $enrollment,
+        'activeYear' => $activeYear,
+    ])
+
+    <form id="student-documents-form" action="{{ route('student.documents.upload') }}" method="POST" enctype="multipart/form-data" class="hidden">
+        @csrf
+    </form>
+
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-200 px-6 py-5">
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <p class="text-sm font-medium text-red-800">Error:</p>
-                    <ul class="text-xs text-red-700 mt-1 list-disc list-inside">
-                        @foreach($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+                    <h1 class="text-2xl font-bold tracking-tight text-gray-800">Documents</h1>
+                    <p class="mt-1 text-sm text-gray-500">Upload your required documents for enrollment verification. Each file must be 15MB or smaller.</p>
                 </div>
+                <p class="text-sm text-gray-500">{{ $uploadedRequiredCount }}/{{ $requiredCount }} required documents uploaded</p>
             </div>
         </div>
-    @endif
 
-    <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg p-6 border border-white/20">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold text-[#296374]">Upload Progress</h3>
-            <span class="text-sm font-medium text-gray-600">{{ $uploadedRequiredCount }}/{{ $requiredCount }} Required Documents</span>
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-2.5">
-            <div class="h-2.5 rounded-full bg-[#296374]" style="width: {{ $progressPercentage }}%"></div>
-        </div>
-    </div>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[960px] border-collapse text-sm text-gray-800">
+                <thead>
+                    <tr class="bg-[#dbeaf1] text-left text-xs font-bold uppercase tracking-wide text-gray-700">
+                        <th class="border border-gray-200 px-3 py-3">Document</th>
+                        <th class="border border-gray-200 px-3 py-3 whitespace-nowrap">Requirement</th>
+                        <th class="border border-gray-200 px-3 py-3">Status</th>
+                        <th class="border border-gray-200 px-3 py-3 whitespace-nowrap">Date Uploaded</th>
+                        <th class="border border-gray-200 px-3 py-3">Remarks</th>
+                        <th class="border border-gray-200 px-3 py-3">File</th>
+                        <th class="border border-gray-200 px-3 py-3 text-center whitespace-nowrap">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($documentTypes as $docType => $docInfo)
+                        @php
+                            $uploadedDoc = $uploadedDocuments->get($docType);
+                            $status = $uploadedDoc?->status ?? 'not_uploaded';
+                            $statusLabel = $status === 'not_uploaded' ? 'Not uploaded' : ($uploadedDoc?->status_label ?: ucfirst($status));
+                            $statusClass = match ($status) {
+                                'verified' => 'bg-emerald-50 text-emerald-800',
+                                'returned' => 'bg-red-50 text-red-700',
+                                'rejected' => 'bg-red-50 text-red-700',
+                                'pending' => 'bg-amber-50 text-amber-800',
+                                default => 'bg-gray-100 text-gray-600',
+                            };
+                            $remarks = match (true) {
+                                $uploadedDoc?->isVerified() => 'This document is verified and cannot be replaced.',
+                                $uploadedDoc?->isReturned() => 'This document was returned'.($uploadedDoc->returnReason ? ': '.$uploadedDoc->returnReason->name : '').'.',
+                                ($uploadedDoc?->status ?? '') === 'pending' => 'Awaiting guidance review.',
+                                default => '—',
+                            };
+                        @endphp
+                        <tr class="{{ $loop->even ? 'bg-gray-50' : 'bg-white' }}">
+                            <td class="border border-gray-200 px-3 py-2.5 align-top">
+                                <p class="font-semibold text-gray-800">{{ $docInfo['title'] }}</p>
+                                <p class="mt-0.5 text-xs text-gray-500">{{ $docInfo['desc'] }}</p>
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2.5 align-top whitespace-nowrap">
+                                <span class="text-xs font-semibold {{ $docInfo['required'] ? 'text-red-600' : 'text-gray-500' }}">
+                                    {{ $docInfo['required'] ? 'Required' : 'Optional' }}
+                                </span>
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2.5 align-top">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $statusClass }}">
+                                    {{ $statusLabel }}
+                                </span>
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2.5 align-top whitespace-nowrap text-gray-700">
+                                {{ $uploadedDoc?->date_uploaded?->format('M d, Y h:i A') ?? '—' }}
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2.5 align-top text-xs {{ $uploadedDoc?->isReturned() ? 'text-red-700' : 'text-gray-600' }}">
+                                {{ $remarks }}
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2.5 align-top">
+                                @unless ($uploadedDoc?->isVerified())
+                                    <input
+                                        form="student-documents-form"
+                                        type="file"
+                                        name="documents[{{ $docType }}]"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        class="student-document-file {{ $fieldClass }}"
+                                    >
+                                @else
+                                    <span class="text-xs text-gray-400">—</span>
+                                @endunless
+                            </td>
+                            <td class="border border-gray-200 px-3 py-2.5 align-middle">
+                                <div class="flex items-center justify-center gap-1">
+                                    @if ($uploadedDoc?->file_path)
+                                        <a href="{{ route('student.documents.view', $uploadedDoc) }}" target="_blank" rel="noopener noreferrer" class="{{ $iconButtonClass }}" title="View Document" aria-label="View Document">
+                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                            </svg>
+                                        </a>
+                                        @unless ($uploadedDoc->isVerified())
+                                            <form action="{{ route('student.documents.delete', $uploadedDoc) }}" method="POST" class="inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="{{ $iconDeleteClass }}" title="Delete" aria-label="Delete" onclick="return confirm('Are you sure you want to delete this document?')">
+                                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        @endunless
+                                    @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        @foreach($documentTypes as $docType => $docInfo)
-            @php
-                $uploadedDoc = $uploadedDocuments->get($docType);
-            @endphp
-            <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg p-6 border border-white/20 hover:shadow-2xl transition-all duration-300">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex-1">
-                        <h3 class="font-bold text-[#296374] text-lg mb-1">{{ $docInfo['title'] }}</h3>
-                        <p class="text-xs text-gray-600">{{ $docInfo['desc'] }}</p>
-                    </div>
-                    @if($docInfo['required'])
-                        <span class="text-[10px] font-bold text-red-500 uppercase tracking-tighter bg-red-50 px-2 py-1 rounded ml-2">Required</span>
-                    @else
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-tighter bg-gray-50 px-2 py-1 rounded ml-2">Optional</span>
-                    @endif
-                </div>
-
-                @if($uploadedDoc)
-                    <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <div>
-                                    <p class="text-sm font-medium text-green-800">Document Uploaded</p>
-                                    <p class="text-xs text-green-600">{{ $uploadedDoc->date_uploaded->format('M d, Y h:i A') }}</p>
+                                    @unless ($uploadedDoc?->isVerified())
+                                        <button
+                                            form="student-documents-form"
+                                            type="submit"
+                                            class="{{ $iconButtonClass }}"
+                                            title="{{ $uploadedDoc ? 'Replace Document' : 'Upload Document' }}"
+                                            aria-label="{{ $uploadedDoc ? 'Replace Document' : 'Upload Document' }}"
+                                        >
+                                            @if ($uploadedDoc)
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                </svg>
+                                            @else
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                                </svg>
+                                            @endif
+                                        </button>
+                                    @endunless
                                 </div>
-                            </div>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {{ $uploadedDoc->status === 'verified' ? 'bg-green-100 text-green-800' : 
-                                   ($uploadedDoc->status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800') }}">
-                                {{ ucfirst($uploadedDoc->status) }}
-                            </span>
-                        </div>
-                        @if($uploadedDoc->file_path)
-                            <div class="mt-2 flex items-center gap-2">
-                                <a href="{{ route('student.documents.view', $uploadedDoc) }}" target="_blank" 
-                                   class="text-xs text-blue-600 hover:text-blue-800 underline">View Document</a>
-                                <form action="{{ route('student.documents.delete', $uploadedDoc) }}" method="POST" class="inline">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-xs text-red-600 hover:text-red-800 underline" 
-                                            onclick="return confirm('Are you sure you want to delete this document?')">Delete</button>
-                                </form>
-                            </div>
-                        @endif
-                    </div>
-                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
 
-                <form action="{{ route('student.documents.upload') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
-                    @csrf
-                    <input type="hidden" name="doc_type" value="{{ $docType }}">
-                    
-                    <label class="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white/50 hover:bg-white/80 transition-all group">
-                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                            <svg class="w-8 h-8 mb-2 text-gray-400 group-hover:text-[#296374] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            <p class="text-sm text-gray-600 font-medium">Click to upload or drag & drop</p>
-                            <p class="text-[10px] text-gray-500 mt-1 uppercase">PDF, JPG, PNG (Max 5MB)</p>
-                        </div>
-                        <input type="file" name="document" class="hidden" accept=".pdf,.jpg,.jpeg,.png">
-                    </label>
-                    
-                    <button type="submit" class="w-full px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-opacity-90 transition-colors font-medium text-sm">
-                        {{ $uploadedDoc ? 'Replace Document' : 'Upload Document' }}
+        <div class="border-t border-gray-200 px-6 py-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-gray-500">Birth Certificate and Form 137 / SF9 are required. Each file must be a PDF, JPG, or PNG and 15MB or smaller. Choose files for each document, then use Submit All so they are saved together. Unverified documents can be replaced. Verified documents cannot be replaced until the guidance counselor unverifies them.</p>
+                @if ($canUploadAny)
+                    <button
+                        id="student-documents-submit-all"
+                        form="student-documents-form"
+                        type="submit"
+                        class="inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:opacity-90"
+                        style="background-color: #296374;"
+                    >
+                        Submit All
                     </button>
-                </form>
-            </div>
-        @endforeach
-    </div>
-
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div class="flex items-start gap-3">
-            <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-                <p class="text-sm font-medium text-blue-800">Important Notes:</p>
-                <ul class="text-xs text-blue-700 mt-1 list-disc list-inside space-y-1">
-                    <li>Uploaded documents will be reviewed by the guidance office.</li>
-                    <li>Make sure all documents are clear and readable.</li>
-                <li>Birth Certificate and Form 137 / SF9 are the only required documents before enrollment is finalized.</li>
-                    <li>Documents can be replaced by uploading a new file of the same type.</li>
-                </ul>
+                @endif
             </div>
         </div>
     </div>
 </div>
 
 <script>
-document.querySelectorAll('input[type="file"]').forEach(input => {
-    input.addEventListener('change', function(e) {
-        const fileName = e.target.files[0]?.name;
-        if (fileName) {
-            const label = e.target.closest('label');
-            const p = label.querySelector('p.text-sm');
-            p.textContent = `Selected: ${fileName}`;
+    (function () {
+        const maxBytes = {{ \App\Http\Requests\Student\StoreStudentDocumentsRequest::MAX_FILE_SIZE_KILOBYTES * 1024 }};
+        const maxMegabytes = {{ \App\Http\Requests\Student\StoreStudentDocumentsRequest::MAX_FILE_SIZE_MEGABYTES }};
+        const form = document.getElementById('student-documents-form');
+        const errorBox = document.getElementById('student-documents-client-error');
+        const errorText = document.getElementById('student-documents-client-error-text');
+
+        if (! form) {
+            return;
         }
-    });
-});
+
+        const showError = (message) => {
+            if (errorBox && errorText) {
+                errorText.textContent = message;
+                errorBox.classList.remove('hidden');
+                errorBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+
+        const hideError = () => {
+            if (errorBox) {
+                errorBox.classList.add('hidden');
+            }
+        };
+
+        const fileIsTooLarge = (file) => file && file.size > maxBytes;
+
+        document.querySelectorAll('.student-document-file').forEach((input) => {
+            input.addEventListener('change', () => {
+                const file = input.files && input.files[0];
+
+                if (fileIsTooLarge(file)) {
+                    input.value = '';
+                    showError('Each document must be ' + maxMegabytes + 'MB or smaller.');
+                    return;
+                }
+
+                hideError();
+            });
+        });
+
+        form.addEventListener('submit', (event) => {
+            const oversized = Array.from(document.querySelectorAll('.student-document-file'))
+                .some((input) => fileIsTooLarge(input.files && input.files[0]));
+
+            if (oversized) {
+                event.preventDefault();
+                showError('Each document must be ' + maxMegabytes + 'MB or smaller.');
+            }
+        });
+    })();
 </script>
 @endsection
-
-

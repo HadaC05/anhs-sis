@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Principal Dashboard') | Agusan National High School</title>
+    <title>@yield('title', 'Dashboard') | Agusan National High School</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('users.partials.sidebar-behavior')
     <style>
         .sidebar-link {
             display: flex;
@@ -21,13 +22,13 @@
         }
 
         .sidebar-link.active {
-            color: white;
-            background-color: #296374 !important;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            color: #296374;
+            background-color: rgba(41, 99, 116, 0.10) !important;
+            box-shadow: none;
         }
 
         .sidebar-link.active::before {
-            content: '';
+            display: none;
             position: absolute;
             left: 0;
             top: 50%;
@@ -58,7 +59,7 @@
         }
 
         .sidebar-link.active span {
-            color: white !important;
+            color: #296374 !important;
         }
     </style>
 </head>
@@ -67,36 +68,31 @@
     <header class="fixed top-0 left-0 right-0 w-full backdrop-blur-sm shadow-sm border-b border-white/20 z-50" style="background-color: #296374;">
         <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center pl-6">
+                <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </button>
                 <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-12 w-auto">
             </div>
 
-            <nav class="flex items-center flex-wrap justify-center gap-6 sm:gap-8 pr-6">
-                <div class="text-right">
-                    <p class="text-[10px] font-bold text-white/80 uppercase tracking-widest leading-none">Logged in as</p>
-                    <p class="text-sm font-semibold text-white">{{ Auth::user()->username }}</p>
-                </div>
-                <form action="{{ route('logout') }}" method="POST" class="border-l pl-4 border-white/30">
-                    @csrf
-                    <button type="submit" class="text-white hover:text-white/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">
-                        Logout
-                    </button>
-                </form>
+            <nav class="flex items-center flex-wrap justify-center gap-4 sm:gap-6 pr-6">
+                @include('users.partials.staff-profile-menu')
             </nav>
         </div>
     </header>
 
     <div class="min-h-screen flex relative pt-20" style="background-image: url('{{ asset('images/student-dash-image.png') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;">
-        <aside class="fixed left-0 top-20 bottom-0 w-72 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
+        <aside class="app-sidebar fixed left-0 top-20 bottom-0 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
             <div class="p-6 border-b border-gray-200/50 bg-gradient-to-r from-[#296374]/5 to-transparent">
                 <div class="flex items-center gap-3 mb-1">
-                    <div class="h-10 w-10 rounded-lg flex items-center justify-center shadow-md" style="background-color: #296374;">
+                    <div class="sidebar-user-icon h-10 w-10 rounded-lg flex items-center justify-center shadow-md" style="background-color: #296374;">
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V7l8-4 6 4v14M9 21v-6h6v6M9 10h.01M13 10h.01M17 10h.01"></path>
                         </svg>
                     </div>
-                    <div>
-                        <h2 class="text-sm font-bold text-[#296374] uppercase tracking-wider">Principal</h2>
-                        <p class="text-xs text-gray-500">School Leadership</p>
+                    <div class="sidebar-user-details min-w-0">
+                        <p class="sidebar-user-label">Signed in</p>
+                        <h2 class="truncate text-sm font-bold text-[#296374]">{{ trim(implode(' ', array_filter([Auth::user()?->first_name, Auth::user()?->middle_name, Auth::user()?->last_name, Auth::user()?->suffix]))) ?: (Auth::user()?->username ?? 'Principal') }}</h2>
+                        <p class="text-xs text-gray-500">Principal</p>
                     </div>
                 </div>
             </div>
@@ -111,30 +107,42 @@
                     </a>
 
                     <div class="space-y-1">
-                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overview</p>
-                        <a href="{{ route('principal.dashboard') }}#enrollment-summary" class="sidebar-link">
+                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grades</p>
+                        <a href="{{ route('principal.grade-releases') }}" class="sidebar-link {{ request()->routeIs('principal.grade-releases*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 19V5m0 14h16M8 17V9m4 8V7m4 10v-5"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path>
                             </svg>
-                            <span class="font-semibold">Enrollment Summary</span>
+                            <span class="font-semibold">Grade Releases</span>
                         </a>
-                        <a href="{{ route('principal.dashboard') }}#school-operations" class="sidebar-link">
+                        <a href="{{ route('principal.proficiency-levels') }}" class="sidebar-link {{ request()->routeIs('principal.proficiency-levels') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5h6m-6 4h6m-7 4h8m-9 4h10M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15zM8 7h8M8 11h8M8 15h5"></path>
                             </svg>
-                            <span class="font-semibold">Operations</span>
+                            <span class="font-semibold">Proficiency Levels</span>
+                        </a>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reports</p>
+                        <a href="{{ route('principal.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('principal.reports.age-for-grade') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3M4 6h16M6 6v14h12V6M9 6V4h6v2"></path>
+                            </svg>
+                            <span class="font-semibold">Age Alignment</span>
                         </a>
                     </div>
                 </nav>
             </div>
         </aside>
 
-        <main class="flex-1 ml-72 relative z-10">
+        <main class="app-main flex-1 relative z-10">
             <div class="max-w-7xl mx-auto py-12 px-4 md:px-8">
                 @yield('content')
             </div>
         </main>
     </div>
+
+    <x-idle-session-timeout />
 </body>
 
 </html>

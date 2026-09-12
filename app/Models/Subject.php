@@ -12,8 +12,11 @@ class Subject extends Model
     use HasFactory;
 
     protected $table = 'subjects';
+
     protected $primaryKey = 'subject_ID';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
 
     protected $fillable = [
@@ -27,11 +30,6 @@ class Subject extends Model
     public function cluster(): BelongsTo
     {
         return $this->belongsTo(Cluster::class, 'cluster_ID', 'cluster_ID');
-    }
-
-    public function books(): HasMany
-    {
-        return $this->hasMany(RefBook::class, 'subject_ID', 'subject_ID');
     }
 
     public function curriculumSubjects(): HasMany

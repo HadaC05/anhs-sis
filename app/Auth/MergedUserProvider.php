@@ -7,6 +7,8 @@ use App\Models\Student;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Laravel\Fortify\Fortify;
 
 class MergedUserProvider implements UserProvider
 {
@@ -16,13 +18,13 @@ class MergedUserProvider implements UserProvider
             [$type, $id] = explode(':', $identifier, 2);
 
             return match ($type) {
-                'staff' => Staff::query()->find($id),
-                'student' => Student::query()->find($id),
+                'staff' => $this->activeAccount(Staff::query()->find($id)),
+                'student' => $this->activeAccount(Student::query()->find($id)),
                 default => null,
             };
         }
 
-        return Staff::query()->find($identifier);
+        return $this->activeAccount(Staff::query()->find($identifier));
     }
 
     public function retrieveByToken($identifier, #[\SensitiveParameter] $token): ?Authenticatable
@@ -57,7 +59,17 @@ class MergedUserProvider implements UserProvider
     {
         $plain = $credentials['password'] ?? null;
 
-        return is_string($plain) && Hash::check($plain, $user->getAuthPassword());
+        if (! is_string($plain) || ! Hash::check($plain, $user->getAuthPassword())) {
+            return false;
+        }
+
+        if (method_exists($user, 'isAccountActive') && ! $user->isAccountActive()) {
+            throw ValidationException::withMessages([
+                Fortify::username() => __('auth.inactive'),
+            ]);
+        }
+
+        return true;
     }
 
     public function rehashPasswordIfRequired(Authenticatable $user, #[\SensitiveParameter] array $credentials, bool $force = false): void
@@ -71,5 +83,14 @@ class MergedUserProvider implements UserProvider
         $user->forceFill([
             'password' => Hash::make($plain),
         ])->save();
+    }
+
+    private function activeAccount(?Authenticatable $user): ?Authenticatable
+    {
+        if ($user && method_exists($user, 'isAccountActive') && ! $user->isAccountActive()) {
+            return null;
+        }
+
+        return $user;
     }
 }

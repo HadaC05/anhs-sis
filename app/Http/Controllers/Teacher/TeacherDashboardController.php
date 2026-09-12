@@ -4,8 +4,14 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
+use App\Models\Enrollment;
+use App\Models\EnrollmentStatus;
+use App\Models\GradeLevel;
+use App\Models\LearnerType;
 use App\Models\Section;
+use App\Models\TeacherSubjectAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class TeacherDashboardController extends Controller
@@ -13,37 +19,167 @@ class TeacherDashboardController extends Controller
     public function index(Request $request): View
     {
         $staff = $request->user();
-        $staff?->load('sections');
         $activeYear = AcademicYear::query()->where('status', true)->first();
-        $sectionsCount = 0;
-        $studentsCount = 0;
-        $subjectsCount = 0;
+        $syId = $activeYear?->SY_ID;
+
+        $advisorySectionIds = collect();
+        $teachingSectionIds = collect();
+        $sectionIds = collect();
 
         if ($staff) {
-            $sections = Section::query()
-                ->withCount(['enrollments as active_enrollments_count' => function ($query) {
-                    $query->whereIn('enrollment_status', ['enrolled', 'temporarily_enrolled']);
-                }])
+            $advisorySectionIds = Section::query()
+                ->when($syId, fn ($query) => $query->where('SY_ID', $syId))
                 ->where('staff_ID', $staff->staff_id)
-                ->when($activeYear, function ($query) use ($activeYear): void {
-                    $query->where('SY_ID', $activeYear->SY_ID);
-                })
-                ->get();
+                ->pluck('section_ID');
 
-            $sectionsCount = $sections->count();
-            $studentsCount = $sections->sum('active_enrollments_count');
-            $subjectsCount = \App\Models\TeacherSubjectAssignment::query()
+            $teachingSectionIds = TeacherSubjectAssignment::query()
+                ->when($syId, fn ($query) => $query->where('SY_ID', $syId))
                 ->where('staff_ID', $staff->staff_id)
-                ->when($activeYear, fn ($q) => $q->where('SY_ID', $activeYear->SY_ID))
-                ->count();
+                ->pluck('section_ID');
+
+            $sectionIds = $advisorySectionIds
+                ->merge($teachingSectionIds)
+                ->unique()
+                ->values();
         }
+
+        $baseQuery = Enrollment::query()
+            ->when($syId, fn ($query) => $query->where('SY_ID', $syId))
+            ->when(
+                $sectionIds->isNotEmpty(),
+                fn ($query) => $query->whereIn('section_ID', $sectionIds),
+                fn ($query) => $query->whereRaw('1 = 0')
+            );
+
+        $activeEnrolleeQuery = (clone $baseQuery)
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
+
+        $totalStudents = (clone $activeEnrolleeQuery)->count();
+        $enrolledCount = (clone $baseQuery)->where('enrollment_status_ID', EnrollmentStatus::idFor(EnrollmentStatus::ENROLLED))->count();
+        $temporaryCount = (clone $baseQuery)->where('enrollment_status_ID', EnrollmentStatus::idFor(EnrollmentStatus::TEMPORARILY_ENROLLED))->count();
+        $transfereeCount = (clone $activeEnrolleeQuery)->where('learner_type_ID', LearnerType::idFor(LearnerType::TRANSFEREE))->count();
+        $balikAralCount = (clone $activeEnrolleeQuery)->where('learner_type_ID', LearnerType::idFor(LearnerType::BALIK_ARAL))->count();
+
+        $genderSectionId = $request->string('gender_section_id')->toString();
+        $genderSectionId = $sectionIds->contains((int) $genderSectionId) ? (int) $genderSectionId : null;
+
+        $genderDistribution = (clone $activeEnrolleeQuery)
+            ->when($genderSectionId, fn ($query) => $query->where('section_ID', $genderSectionId))
+            ->join('students', 'enrollments.student_ID', '=', 'students.id')
+            ->selectRaw("CASE WHEN students.sex = 'male' THEN 'Male' WHEN students.sex = 'female' THEN 'Female' ELSE 'Unspecified' END as label")
+            ->selectRaw('COUNT(*) as total')
+            ->groupByRaw("CASE WHEN students.sex = 'male' THEN 'Male' WHEN students.sex = 'female' THEN 'Female' ELSE 'Unspecified' END")
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row): array => [
+                'label' => $row->label,
+                'total' => (int) $row->total,
+            ])
+            ->values()
+            ->all();
+
+        $sectionDistribution = Section::query()
+            ->with(['gradeLevel', 'cluster'])
+            ->whereIn('section_ID', $sectionIds)
+            ->withCount(['enrollments as active_enrollments_count' => function ($query): void {
+                $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
+            }])
+            ->orderByDesc('active_enrollments_count')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Section $section): array => [
+                'label' => $section->name,
+                'total' => (int) ($section->active_enrollments_count ?? 0),
+                'is_advisory' => $advisorySectionIds->contains($section->section_ID),
+            ])
+            ->values()
+            ->all();
+
+        $enrollmentGradeLevel = $request->string('enrollment_grade_level')->toString();
+        $enrollmentGradeId = GradeLevel::idForValue($enrollmentGradeLevel);
+
+        $enrolledStatusId = EnrollmentStatus::idFor(EnrollmentStatus::ENROLLED);
+        $temporaryStatusId = EnrollmentStatus::idFor(EnrollmentStatus::TEMPORARILY_ENROLLED);
+
+        $enrollmentByGrade = DB::table('enrollments')
+            ->join('grade_level', 'enrollments.grade_ID', '=', 'grade_level.grade_ID')
+            ->when($syId, fn ($query) => $query->where('enrollments.SY_ID', $syId))
+            ->when(
+                $sectionIds->isNotEmpty(),
+                fn ($query) => $query->whereIn('enrollments.section_ID', $sectionIds->all()),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->whereIn('enrollments.enrollment_status_ID', EnrollmentStatus::activeIds())
+            ->when($enrollmentGradeId, fn ($query) => $query->where('enrollments.grade_ID', $enrollmentGradeId))
+            ->select('grade_level.grade_ID')
+            ->selectRaw('grade_level.grade_label as label')
+            ->selectRaw('SUM(CASE WHEN enrollments.enrollment_status_ID = ? THEN 1 ELSE 0 END) as enrolled', [$enrolledStatusId])
+            ->selectRaw('SUM(CASE WHEN enrollments.enrollment_status_ID = ? THEN 1 ELSE 0 END) as temporary', [$temporaryStatusId])
+            ->groupBy('grade_level.grade_ID', 'grade_level.grade_label')
+            ->orderBy('grade_level.grade_ID')
+            ->get()
+            ->map(fn ($row): array => [
+                'label' => $row->label,
+                'enrolled' => (int) $row->enrolled,
+                'temporary' => (int) $row->temporary,
+                'total' => (int) $row->enrolled + (int) $row->temporary,
+            ])
+            ->values()
+            ->all();
+
+        $enrollmentGradeSummary = [
+            'enrolled' => array_sum(array_column($enrollmentByGrade, 'enrolled')),
+            'temporary' => array_sum(array_column($enrollmentByGrade, 'temporary')),
+            'total' => array_sum(array_column($enrollmentByGrade, 'total')),
+        ];
+
+        $recentStudents = (clone $baseQuery)
+            ->with(['student.application', 'section.gradeLevel', 'gradeLevel', 'cluster', 'learnerType'])
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+            ->latest('updated_at')
+            ->limit(5)
+            ->get();
+
+        $sectionsCount = $sectionIds->count();
+        $advisoryCount = $advisorySectionIds->count();
+        $subjectsCount = $staff
+            ? TeacherSubjectAssignment::query()
+                ->where('staff_ID', $staff->staff_id)
+                ->when($syId, fn ($query) => $query->where('SY_ID', $syId))
+                ->count()
+            : 0;
+
+        $teacherSections = Section::query()
+            ->with(['gradeLevel', 'cluster', 'academicYear'])
+            ->whereIn('section_ID', $sectionIds)
+            ->withCount(['enrollments as active_enrollments_count' => function ($query): void {
+                $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
+            }])
+            ->orderBy('grade_ID')
+            ->orderBy('name')
+            ->get();
 
         return view('users.teacher.dashboard', [
             'staff' => $staff,
             'activeYear' => $activeYear,
+            'totalStudents' => $totalStudents,
+            'enrolledCount' => $enrolledCount,
+            'temporaryCount' => $temporaryCount,
+            'transfereeCount' => $transfereeCount,
+            'balikAralCount' => $balikAralCount,
+            'genderDistribution' => $genderDistribution,
+            'sectionDistribution' => $sectionDistribution,
+            'recentStudents' => $recentStudents,
+            'genderSectionId' => $genderSectionId ? (string) $genderSectionId : '',
+            'enrollmentGradeLevel' => $enrollmentGradeLevel,
+            'enrollmentByGrade' => $enrollmentByGrade,
+            'enrollmentGradeSummary' => $enrollmentGradeSummary,
+            'gradeLevels' => GradeLevel::options(),
             'sectionsCount' => $sectionsCount,
-            'studentsCount' => $studentsCount,
+            'advisoryCount' => $advisoryCount,
             'subjectsCount' => $subjectsCount,
+            'teacherSections' => $teacherSections,
+            'advisorySectionIds' => $advisorySectionIds,
         ]);
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreSubjectRequest;
+use App\Http\Requests\Admin\UpdateSubjectRequest;
 use App\Models\Cluster;
 use App\Models\PreferredCourse;
 use App\Models\Subject;
@@ -23,7 +25,7 @@ class SubjectConfigurationController extends Controller
         $search = trim($request->string('search')->toString());
         $status = $request->string('status')->toString();
         $type = $request->string('type')->toString();
-        $clusterId = $request->integer('cluster_ID');
+        $clusterFilter = $request->string('cluster_ID')->toString();
         $preferredCoursesPerPage = (int) $request->integer('preferred_courses_per_page', 10);
         if (! in_array($preferredCoursesPerPage, [5, 10, 15, 25, 50], true)) {
             $preferredCoursesPerPage = 10;
@@ -46,8 +48,11 @@ class SubjectConfigurationController extends Controller
             ->when(in_array($type, ['core', 'applied', 'specialized'], true), function ($query) use ($type): void {
                 $query->where('type', $type);
             })
-            ->when($clusterId > 0, function ($query) use ($clusterId): void {
-                $query->where('cluster_ID', $clusterId);
+            ->when($clusterFilter === 'none', function ($query): void {
+                $query->whereNull('cluster_ID');
+            })
+            ->when(ctype_digit($clusterFilter) && (int) $clusterFilter > 0, function ($query) use ($clusterFilter): void {
+                $query->where('cluster_ID', (int) $clusterFilter);
             })
             ->orderBy('code')
             ->paginate($perPage)
@@ -88,33 +93,23 @@ class SubjectConfigurationController extends Controller
             'preferredClusters' => $preferredClusters,
             'perPage' => $perPage,
             'preferredCoursesPerPage' => $preferredCoursesPerPage,
+            'totalSubjects' => Subject::query()->count(),
+            'activeSubjectCount' => Subject::query()->where('status', 'active')->count(),
+            'archivedSubjectCount' => Subject::query()->where('status', 'archived')->count(),
+            'preferredCourseCount' => PreferredCourse::query()->count(),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreSubjectRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'cluster_ID' => ['required', 'integer', Rule::exists('clusters', 'cluster_ID')],
-            'code' => ['required', 'string', 'max:255', 'unique:subjects,code'],
-            'title' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::in(['core', 'applied', 'specialized'])],
-        ]);
-
-        Subject::query()->create($validated);
+        Subject::query()->create($request->validated());
 
         return back()->with('success', 'Subject created successfully.');
     }
 
-    public function update(Request $request, Subject $subject): RedirectResponse
+    public function update(UpdateSubjectRequest $request, Subject $subject): RedirectResponse
     {
-        $validated = $request->validate([
-            'cluster_ID' => ['required', 'integer', Rule::exists('clusters', 'cluster_ID')],
-            'code' => ['required', 'string', 'max:255', Rule::unique('subjects', 'code')->ignore($subject->subject_ID, 'subject_ID')],
-            'title' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::in(['core', 'applied', 'specialized'])],
-        ]);
-
-        $subject->update($validated);
+        $subject->update($request->validated());
 
         return back()->with('success', 'Subject updated successfully.');
     }

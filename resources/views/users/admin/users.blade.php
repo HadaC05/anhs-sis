@@ -3,415 +3,430 @@
 @section('title', 'Users')
 
 @section('content')
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800">Users</h1>
-            </div>
-            <button onclick="openAddModal()" class="inline-flex items-center px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57] transition-colors shadow-md">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                </svg>
-                Add New Staff
-            </button>
-        </div>
+@php
+$roleCardStyles = [
+'admin' => ['text' => 'text-purple-700', 'hover' => 'hover:border-purple-200'],
+'teacher' => ['text' => 'text-blue-700', 'hover' => 'hover:border-blue-200'],
+'guidance counselor' => ['text' => 'text-emerald-700', 'hover' => 'hover:border-emerald-200'],
+'registrar' => ['text' => 'text-amber-700', 'hover' => 'hover:border-amber-200'],
+'principal' => ['text' => 'text-rose-700', 'hover' => 'hover:border-rose-200'],
+'student' => ['text' => 'text-cyan-700', 'hover' => 'hover:border-cyan-200'],
+];
+@endphp
+
+<div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Users</h1>
     </div>
-
-    <!-- Flash Messages -->
-    @if(session('success'))
-    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-        {{ session('success') }}
-    </div>
-    @endif
-    @if($errors->any())
-    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-        @foreach($errors->all() as $error)
-        <p>{{ $error }}</p>
-        @endforeach
-    </div>
-    @endif
-
-    <!-- Statistics -->
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-4 text-center">
-            <p class="text-2xl font-bold text-gray-800">{{ $totalUsers }}</p>
-            <p class="text-xs text-gray-500 uppercase tracking-wide">Total Users</p>
-        </div>
-        @foreach($roleCounts as $roleName => $count)
-        <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-4 text-center">
-            <p class="text-2xl font-bold 
-                    @if($roleName === 'admin') text-purple-600
-                    @elseif($roleName === 'teacher') text-blue-600
-                    @elseif($roleName === 'guidance counselor') text-green-600
-                    @elseif($roleName === 'registrar') text-yellow-600
-                    @elseif($roleName === 'principal') text-red-600
-                    @elseif($roleName === 'student') text-cyan-600
-                    @else text-gray-600
-                    @endif">{{ $count }}</p>
-            <p class="text-xs text-gray-500 uppercase tracking-wide">{{ ucfirst($roleName) }}</p>
-        </div>
-        @endforeach
-    </div>
-
-    <!-- Tabs -->
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        <div class="border-b border-gray-200">
-            <nav class="flex">
-                <a href="{{ route('admin.users', array_merge(request()->except(['tab', 'page']), ['tab' => 'staff'])) }}"
-                    class="px-6 py-4 text-sm font-semibold border-b-2 transition-colors {{ $activeTab === 'staff' ? 'border-[#296374] text-[#296374]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
-                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    Staff Users
-                    <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{ $activeTab === 'staff' ? 'bg-[#296374] text-white' : 'bg-gray-200 text-gray-600' }}">{{ $staffCount }}</span>
-                </a>
-                <a href="{{ route('admin.users', array_merge(request()->except(['tab', 'page']), ['tab' => 'students'])) }}"
-                    class="px-6 py-4 text-sm font-semibold border-b-2 transition-colors {{ $activeTab === 'students' ? 'border-[#296374] text-[#296374]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
-                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                    </svg>
-                    Students
-                    <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{ $activeTab === 'students' ? 'bg-[#296374] text-white' : 'bg-gray-200 text-gray-600' }}">{{ $studentCount }}</span>
-                </a>
-            </nav>
-        </div>
-
-        <!-- Filters -->
-        <div class="p-6 border-b border-gray-200 bg-gray-50/50">
-            <form method="GET" action="{{ route('admin.users') }}" class="flex flex-wrap items-end gap-4">
-                <input type="hidden" name="tab" value="{{ $activeTab }}">
-                <div class="flex-1 min-w-[200px]">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}"
-                        placeholder="{{ $activeTab === 'students' ? 'Name, LRN, or email...' : 'Username or email...' }}"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                </div>
-                @if($activeTab === 'staff')
-                <div class="w-40">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Role</label>
-                    <select name="role" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                        <option value="">All Roles</option>
-                        @foreach($staffRoles as $role)
-                        <option value="{{ $role->role_name }}" {{ request('role') === $role->role_name ? 'selected' : '' }}>
-                            {{ ucfirst($role->role_name) }}
-                        </option>
-                        @endforeach
-                    </select>
-                </div>
-                @endif
-                <div class="w-40">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Status</label>
-                    <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                        <option value="">All Status</option>
-                        <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                        <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
-                    </select>
-                </div>
-                <div class="w-40">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Per Page</label>
-                    <select name="per_page" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                        @foreach([10, 15, 25, 50, 100] as $size)
-                            <option value="{{ $size }}" {{ (int) ($perPage ?? 15) === $size ? 'selected' : '' }}>{{ $size }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <button type="submit" class="px-6 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57] transition-colors">
-                    Filter
-                </button>
-                @if(request()->hasAny(['search', 'role', 'status', 'per_page']))
-                <a href="{{ route('admin.users', ['tab' => $activeTab]) }}" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                    Clear
-                </a>
-                @endif
-            </form>
-        </div>
-
-        <!-- Users Table -->
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                    <tr class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        <th class="px-6 py-4">User</th>
-                        @if($activeTab === 'staff')
-                        <th class="px-6 py-4">Role</th>
-                        @else
-                        <th class="px-6 py-4">LRN</th>
-                        @endif
-                        <th class="px-6 py-4">Status</th>
-                        <th class="px-6 py-4">Created</th>
-                        <th class="px-6 py-4 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    @forelse($users as $user)
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white
-                                        @if($user->role->role_name === 'admin') bg-purple-500
-                                        @elseif($user->role->role_name === 'teacher') bg-blue-500
-                                        @elseif($user->role->role_name === 'guidance counselor') bg-green-500
-                                        @elseif($user->role->role_name === 'registrar') bg-yellow-500
-                                        @elseif($user->role->role_name === 'principal') bg-red-500
-                                        @elseif($user->role->role_name === 'student') bg-cyan-500
-                                        @else bg-gray-500
-                                        @endif">
-                                    @if($activeTab === 'students' && $user->student)
-                                    {{ strtoupper(substr(optional($user->student->application)->first_name ?? $user->name ?? 'S', 0, 1)) }}
-                                    @elseif($activeTab === 'staff' && $user->staff)
-                                    {{ strtoupper(substr($user->staff->first_name ?? $user->username, 0, 1)) }}
-                                    @else
-                                    {{ strtoupper(substr($user->username, 0, 1)) }}
-                                    @endif
-                                </div>
-                                <div>
-                                    @if($activeTab === 'students' && $user->student)
-                                    <p class="font-semibold text-gray-800">
-                                        {{ optional($user->student->application)->last_name ?? $user->name }},
-                                        {{ optional($user->student->application)->first_name ?? '' }}
-                                        {{ optional($user->student->application)->middle_name ? substr(optional($user->student->application)->middle_name, 0, 1) . '.' : '' }}
-                                    </p>
-                                    @elseif($activeTab === 'staff' && $user->staff)
-                                    <p class="font-semibold text-gray-800">
-                                        {{ $user->staff->last_name }}, {{ $user->staff->first_name }} {{ $user->staff->middle_name ? substr($user->staff->middle_name, 0, 1) . '.' : '' }}
-                                    </p>
-                                    @else
-                                    <p class="font-semibold text-gray-800">{{ $user->username }}</p>
-                                    @endif
-                                    <p class="text-sm text-gray-500">{{ $user->email }}</p>
-                                </div>
-                            </div>
-                        </td>
-                        @if($activeTab === 'staff')
-                        <td class="px-6 py-4">
-                            <span class="px-3 py-1 text-xs font-semibold rounded-full 
-                                        @if($user->role->role_name === 'admin') bg-purple-100 text-purple-700
-                                        @elseif($user->role->role_name === 'teacher') bg-blue-100 text-blue-700
-                                        @elseif($user->role->role_name === 'guidance counselor') bg-green-100 text-green-700
-                                        @elseif($user->role->role_name === 'registrar') bg-yellow-100 text-yellow-700
-                                        @elseif($user->role->role_name === 'principal') bg-red-100 text-red-700
-                                        @else bg-gray-100 text-gray-700
-                                        @endif">
-                                {{ ucfirst($user->role->role_name) }}
-                            </span>
-                        </td>
-                        @else
-                        <td class="px-6 py-4 text-gray-600">
-                            {{ $user->student->lrn ?? 'Not set' }}
-                        </td>
-                        @endif
-                        <td class="px-6 py-4">
-                            <span class="px-3 py-1 text-xs font-semibold rounded-full {{ ($user->status ?? 'active') === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">
-                                {{ ucfirst($user->status ?? 'active') }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-gray-500 text-sm">
-                            {{ $user->created_at->format('M d, Y') }}
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                @if($activeTab === 'students')
-                                <button onclick="openEditStudentModal({{ json_encode([
-                                    'id' => $user->id,
-                                    'username' => $user->username,
-                                    'email' => $user->email,
-                                    'lrn' => optional($user->student)->lrn,
-                                    'first_name' => optional(optional($user->student)->application)->first_name,
-                                    'middle_name' => optional(optional($user->student)->application)->middle_name,
-                                    'last_name' => optional(optional($user->student)->application)->last_name,
-                                ]) }})"
-                                    class="p-2 text-gray-500 hover:text-[#296374] hover:bg-gray-100 rounded-lg transition-colors" title="Edit">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                    </svg>
-                                </button>
-                                @else
-                                <button onclick="openEditModal({{ json_encode($user) }})"
-                                    class="p-2 text-gray-500 hover:text-[#296374] hover:bg-gray-100 rounded-lg transition-colors" title="Edit">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                    </svg>
-                                </button>
-                                @endif
-                                @if($activeTab === 'students' || $user->id !== auth()->user()?->staff_id)
-                                <form action="{{ route('admin.users.toggle-status', $user->id) }}" method="POST" class="inline">
-                                    @csrf
-                                    @method('PATCH')
-                                    @if($activeTab === 'students')
-                                    <input type="hidden" name="is_student" value="1">
-                                    @endif
-                                    <button type="submit"
-                                        class="p-2 {{ ($user->status ?? 'active') === 'active' ? 'text-gray-500 hover:text-red-600 hover:bg-red-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50' }} rounded-lg transition-colors"
-                                        title="{{ ($user->status ?? 'active') === 'active' ? 'Deactivate' : 'Activate' }}">
-                                        @if(($user->status ?? 'active') === 'active')
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                                        </svg>
-                                        @else
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        @endif
-                                    </button>
-                                </form>
-                                <form action="{{ route('admin.users.delete', $user->id) }}" method="POST" class="inline"
-                                      onsubmit="return confirm('Are you sure you want to delete this user? This action cannot be undone and will also delete their profile and related data.');">
-                                    @csrf
-                                    @method('DELETE')
-                                    @if($activeTab === 'students')
-                                    <input type="hidden" name="is_student" value="1">
-                                    @endif
-                                    <button type="submit"
-                                        class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                        title="Delete User">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </form>
-                                @endif
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
-                            <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                            </svg>
-                            <p>No {{ $activeTab === 'students' ? 'students' : 'staff users' }} found.</p>
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        @if($users->hasPages())
-        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {{ $users->withQueryString()->links() }}
-        </div>
-        @endif
-    </div>
+    <button type="button" onclick="openAddModal()" class="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style="background-color: #296374;">
+        Add New Staff
+    </button>
 </div>
 
-<!-- Add Staff Modal -->
-<div id="addModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent">
-            <h3 class="text-xl font-bold text-gray-800">Add New Staff User</h3>
-            <p class="text-sm text-gray-500 mt-1">Create a new account for a staff member</p>
+@if(session('success'))
+<div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+    {{ session('success') }}
+</div>
+@endif
+@if($errors->any() && old('_form') !== 'add_staff')
+<div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    @foreach($errors->all() as $error)
+    <p>{{ $error }}</p>
+    @endforeach
+</div>
+@endif
+
+<div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+    <a href="{{ route('admin.users', ['tab' => 'staff']) }}" class="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#296374]/30 hover:shadow-md">
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Total Users</p>
+        <p class="mt-2 text-3xl font-bold text-gray-900">{{ number_format($totalUsers) }}</p>
+        <p class="mt-1 text-xs text-gray-500">Staff + student accounts</p>
+    </a>
+    @foreach($roleCounts as $roleName => $count)
+    @php
+    $styles = $roleCardStyles[$roleName] ?? ['text' => 'text-gray-800', 'hover' => 'hover:border-gray-300'];
+    $cardUrl = $roleName === 'student'
+    ? route('admin.users', ['tab' => 'students'])
+    : route('admin.users', ['tab' => 'staff', 'role' => $roleName]);
+    @endphp
+    <a href="{{ $cardUrl }}" class="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md {{ $styles['hover'] }}">
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ ucfirst($roleName) }}</p>
+        <p class="mt-2 text-3xl font-bold {{ $styles['text'] }}">{{ number_format($count) }}</p>
+        <p class="mt-1 text-xs text-gray-500">{{ $roleName === 'student' ? 'Portal accounts' : 'Staff accounts' }}</p>
+    </a>
+    @endforeach
+</div>
+
+<div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
+    <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <h2 class="text-lg font-bold text-gray-900">{{ $activeTab === 'students' ? 'Student Accounts' : 'Staff Users' }}</h2>
+            <p class="mt-1 text-sm text-gray-500">{{ $activeTab === 'students' ? 'Student portal usernames and login status' : 'Personnel accounts across all staff roles' }}</p>
         </div>
-        <form action="{{ route('admin.users.store') }}" method="POST" class="p-6 space-y-4">
+        <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+            <a href="{{ route('admin.users', array_merge(request()->except(['tab', 'page', 'role']), ['tab' => 'staff'])) }}"
+                class="rounded-md px-4 py-2 text-sm font-semibold transition {{ $activeTab === 'staff' ? 'bg-white text-[#296374] shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                Staff
+                <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs {{ $activeTab === 'staff' ? 'bg-[#296374] text-white' : 'bg-gray-200 text-gray-600' }}">{{ $staffCount }}</span>
+            </a>
+            <a href="{{ route('admin.users', array_merge(request()->except(['tab', 'page', 'role']), ['tab' => 'students'])) }}"
+                class="rounded-md px-4 py-2 text-sm font-semibold transition {{ $activeTab === 'students' ? 'bg-white text-[#296374] shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                Students
+                <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs {{ $activeTab === 'students' ? 'bg-[#296374] text-white' : 'bg-gray-200 text-gray-600' }}">{{ $studentCount }}</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="border-b border-gray-100 px-4 py-4">
+        <form method="GET" action="{{ route('admin.users') }}" class="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="tab" value="{{ $activeTab }}">
+            <div class="relative min-w-[200px] flex-1">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
+                </svg>
+                <input type="search" name="search" value="{{ request('search') }}"
+                    placeholder="{{ $activeTab === 'students' ? 'Search name, LRN, or email' : 'Search name, username, or email' }}"
+                    class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
+            </div>
+            @if($activeTab === 'staff')
+            <select name="role" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All roles</option>
+                @foreach($staffRoles as $role)
+                <option value="{{ $role->role_name }}" {{ request('role') === $role->role_name ? 'selected' : '' }}>
+                    {{ ucfirst($role->role_name) }}
+                </option>
+                @endforeach
+            </select>
+            @endif
+            <select name="status" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="active" @selected(request('status') !== 'inactive')>Active</option>
+                <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+            </select>
+            <select name="per_page" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                @foreach([10, 15, 25, 50, 100] as $size)
+                <option value="{{ $size }}" {{ (int) ($perPage ?? 15) === $size ? 'selected' : '' }}>{{ $size }} per page</option>
+                @endforeach
+            </select>
+            <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
+            @if(request()->hasAny(['search', 'role', 'status', 'per_page']))
+            <a href="{{ route('admin.users', ['tab' => $activeTab]) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+            @endif
+        </form>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[760px] border-collapse text-left">
+            <thead>
+                <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                    <th class="border-r border-gray-200 px-5 py-4">Name</th>
+                    @if($activeTab === 'staff')
+                    <th class="border-r border-gray-200 px-5 py-4">Username</th>
+                    <th class="border-r border-gray-200 px-5 py-4">Role</th>
+                    @else
+                    <th class="border-r border-gray-200 px-5 py-4">Username</th>
+                    <th class="border-r border-gray-200 px-5 py-4">LRN</th>
+                    @endif
+                    <th class="border-r border-gray-200 px-5 py-4">Status</th>
+                    <th class="border-r border-gray-200 px-5 py-4">Created</th>
+                    <th class="px-5 py-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 text-sm">
+                @forelse($users as $user)
+                @php
+                $roleName = $user->roleName() !== '' ? $user->roleName() : ($activeTab === 'students' ? 'student' : 'unknown');
+                $displayName = trim(($user->last_name ? $user->last_name.', ' : '').$user->first_name.($user->middle_name ? ' '.substr($user->middle_name, 0, 1).'.' : '').($user->suffix ? ' '.$user->suffix : ''));
+                $isActive = $activeTab === 'students'
+                    ? $user->status !== 'inactive'
+                    : ($user->status ?? 'active') === 'active';
+                @endphp
+                <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
+                    <td class="border-r border-gray-100 px-5 py-4">
+                        <p class="font-semibold text-gray-900">{{ $displayName !== '' ? $displayName : '—' }}</p>
+                        <p class="text-xs text-gray-500">{{ $user->email ?: 'No email' }}</p>
+                    </td>
+                    @if($activeTab === 'staff')
+                    <td class="border-r border-gray-100 px-5 py-4 font-mono text-xs font-semibold text-gray-700">{{ $user->username }}</td>
+                    <td class="border-r border-gray-100 px-5 py-4">
+                        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1
+                                    @if($roleName === 'admin') bg-purple-50 text-purple-700 ring-purple-200
+                                    @elseif($roleName === 'teacher') bg-blue-50 text-blue-700 ring-blue-200
+                                    @elseif($roleName === 'guidance counselor') bg-emerald-50 text-emerald-700 ring-emerald-200
+                                    @elseif($roleName === 'registrar') bg-amber-50 text-amber-700 ring-amber-200
+                                    @elseif($roleName === 'principal') bg-rose-50 text-rose-700 ring-rose-200
+                                    @else bg-gray-100 text-gray-700 ring-gray-200
+                                    @endif">
+                            {{ ucfirst($roleName) }}
+                        </span>
+                    </td>
+                    @else
+                    <td class="border-r border-gray-100 px-5 py-4 font-mono text-xs font-semibold text-gray-700">{{ $user->username ?: '—' }}</td>
+                    <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $user->lrn ?: 'Not set' }}</td>
+                    @endif
+                    <td class="border-r border-gray-100 px-5 py-4">
+                        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $isActive ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-rose-50 text-rose-700 ring-rose-200' }}">
+                            {{ $isActive ? 'Active' : 'Inactive' }}
+                        </span>
+                    </td>
+                    <td class="border-r border-gray-100 px-5 py-4 text-gray-600">{{ $user->created_at?->format('M d, Y') ?? '—' }}</td>
+                    <td class="px-5 py-4">
+                        <div class="flex items-center justify-end gap-1">
+                            @if($activeTab === 'students')
+                            <button type="button" onclick="openEditStudentModal({{ json_encode([
+                                        'id' => $user->id,
+                                        'username' => $user->username,
+                                        'email' => $user->email,
+                                        'lrn' => $user->lrn,
+                                        'first_name' => $user->first_name,
+                                        'middle_name' => $user->middle_name,
+                                        'last_name' => $user->last_name,
+                                    ]) }})"
+                                class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            @else
+                            <button type="button" onclick="openEditModal({{ json_encode($user) }})"
+                                class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            @endif
+                            @if($activeTab === 'students' || $user->id !== auth()->user()?->staff_id)
+                            <form action="{{ route('admin.users.toggle-status', $user->id) }}" method="POST" class="inline">
+                                @csrf
+                                @method('PATCH')
+                                @if($activeTab === 'students')
+                                <input type="hidden" name="is_student" value="1">
+                                @endif
+                                <button type="submit"
+                                    class="rounded-lg p-2 {{ $isActive ? 'text-gray-500 hover:bg-red-50 hover:text-red-600' : 'text-gray-500 hover:bg-emerald-50 hover:text-emerald-600' }} transition"
+                                    title="{{ $isActive ? 'Deactivate' : 'Activate' }}">
+                                    @if($isActive)
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                    </svg>
+                                    @else
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    @endif
+                                </button>
+                            </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="6" class="px-6 py-16 text-center text-gray-500">No {{ $activeTab === 'students' ? 'students' : 'staff users' }} found.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    @if($users->hasPages())
+    <div class="border-t border-gray-100 bg-gray-50 px-4 py-3">
+        {{ $users->withQueryString()->links() }}
+    </div>
+    @endif
+</div>
+
+@php
+$addStaffModalOpen = $errors->any() && old('_form') === 'add_staff';
+$addFieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
+$addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
+@endphp
+<div id="addModal" role="dialog" aria-modal="true" aria-labelledby="addStaffTitle" data-open="{{ $addStaffModalOpen ? 'true' : 'false' }}"
+    class="fixed inset-0 z-[100] {{ $addStaffModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
+    <div class="mx-auto flex max-h-[calc(100vh-8rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
+        <div class="shrink-0 border-b border-gray-300 bg-[#296374] px-6 py-4">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">User management</p>
+                    <h3 id="addStaffTitle" class="mt-1 text-xl font-bold tracking-tight text-white">Add new staff</h3>
+                    <p class="mt-1 text-sm text-white/80">Create a staff login and assign a system role.</p>
+                </div>
+                <button type="button" onclick="closeAddModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10" aria-label="Close">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <form id="addStaffForm" action="{{ route('admin.users.store') }}" method="POST" class="flex min-h-0 flex-1 flex-col">
             @csrf
+            <input type="hidden" name="_form" value="add_staff">
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="first_name" required
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
+            <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                @if($addStaffModalOpen)
+                <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <p class="font-semibold">Please fix the highlighted fields before creating this account.</p>
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="last_name" required
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                </div>
+                @endif
+
+                <section>
+                    <div class="mb-4">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">Personal information</p>
+                        <p class="mt-1 text-sm text-gray-500">Name details as they should appear in staff records.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="add_first_name" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">First name <span class="text-red-500">*</span></label>
+                            <input id="add_first_name" type="text" name="first_name" value="{{ old('first_name') }}" required autocomplete="given-name"
+                                class="{{ $addFieldClass }} {{ $errors->has('first_name') ? 'border-red-300' : 'border-gray-200' }}">
+                            @error('first_name')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="add_last_name" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Last name <span class="text-red-500">*</span></label>
+                            <input id="add_last_name" type="text" name="last_name" value="{{ old('last_name') }}" required autocomplete="family-name"
+                                class="{{ $addFieldClass }} {{ $errors->has('last_name') ? 'border-red-300' : 'border-gray-200' }}">
+                            @error('last_name')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="add_middle_name" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Middle name</label>
+                            <input id="add_middle_name" type="text" name="middle_name" value="{{ old('middle_name') }}" autocomplete="additional-name"
+                                class="{{ $addFieldClass }} border-gray-200">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="add_suffix" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Suffix</label>
+                                <select id="add_suffix" name="suffix" class="{{ $addFieldClass }} {{ $errors->has('suffix') ? 'border-red-300' : 'border-gray-200' }}">
+                                    <option value="">None</option>
+                                    @foreach ($suffixOptions as $suffixOption)
+                                        <option value="{{ $suffixOption }}" @selected(old('suffix') === $suffixOption)>{{ $suffixOption }}</option>
+                                    @endforeach
+                                </select>
+                                @error('suffix')
+                                    <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <label for="add_birthdate" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Birthdate <span class="text-red-500">*</span></label>
+                                <input id="add_birthdate" type="date" name="birthdate" value="{{ old('birthdate') }}" required
+                                    min="{{ $earliestBirthdate }}" max="{{ $latestBirthdate }}"
+                                    class="{{ $addFieldClass }} {{ $errors->has('birthdate') ? 'border-red-300' : 'border-gray-200' }}">
+                                @error('birthdate')
+                                    <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="my-6 border-t border-gray-200"></div>
+
+                <section>
+                    <div class="mb-4">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">Account access</p>
+                        <p class="mt-1 text-sm text-gray-500">Login credentials and the role this staff member will use.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <label for="add_role" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Role <span class="text-red-500">*</span></label>
+                            <select id="add_role" name="role" required class="{{ $addFieldClass }} {{ $errors->has('role') ? 'border-red-300' : 'border-gray-200' }}">
+                                <option value="">Select a role</option>
+                                @foreach($staffRoles as $role)
+                                <option value="{{ $role->role_name }}" @selected(old('role')===$role->role_name)>{{ ucfirst($role->role_name) }}</option>
+                                @endforeach
+                            </select>
+                            @error('role')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="add_username" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Username <span class="text-red-500">*</span></label>
+                            <input id="add_username" type="text" name="username" value="{{ old('username') }}" required autocomplete="username"
+                                class="{{ $addFieldClass }} {{ $errors->has('username') ? 'border-red-300' : 'border-gray-200' }}">
+                            @error('username')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="add_email" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Email <span class="text-red-500">*</span></label>
+                            <input id="add_email" type="email" name="email" value="{{ old('email') }}" required autocomplete="email"
+                                class="{{ $addFieldClass }} {{ $errors->has('email') ? 'border-red-300' : 'border-gray-200' }}">
+                            @error('email')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="add_password" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Password <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <input id="add_password" type="password" name="password" required minlength="12" autocomplete="new-password"
+                                    class="{{ $addPasswordFieldClass }} {{ $errors->has('password') ? 'border-red-300' : 'border-gray-200' }}">
+                                <button type="button" onclick="togglePasswordVisibility('add_password', this)" class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-gray-400 transition hover:text-gray-600" aria-label="Show password">
+                                    <svg data-icon="show" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    <svg data-icon="hide" class="hidden h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                                </button>
+                            </div>
+                            @error('password')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="add_password_confirmation" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Confirm password <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <input id="add_password_confirmation" type="password" name="password_confirmation" required minlength="12" autocomplete="new-password"
+                                    class="{{ $addPasswordFieldClass }} {{ $errors->has('password_confirmation') ? 'border-red-300' : 'border-gray-200' }}">
+                                <button type="button" onclick="togglePasswordVisibility('add_password_confirmation', this)" class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-gray-400 transition hover:text-gray-600" aria-label="Show password">
+                                    <svg data-icon="show" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    <svg data-icon="hide" class="hidden h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                                </button>
+                            </div>
+                            @error('password_confirmation')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+                    <p class="mt-3 text-xs leading-relaxed text-gray-500">Use at least 12 characters, with uppercase and lowercase letters, a number, and a symbol. The staff member will be asked to change this password after first login.</p>
+                </section>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Middle Name</label>
-                    <input type="text" name="middle_name"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Suffix</label>
-                    <input type="text" name="suffix" placeholder="Jr., Sr., III, etc."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Birthdate</label>
-                <input type="date" name="birthdate"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
-                <select name="role" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                    <option value="">Select a role</option>
-                    @foreach($staffRoles as $role)
-                    <option value="{{ $role->role_name }}">{{ ucfirst($role->role_name) }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Username <span class="text-red-500">*</span></label>
-                <input type="text" name="username" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-                <input type="email" name="email" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
-                <input type="password" name="password" required minlength="8"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                <p class="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
-                <input type="password" name="password_confirmation" required minlength="8"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-            </div>
-
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeAddModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
+            <div class="flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
+                <button type="button" onclick="closeAddModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
                     Cancel
                 </button>
-                <button type="submit" class="flex-1 px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57] transition-colors font-medium">
-                    Create User
+                <button type="submit" class="rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+                    Create staff account
                 </button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Edit Staff Modal -->
-<div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent">
+<div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div class="border-b border-gray-200 px-6 py-5">
             <h3 class="text-xl font-bold text-gray-800">Edit Staff User</h3>
         </div>
-        <form id="editForm" method="POST" class="p-6 space-y-4">
+        <form id="editForm" method="POST" class="space-y-4 p-6">
             @csrf
             @method('PUT')
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Username <span class="text-red-500">*</span></label>
+                <label class="mb-1 block text-sm font-semibold text-gray-700">Username <span class="text-red-500">*</span></label>
                 <input type="text" name="username" id="edit_username" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+                <label class="mb-1 block text-sm font-semibold text-gray-700">Email <span class="text-red-500">*</span></label>
                 <input type="email" name="email" id="edit_email" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
-                <select name="role" id="edit_role" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
+                <label class="mb-1 block text-sm font-semibold text-gray-700">Role <span class="text-red-500">*</span></label>
+                <select name="role" id="edit_role" required class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
                     @foreach($staffRoles as $role)
                     <option value="{{ $role->role_name }}">{{ ucfirst($role->role_name) }}</option>
                     @endforeach
@@ -419,23 +434,23 @@
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">New Password</label>
-                <input type="password" name="password" minlength="8"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
+                <label class="mb-1 block text-sm font-semibold text-gray-700">New Password</label>
+                <input type="password" name="password" minlength="12" autocomplete="new-password"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
+                <p class="mt-1 text-xs text-gray-500">Leave blank to keep the current password. If changing, use at least 12 characters, with uppercase and lowercase letters, a number, and a symbol.</p>
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Confirm New Password</label>
-                <input type="password" name="password_confirmation" minlength="8"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
+                <label class="mb-1 block text-sm font-semibold text-gray-700">Confirm New Password</label>
+                <input type="password" name="password_confirmation" minlength="12" autocomplete="new-password"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
             </div>
 
             <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
+                <button type="button" onclick="closeEditModal()" class="flex-1 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-200">
                     Cancel
                 </button>
-                <button type="submit" class="flex-1 px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57] transition-colors font-medium">
+                <button type="submit" class="flex-1 rounded-lg px-4 py-2 font-medium text-white transition hover:opacity-90" style="background-color: #296374;">
                     Update User
                 </button>
             </div>
@@ -443,47 +458,46 @@
     </div>
 </div>
 
-<!-- Edit Student Modal -->
-<div id="editStudentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-cyan-500/10 to-transparent">
+<div id="editStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div class="border-b border-gray-200 px-6 py-5">
             <h3 class="text-xl font-bold text-gray-800">Edit Student Account</h3>
         </div>
-        <form id="editStudentForm" method="POST" class="p-6 space-y-4">
+        <form id="editStudentForm" method="POST" class="space-y-4 p-6">
             @csrf
             @method('PUT')
             <input type="hidden" name="is_student" value="1">
 
-            <div class="p-4 bg-cyan-50 rounded-lg border border-cyan-200">
-                <p class="text-sm font-semibold text-cyan-800" id="student_name_display">Student Name</p>
-                <p class="text-xs text-cyan-600" id="student_lrn_display">LRN: ---</p>
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p class="text-sm font-semibold text-gray-800" id="student_name_display">Student Name</p>
+                <p class="text-xs text-gray-500" id="student_lrn_display">LRN: ---</p>
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+                <label class="mb-1 block text-sm font-semibold text-gray-700">Email <span class="text-red-500">*</span></label>
                 <input type="email" name="email" id="edit_student_email" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                <p class="text-xs text-gray-500 mt-1">This is also used as the username for login</p>
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
+                <p class="mt-1 text-xs text-gray-500">This is also used as the username for login</p>
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">New Password</label>
-                <input type="password" name="password" minlength="8"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
-                <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password. Use this to reset forgotten passwords.</p>
+                <label class="mb-1 block text-sm font-semibold text-gray-700">New Password</label>
+                <input type="password" name="password" minlength="12" autocomplete="new-password"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
+                <p class="mt-1 text-xs text-gray-500">Leave blank to keep the current password. If changing, use at least 12 characters, with uppercase and lowercase letters, a number, and a symbol.</p>
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Confirm New Password</label>
-                <input type="password" name="password_confirmation" minlength="8"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#296374] focus:border-transparent">
+                <label class="mb-1 block text-sm font-semibold text-gray-700">Confirm New Password</label>
+                <input type="password" name="password_confirmation" minlength="12" autocomplete="new-password"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
             </div>
 
             <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeEditStudentModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
+                <button type="button" onclick="closeEditStudentModal()" class="flex-1 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-200">
                     Cancel
                 </button>
-                <button type="submit" class="flex-1 px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57] transition-colors font-medium">
+                <button type="submit" class="flex-1 rounded-lg px-4 py-2 font-medium text-white transition hover:opacity-90" style="background-color: #296374;">
                     Update Student
                 </button>
             </div>
@@ -493,13 +507,21 @@
 
 <script>
     function openAddModal() {
-        document.getElementById('addModal').classList.remove('hidden');
-        document.getElementById('addModal').classList.add('flex');
+        var modal = document.getElementById('addModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal.setAttribute('data-open', 'true');
+        var firstField = document.getElementById('add_first_name');
+        if (firstField) {
+            firstField.focus();
+        }
     }
 
     function closeAddModal() {
-        document.getElementById('addModal').classList.add('hidden');
-        document.getElementById('addModal').classList.remove('flex');
+        var modal = document.getElementById('addModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        modal.setAttribute('data-open', 'false');
     }
 
     function openEditModal(user) {
@@ -535,9 +557,51 @@
         document.getElementById('editStudentModal').classList.remove('flex');
     }
 
-    // Close modals when clicking outside
+    function togglePasswordVisibility(inputId, button) {
+        var input = document.getElementById(inputId);
+        var showIcon = button.querySelector('[data-icon="show"]');
+        var hideIcon = button.querySelector('[data-icon="hide"]');
+        var isHidden = input.type === 'password';
+
+        input.type = isHidden ? 'text' : 'password';
+        showIcon.classList.toggle('hidden', isHidden);
+        hideIcon.classList.toggle('hidden', !isHidden);
+        button.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+    }
+
+    function syncPasswordConfirmationValidity() {
+        var password = document.getElementById('add_password');
+        var confirmation = document.getElementById('add_password_confirmation');
+
+        if (!password || !confirmation) {
+            return true;
+        }
+
+        if (confirmation.value !== '' && confirmation.value !== password.value) {
+            confirmation.setCustomValidity('The confirm password must match the password.');
+            return false;
+        }
+
+        confirmation.setCustomValidity('');
+        return true;
+    }
+
+    document.getElementById('addStaffForm').addEventListener('submit', function (event) {
+        if (! syncPasswordConfirmationValidity()) {
+            event.preventDefault();
+            document.getElementById('add_password_confirmation').reportValidity();
+        }
+    });
+    document.getElementById('add_password').addEventListener('input', syncPasswordConfirmationValidity);
+    document.getElementById('add_password_confirmation').addEventListener('input', syncPasswordConfirmationValidity);
+
     document.getElementById('addModal').addEventListener('click', function(e) {
         if (e.target === this) closeAddModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('addModal').getAttribute('data-open') === 'true') {
+            closeAddModal();
+        }
     });
     document.getElementById('editModal').addEventListener('click', function(e) {
         if (e.target === this) closeEditModal();

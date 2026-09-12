@@ -12,12 +12,20 @@ return new class extends Migration
             return;
         }
 
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement('ALTER TABLE sessions MODIFY user_id VARCHAR(255) NULL');
     }
 
     public function down(): void
     {
         if (! Schema::hasTable('sessions') || ! Schema::hasColumn('sessions', 'user_id')) {
+            return;
+        }
+
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
             return;
         }
 

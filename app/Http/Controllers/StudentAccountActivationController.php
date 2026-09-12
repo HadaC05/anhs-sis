@@ -31,7 +31,6 @@ class StudentAccountActivationController extends Controller
 
         $user = Student::query()
             ->where('username', $validated['username'])
-            ->whereHas('role', fn ($query) => $query->where('role_name', 'student'))
             ->first();
 
         if (! $user) {

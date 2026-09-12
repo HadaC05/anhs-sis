@@ -38,6 +38,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Idle Session Timeout
+    |--------------------------------------------------------------------------
+    |
+    | After this many minutes without mouse, keyboard, or touch activity,
+    | authenticated users are shown a timeout modal and logged out.
+    |
+    */
+
+    'idle_timeout' => (int) env('SESSION_IDLE_TIMEOUT', 5),
+
+    /*
+    |--------------------------------------------------------------------------
     | Session Encryption
     |--------------------------------------------------------------------------
     |

@@ -1,307 +1,464 @@
 @extends('users.admin.layout')
 
-@section('title', 'Subject Configuration')
+@section('title', 'Subjects')
 
 @section('content')
-<div class="space-y-6">
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
-        <h1 class="text-2xl font-bold text-gray-800">Subject Configuration</h1>
-        <p class="text-sm text-gray-500 mt-1">Manage subjects and preferred courses masterfile.</p>
+@php
+    $fieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
+    $subjectModalOpen = old('_form') === 'subject' && $errors->any();
+    $preferredCourseModalOpen = old('_form') === 'preferred_course' && $errors->any();
+    $activeTab = $preferredCourseModalOpen
+        ? 'preferred_courses'
+        : ($subjectModalOpen || request('tab') !== 'preferred_courses' ? 'subjects' : 'preferred_courses');
+@endphp
+
+<div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Subjects</h1>
+        <p class="mt-1 text-sm text-gray-500">Manage the subject masterfile and preferred courses.</p>
     </div>
-
-    @if (session('success'))
-        <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if ($errors->any())
-        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            @foreach ($errors->all() as $error)
-                <p>{{ $error }}</p>
-            @endforeach
-        </div>
-    @endif
-
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        <div class="border-b border-gray-200 bg-gray-50/50 px-4 py-2">
-            <nav class="flex gap-2">
-                <button type="button" id="subjectsTabBtn" onclick="switchSubjectConfigTab('subjects')" class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-[#296374] text-white">Subjects</button>
-                <button type="button" id="preferredCoursesTabBtn" onclick="switchSubjectConfigTab('preferred_courses')" class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-white text-gray-600 hover:bg-gray-100">Preferred Courses</button>
-            </nav>
-        </div>
-
-        <div id="subjectsTabPanel">
-            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent flex items-center justify-between">
-                <h2 class="text-base font-bold text-[#296374] uppercase tracking-wider">Subjects</h2>
-                <button type="button" onclick="openSubjectModal()" class="inline-flex items-center px-3 py-2 bg-[#296374] text-white text-sm rounded-lg hover:bg-[#1e4a57] transition-colors">Add Subject</button>
-            </div>
-
-            <div class="p-6 border-b border-gray-200 bg-gray-50/50">
-                <form method="GET" action="{{ route('admin.subject-config.index') }}" class="flex flex-wrap items-end gap-4">
-                    <input type="hidden" name="tab" value="subjects">
-                    <input type="hidden" name="preferred_courses_search" value="{{ request('preferred_courses_search') }}">
-                    <input type="hidden" name="preferred_courses_cluster_ID" value="{{ request('preferred_courses_cluster_ID') }}">
-                    <input type="hidden" name="preferred_courses_per_page" value="{{ request('preferred_courses_per_page', $preferredCoursesPerPage ?? 10) }}">
-
-                    <div class="min-w-[220px]">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Search</label>
-                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Code or title" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div class="w-40">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Type</label>
-                        <select name="type" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="">All Types</option>
-                            <option value="core" {{ request('type') === 'core' ? 'selected' : '' }}>Core</option>
-                            <option value="applied" {{ request('type') === 'applied' ? 'selected' : '' }}>Applied</option>
-                            <option value="specialized" {{ request('type') === 'specialized' ? 'selected' : '' }}>Specialized</option>
-                        </select>
-                    </div>
-                    <div class="w-48">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Cluster</label>
-                        <select name="cluster_ID" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="">All Clusters</option>
-                            @foreach ($clusters as $cluster)
-                                <option value="{{ $cluster->cluster_ID }}" {{ (int) request('cluster_ID') === (int) $cluster->cluster_ID ? 'selected' : '' }}>{{ $cluster->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="w-40">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Status</label>
-                        <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="">All Status</option>
-                            <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                            <option value="archived" {{ request('status') === 'archived' ? 'selected' : '' }}>Archived</option>
-                        </select>
-                    </div>
-                    <div class="w-32">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Per Page</label>
-                        <select name="per_page" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            @foreach([10, 15, 25, 50, 100] as $size)
-                                <option value="{{ $size }}" {{ (int) ($perPage ?? 15) === $size ? 'selected' : '' }}>{{ $size }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <button type="submit" class="px-5 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57]">Filter</button>
-                    @if(request()->hasAny(['search', 'type', 'cluster_ID', 'status', 'per_page']))
-                        <a href="{{ route('admin.subject-config.index', ['tab' => 'subjects']) }}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Clear</a>
-                    @endif
-                </form>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            <th class="px-6 py-4">Code</th>
-                            <th class="px-6 py-4">Title</th>
-                            <th class="px-6 py-4">Type</th>
-                            <th class="px-6 py-4">Cluster</th>
-                            <th class="px-6 py-4">Status</th>
-                            <th class="px-6 py-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse ($subjects as $subject)
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 text-gray-700 font-semibold">{{ $subject->code }}</td>
-                                <td class="px-6 py-4 text-gray-800">{{ $subject->title }}</td>
-                                <td class="px-6 py-4 text-gray-600 uppercase">{{ $subject->type }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ optional($subject->cluster)->name ?? 'N/A' }}</td>
-                                <td class="px-6 py-4">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $subject->status === 'active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700' }}">
-                                        {{ ucfirst($subject->status ?? 'active') }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="inline-flex items-center gap-2">
-                                        <button type="button" onclick='openSubjectModal(@json($subject))' class="px-3 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200">Edit</button>
-                                        <form action="{{ route('admin.subject-config.delete', $subject) }}" method="POST" class="inline" onsubmit="return confirm('{{ $subject->status === 'active' ? 'Archive this subject?' : 'Restore this subject?' }}');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="px-3 py-1 text-xs rounded {{ $subject->status === 'active' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-green-100 text-green-700 hover:bg-green-200' }}">
-                                                {{ $subject->status === 'active' ? 'Archive' : 'Restore' }}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="px-6 py-8 text-center text-gray-500">No subjects yet.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            @if ($subjects->hasPages())
-                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    {{ $subjects->appends(['tab' => 'subjects'])->withQueryString()->links() }}
-                </div>
-            @endif
-        </div>
-
-        <div id="preferredCoursesTabPanel" class="hidden">
-            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent flex items-center justify-between">
-                <h2 class="text-base font-bold text-[#296374] uppercase tracking-wider">Preferred Courses Masterfile</h2>
-                <button type="button" onclick="openPreferredCourseModal()" class="inline-flex items-center px-3 py-2 bg-[#296374] text-white text-sm rounded-lg hover:bg-[#1e4a57] transition-colors">Add Preferred Course</button>
-            </div>
-
-            <div class="p-6 border-b border-gray-200 bg-gray-50/50">
-                <form method="GET" action="{{ route('admin.subject-config.index') }}" class="flex flex-wrap items-end gap-4">
-                    <input type="hidden" name="tab" value="preferred_courses">
-                    <input type="hidden" name="search" value="{{ request('search') }}">
-                    <input type="hidden" name="type" value="{{ request('type') }}">
-                    <input type="hidden" name="cluster_ID" value="{{ request('cluster_ID') }}">
-                    <input type="hidden" name="status" value="{{ request('status') }}">
-                    <input type="hidden" name="per_page" value="{{ request('per_page', $perPage ?? 15) }}">
-
-                    <div class="min-w-[220px]">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Search</label>
-                        <input type="text" name="preferred_courses_search" value="{{ request('preferred_courses_search') }}" placeholder="Course name" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div class="w-64">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Academic Cluster</label>
-                        <select name="preferred_courses_cluster_ID" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="">All Clusters</option>
-                            @foreach ($preferredClusters as $cluster)
-                                <option value="{{ $cluster->cluster_ID }}" {{ (int) request('preferred_courses_cluster_ID') === (int) $cluster->cluster_ID ? 'selected' : '' }}>{{ $cluster->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="w-32">
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Per Page</label>
-                        <select name="preferred_courses_per_page" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            @foreach([5, 10, 15, 25, 50] as $size)
-                                <option value="{{ $size }}" {{ (int) ($preferredCoursesPerPage ?? 10) === $size ? 'selected' : '' }}>{{ $size }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <button type="submit" class="px-5 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57]">Filter</button>
-                    @if(request()->hasAny(['preferred_courses_search', 'preferred_courses_cluster_ID', 'preferred_courses_per_page']))
-                        <a href="{{ route('admin.subject-config.index', ['tab' => 'preferred_courses']) }}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Clear</a>
-                    @endif
-                </form>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            <th class="px-6 py-4">Course</th>
-                            <th class="px-6 py-4">Academic Cluster</th>
-                            <th class="px-6 py-4">Description</th>
-                            <th class="px-6 py-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse ($preferredCourses as $course)
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 text-gray-800 font-semibold">{{ $course->name }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ optional($course->cluster)->name ?? 'N/A' }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ $course->description ?: '-' }}</td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="inline-flex items-center gap-2">
-                                        <button type="button" onclick='openPreferredCourseModal(@json($course))' class="px-3 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200">Edit</button>
-                                        <form action="{{ route('admin.subject-config.preferred-courses.delete', $course) }}" method="POST" class="inline" onsubmit="return confirm('Delete this preferred course?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="px-3 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200">Delete</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="px-6 py-8 text-center text-gray-500">No preferred courses yet.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            @if ($preferredCourses->hasPages())
-                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    {{ $preferredCourses->appends(['tab' => 'preferred_courses'])->withQueryString()->links() }}
-                </div>
-            @endif
-        </div>
+    <div>
+        <button type="button" id="addSubjectHeaderBtn" onclick="openSubjectModal()"
+            class="{{ $activeTab === 'subjects' ? 'inline-flex' : 'hidden' }} items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
+            style="background-color: #296374;">
+            Add Subject
+        </button>
+        <button type="button" id="addPreferredCourseHeaderBtn" onclick="openPreferredCourseModal()"
+            class="{{ $activeTab === 'preferred_courses' ? 'inline-flex' : 'hidden' }} items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
+            style="background-color: #296374;">
+            Add Preferred Course
+        </button>
     </div>
 </div>
 
-<div id="subjectModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-4 overflow-hidden">
-        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent">
-            <h3 id="subjectModalTitle" class="text-xl font-bold text-gray-800">Add Subject</h3>
-        </div>
-        <form id="subjectForm" class="p-6 space-y-4" action="{{ route('admin.subject-config.store') }}" method="POST">
-            @csrf
-            <input type="hidden" id="subject_method" name="_method" value="POST">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Code</label>
-                    <input id="subject_code" name="code" type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+@if (session('success'))
+    <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        {{ session('success') }}
+    </div>
+@endif
+
+@if ($errors->any() && ! in_array(old('_form'), ['subject', 'preferred_course'], true))
+    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        @foreach ($errors->all() as $error)
+            <p>{{ $error }}</p>
+        @endforeach
+    </div>
+@endif
+
+<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Total Subjects</p>
+        <p class="mt-2 text-3xl font-bold text-gray-900">{{ number_format($totalSubjects) }}</p>
+        <p class="mt-1 text-xs text-gray-500">All subjects in the masterfile</p>
+    </div>
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Active</p>
+        <p class="mt-2 text-3xl font-bold text-emerald-700">{{ number_format($activeSubjectCount) }}</p>
+        <p class="mt-1 text-xs text-gray-500">Available for curriculum assignment</p>
+    </div>
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Archived</p>
+        <p class="mt-2 text-3xl font-bold text-amber-700">{{ number_format($archivedSubjectCount) }}</p>
+        <p class="mt-1 text-xs text-gray-500">Hidden from new assignments</p>
+    </div>
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Preferred Courses</p>
+        <p class="mt-2 text-3xl font-bold text-[#296374]">{{ number_format($preferredCourseCount) }}</p>
+        <p class="mt-1 text-xs text-gray-500">Tracks used during enrollment</p>
+    </div>
+</div>
+
+<div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
+    <div class="flex flex-col gap-3 border-b border-gray-100 px-4 pt-2 sm:flex-row sm:items-center sm:justify-between">
+        <nav class="flex gap-1" role="tablist" aria-label="Subject configuration tabs">
+            <button type="button" id="subjectsTabBtn" onclick="switchSubjectConfigTab('subjects')" role="tab"
+                aria-selected="{{ $activeTab === 'subjects' ? 'true' : 'false' }}"
+                class="relative px-4 py-3 text-sm font-bold transition {{ $activeTab === 'subjects' ? 'text-[#296374]' : 'text-gray-500 hover:text-gray-700' }}">
+                Subjects
+                <span id="subjectsTabIndicator" class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-[#296374] {{ $activeTab === 'subjects' ? '' : 'hidden' }}"></span>
+            </button>
+            <button type="button" id="preferredCoursesTabBtn" onclick="switchSubjectConfigTab('preferred_courses')" role="tab"
+                aria-selected="{{ $activeTab === 'preferred_courses' ? 'true' : 'false' }}"
+                class="relative px-4 py-3 text-sm font-bold transition {{ $activeTab === 'preferred_courses' ? 'text-[#296374]' : 'text-gray-500 hover:text-gray-700' }}">
+                Preferred Courses
+                <span id="preferredCoursesTabIndicator" class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-[#296374] {{ $activeTab === 'preferred_courses' ? '' : 'hidden' }}"></span>
+            </button>
+        </nav>
+    </div>
+
+    <div id="subjectsTabPanel" class="{{ $activeTab === 'subjects' ? '' : 'hidden' }}">
+        <div class="border-b border-gray-100 px-4 py-4">
+            <form method="GET" action="{{ route('admin.subject-config.index') }}" class="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="tab" value="subjects">
+                <input type="hidden" name="preferred_courses_search" value="{{ request('preferred_courses_search') }}">
+                <input type="hidden" name="preferred_courses_cluster_ID" value="{{ request('preferred_courses_cluster_ID') }}">
+                <input type="hidden" name="preferred_courses_per_page" value="{{ request('preferred_courses_per_page', $preferredCoursesPerPage ?? 10) }}">
+
+                <div class="relative min-w-[200px] flex-1">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
+                    </svg>
+                    <input type="search" name="search" value="{{ request('search') }}" placeholder="Search code or title"
+                        class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Type</label>
-                    <select id="subject_type" name="type" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-                        <option value="">Select</option>
-                        <option value="core">Core</option>
-                        <option value="applied">Applied</option>
-                        <option value="specialized">Specialized</option>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Title</label>
-                <input id="subject_title" name="title" type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Cluster</label>
-                <select id="subject_cluster_id" name="cluster_ID" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-                    <option value="">Select cluster</option>
+                <select name="type" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    <option value="">All types</option>
+                    <option value="core" @selected(request('type') === 'core')>Core</option>
+                    <option value="applied" @selected(request('type') === 'applied')>Applied</option>
+                    <option value="specialized" @selected(request('type') === 'specialized')>Specialized</option>
+                </select>
+                <select name="cluster_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    <option value="">All clusters</option>
+                    <option value="none" @selected(request('cluster_ID') === 'none')>No cluster</option>
                     @foreach ($clusters as $cluster)
-                        <option value="{{ $cluster->cluster_ID }}">{{ $cluster->name }}</option>
+                        <option value="{{ $cluster->cluster_ID }}" @selected((string) request('cluster_ID') === (string) $cluster->cluster_ID)>{{ $cluster->name }}</option>
                     @endforeach
                 </select>
+                <select name="status" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    <option value="">All statuses</option>
+                    <option value="active" @selected(request('status') === 'active')>Active</option>
+                    <option value="archived" @selected(request('status') === 'archived')>Archived</option>
+                </select>
+                <select name="per_page" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    @foreach ([10, 15, 25, 50, 100] as $size)
+                        <option value="{{ $size }}" {{ (int) ($perPage ?? 15) === $size ? 'selected' : '' }}>{{ $size }} per page</option>
+                    @endforeach
+                </select>
+                <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
+                @if (request()->hasAny(['search', 'type', 'cluster_ID', 'status', 'per_page']))
+                    <a href="{{ route('admin.subject-config.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                @endif
+            </form>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[720px] border-collapse text-left">
+                <thead>
+                    <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                        <th class="border-r border-gray-200 px-5 py-4">Code</th>
+                        <th class="border-r border-gray-200 px-5 py-4">Title</th>
+                        <th class="border-r border-gray-200 px-5 py-4">Type</th>
+                        <th class="border-r border-gray-200 px-5 py-4">Cluster</th>
+                        <th class="border-r border-gray-200 px-5 py-4">Status</th>
+                        <th class="px-5 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 text-sm">
+                    @forelse ($subjects as $subject)
+                        @php
+                            $subjectPayload = [
+                                'subject_ID' => $subject->subject_ID,
+                                'code' => $subject->code,
+                                'title' => $subject->title,
+                                'type' => $subject->type,
+                                'cluster_ID' => $subject->cluster_ID,
+                            ];
+                            $typeBadge = match ($subject->type) {
+                                'core' => 'bg-[#296374]/10 text-[#296374] ring-[#296374]/20',
+                                'applied' => 'bg-sky-50 text-sky-700 ring-sky-200',
+                                default => 'bg-violet-50 text-violet-700 ring-violet-200',
+                            };
+                        @endphp
+                        <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
+                            <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $subject->code }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $subject->title }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide ring-1 {{ $typeBadge }}">
+                                    {{ $subject->type }}
+                                </span>
+                            </td>
+                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ optional($subject->cluster)->name ?? '—' }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $subject->status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">
+                                    {{ ucfirst($subject->status ?? 'active') }}
+                                </span>
+                            </td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center justify-end gap-1">
+                                    <button type="button" onclick='openSubjectModal(@json($subjectPayload))'
+                                        class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                    </button>
+                                    <form action="{{ route('admin.subject-config.delete', $subject) }}" method="POST" class="inline" onsubmit="return confirm('{{ $subject->status === 'active' ? 'Archive this subject?' : 'Restore this subject?' }}');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rounded-lg p-2 text-gray-500 transition {{ $subject->status === 'active' ? 'hover:bg-amber-50 hover:text-amber-700' : 'hover:bg-emerald-50 hover:text-emerald-600' }}" title="{{ $subject->status === 'active' ? 'Archive' : 'Restore' }}">
+                                            @if ($subject->status === 'active')
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                                                </svg>
+                                            @else
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            @endif
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-16 text-center text-gray-500">No subjects yet.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if ($subjects->hasPages())
+            <div class="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                {{ $subjects->appends(['tab' => 'subjects'])->withQueryString()->links() }}
             </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeSubjectModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Cancel</button>
-                <button type="submit" class="flex-1 px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57]">Save Subject</button>
+        @endif
+    </div>
+
+    <div id="preferredCoursesTabPanel" class="{{ $activeTab === 'preferred_courses' ? '' : 'hidden' }}">
+        <div class="border-b border-gray-100 px-4 py-4">
+            <form method="GET" action="{{ route('admin.subject-config.index') }}" class="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="tab" value="preferred_courses">
+                <input type="hidden" name="search" value="{{ request('search') }}">
+                <input type="hidden" name="type" value="{{ request('type') }}">
+                <input type="hidden" name="cluster_ID" value="{{ request('cluster_ID') }}">
+                <input type="hidden" name="status" value="{{ request('status') }}">
+                <input type="hidden" name="per_page" value="{{ request('per_page', $perPage ?? 15) }}">
+
+                <div class="relative min-w-[200px] flex-1">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
+                    </svg>
+                    <input type="search" name="preferred_courses_search" value="{{ request('preferred_courses_search') }}" placeholder="Search course name"
+                        class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
+                </div>
+                <select name="preferred_courses_cluster_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    <option value="">All clusters</option>
+                    @foreach ($preferredClusters as $cluster)
+                        <option value="{{ $cluster->cluster_ID }}" @selected((int) request('preferred_courses_cluster_ID') === (int) $cluster->cluster_ID)>{{ $cluster->name }}</option>
+                    @endforeach
+                </select>
+                <select name="preferred_courses_per_page" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    @foreach ([5, 10, 15, 25, 50] as $size)
+                        <option value="{{ $size }}" {{ (int) ($preferredCoursesPerPage ?? 10) === $size ? 'selected' : '' }}>{{ $size }} per page</option>
+                    @endforeach
+                </select>
+                <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
+                @if (request()->hasAny(['preferred_courses_search', 'preferred_courses_cluster_ID', 'preferred_courses_per_page']))
+                    <a href="{{ route('admin.subject-config.index', ['tab' => 'preferred_courses']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                @endif
+            </form>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[640px] border-collapse text-left">
+                <thead>
+                    <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                        <th class="border-r border-gray-200 px-5 py-4">Course</th>
+                        <th class="border-r border-gray-200 px-5 py-4">Academic Cluster</th>
+                        <th class="border-r border-gray-200 px-5 py-4">Description</th>
+                        <th class="px-5 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 text-sm">
+                    @forelse ($preferredCourses as $course)
+                        @php
+                            $coursePayload = [
+                                'course_ID' => $course->course_ID,
+                                'cluster_ID' => $course->cluster_ID,
+                                'name' => $course->name,
+                                'description' => $course->description,
+                            ];
+                        @endphp
+                        <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
+                            <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $course->name }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ optional($course->cluster)->name ?? '—' }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $course->description ?: '—' }}</td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center justify-end gap-1">
+                                    <button type="button" onclick='openPreferredCourseModal(@json($coursePayload))'
+                                        class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                    </button>
+                                    <form action="{{ route('admin.subject-config.preferred-courses.delete', $course) }}" method="POST" class="inline" onsubmit="return confirm('Delete this preferred course?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600" title="Delete">
+                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="px-6 py-16 text-center text-gray-500">No preferred courses yet.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if ($preferredCourses->hasPages())
+            <div class="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                {{ $preferredCourses->appends(['tab' => 'preferred_courses'])->withQueryString()->links() }}
+            </div>
+        @endif
+    </div>
+</div>
+
+<div id="subjectModal" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle" data-open="{{ $subjectModalOpen ? 'true' : 'false' }}"
+    class="fixed inset-0 z-[100] {{ $subjectModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
+    <div class="mx-auto w-full max-w-xl overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
+        <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">School management</p>
+                    <h3 id="subjectModalTitle" class="mt-1 text-xl font-bold tracking-tight text-white">Add Subject</h3>
+                </div>
+                <button type="button" onclick="closeSubjectModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10" aria-label="Close">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <form id="subjectForm" action="{{ route('admin.subject-config.store') }}" method="POST">
+            @csrf
+            <input type="hidden" name="_form" value="subject">
+            <input type="hidden" id="subject_method" name="_method" value="POST">
+
+            <div class="space-y-4 px-6 py-5">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="subject_code" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Code <span class="text-red-500">*</span></label>
+                        <input id="subject_code" name="code" type="text" value="{{ old('code') }}" required
+                            class="{{ $fieldClass }} {{ $errors->has('code') ? 'border-red-300' : 'border-gray-200' }}">
+                        @error('code')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="subject_type" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Type <span class="text-red-500">*</span></label>
+                        <select id="subject_type" name="type" required
+                            class="{{ $fieldClass }} {{ $errors->has('type') ? 'border-red-300' : 'border-gray-200' }}">
+                            <option value="">Select type</option>
+                            <option value="core" @selected(old('type') === 'core')>Core</option>
+                            <option value="applied" @selected(old('type') === 'applied')>Applied</option>
+                            <option value="specialized" @selected(old('type') === 'specialized')>Specialized</option>
+                        </select>
+                        @error('type')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+                <div>
+                    <label for="subject_title" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Title <span class="text-red-500">*</span></label>
+                    <input id="subject_title" name="title" type="text" value="{{ old('title') }}" required
+                        class="{{ $fieldClass }} {{ $errors->has('title') ? 'border-red-300' : 'border-gray-200' }}">
+                    @error('title')
+                        <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label for="subject_cluster_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Cluster</label>
+                    <select id="subject_cluster_id" name="cluster_ID"
+                        class="{{ $fieldClass }} {{ $errors->has('cluster_ID') ? 'border-red-300' : 'border-gray-200' }}">
+                        <option value="">No cluster (Junior High)</option>
+                        @foreach ($clusters as $cluster)
+                            <option value="{{ $cluster->cluster_ID }}" @selected((string) old('cluster_ID') === (string) $cluster->cluster_ID)>{{ $cluster->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('cluster_ID')
+                        <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
+                <button type="button" onclick="closeSubjectModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" id="subjectSubmit" class="rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+                    Save Subject
+                </button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="preferredCourseModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-4 overflow-hidden">
-        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent">
-            <h3 id="preferredCourseModalTitle" class="text-xl font-bold text-gray-800">Add Preferred Course</h3>
+<div id="preferredCourseModal" role="dialog" aria-modal="true" aria-labelledby="preferredCourseModalTitle" data-open="{{ $preferredCourseModalOpen ? 'true' : 'false' }}"
+    class="fixed inset-0 z-[100] {{ $preferredCourseModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
+    <div class="mx-auto w-full max-w-xl overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
+        <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">School management</p>
+                    <h3 id="preferredCourseModalTitle" class="mt-1 text-xl font-bold tracking-tight text-white">Add Preferred Course</h3>
+                </div>
+                <button type="button" onclick="closePreferredCourseModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10" aria-label="Close">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
-        <form id="preferredCourseForm" class="p-6 space-y-4" action="{{ route('admin.subject-config.preferred-courses.store') }}" method="POST">
+
+        <form id="preferredCourseForm" action="{{ route('admin.subject-config.preferred-courses.store') }}" method="POST">
             @csrf
+            <input type="hidden" name="_form" value="preferred_course">
             <input type="hidden" id="preferred_course_method" name="_method" value="POST">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Academic Cluster</label>
-                <select id="preferred_course_cluster_id" name="cluster_ID" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-                    <option value="">Select cluster</option>
-                    @foreach ($preferredClusters as $cluster)
-                        <option value="{{ $cluster->cluster_ID }}">{{ $cluster->name }}</option>
-                    @endforeach
-                </select>
+
+            <div class="space-y-4 px-6 py-5">
+                <div>
+                    <label for="preferred_course_cluster_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Academic Cluster <span class="text-red-500">*</span></label>
+                    <select id="preferred_course_cluster_id" name="cluster_ID" required
+                        class="{{ $fieldClass }} {{ $errors->has('cluster_ID') ? 'border-red-300' : 'border-gray-200' }}">
+                        <option value="">Select cluster</option>
+                        @foreach ($preferredClusters as $cluster)
+                            <option value="{{ $cluster->cluster_ID }}" @selected((string) old('cluster_ID') === (string) $cluster->cluster_ID)>{{ $cluster->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('cluster_ID')
+                        @if (old('_form') === 'preferred_course')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                        @endif
+                    @enderror
+                </div>
+                <div>
+                    <label for="preferred_course_name" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Course Name <span class="text-red-500">*</span></label>
+                    <input id="preferred_course_name" name="name" type="text" value="{{ old('name') }}" required
+                        class="{{ $fieldClass }} {{ $errors->has('name') ? 'border-red-300' : 'border-gray-200' }}">
+                    @error('name')
+                        @if (old('_form') === 'preferred_course')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                        @endif
+                    @enderror
+                </div>
+                <div>
+                    <label for="preferred_course_description" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Description</label>
+                    <textarea id="preferred_course_description" name="description" rows="3"
+                        class="w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15 {{ $errors->has('description') ? 'border-red-300' : 'border-gray-200' }}">{{ old('description') }}</textarea>
+                    @error('description')
+                        @if (old('_form') === 'preferred_course')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                        @endif
+                    @enderror
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Course Name</label>
-                <input id="preferred_course_name" name="name" type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                <textarea id="preferred_course_description" name="description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
-            </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closePreferredCourseModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Cancel</button>
-                <button type="submit" class="flex-1 px-4 py-2 bg-[#296374] text-white rounded-lg hover:bg-[#1e4a57]">Save Preferred Course</button>
+
+            <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
+                <button type="button" onclick="closePreferredCourseModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" id="preferredCourseSubmit" class="rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+                    Save Preferred Course
+                </button>
             </div>
         </form>
     </div>
@@ -309,29 +466,52 @@
 
 <script>
     function switchSubjectConfigTab(tab) {
-        const tabs = {
-            subjects: { panel: document.getElementById('subjectsTabPanel'), button: document.getElementById('subjectsTabBtn') },
-            preferred_courses: { panel: document.getElementById('preferredCoursesTabPanel'), button: document.getElementById('preferredCoursesTabBtn') },
-        };
+        const isSubjects = tab === 'subjects';
+        const subjectsPanel = document.getElementById('subjectsTabPanel');
+        const coursesPanel = document.getElementById('preferredCoursesTabPanel');
+        const subjectsBtn = document.getElementById('subjectsTabBtn');
+        const coursesBtn = document.getElementById('preferredCoursesTabBtn');
+        const subjectsIndicator = document.getElementById('subjectsTabIndicator');
+        const coursesIndicator = document.getElementById('preferredCoursesTabIndicator');
+        const addSubjectBtn = document.getElementById('addSubjectHeaderBtn');
+        const addCourseBtn = document.getElementById('addPreferredCourseHeaderBtn');
 
-        Object.keys(tabs).forEach(function (key) {
-            const isActive = key === tab;
-            tabs[key].panel.classList.toggle('hidden', !isActive);
-            tabs[key].button.classList.toggle('bg-[#296374]', isActive);
-            tabs[key].button.classList.toggle('text-white', isActive);
-            tabs[key].button.classList.toggle('bg-white', !isActive);
-            tabs[key].button.classList.toggle('text-gray-600', !isActive);
-            tabs[key].button.classList.toggle('hover:bg-gray-100', !isActive);
-        });
+        subjectsPanel.classList.toggle('hidden', !isSubjects);
+        coursesPanel.classList.toggle('hidden', isSubjects);
+
+        subjectsBtn.classList.toggle('text-[#296374]', isSubjects);
+        subjectsBtn.classList.toggle('text-gray-500', !isSubjects);
+        subjectsBtn.classList.toggle('hover:text-gray-700', !isSubjects);
+        coursesBtn.classList.toggle('text-[#296374]', !isSubjects);
+        coursesBtn.classList.toggle('text-gray-500', isSubjects);
+        coursesBtn.classList.toggle('hover:text-gray-700', isSubjects);
+        subjectsBtn.setAttribute('aria-selected', isSubjects ? 'true' : 'false');
+        coursesBtn.setAttribute('aria-selected', isSubjects ? 'false' : 'true');
+
+        subjectsIndicator.classList.toggle('hidden', !isSubjects);
+        coursesIndicator.classList.toggle('hidden', isSubjects);
+
+        addSubjectBtn.classList.toggle('hidden', !isSubjects);
+        addSubjectBtn.classList.toggle('inline-flex', isSubjects);
+        addCourseBtn.classList.toggle('hidden', isSubjects);
+        addCourseBtn.classList.toggle('inline-flex', !isSubjects);
+
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tab);
+        window.history.replaceState({}, '', url);
     }
 
     function openSubjectModal(subject = null) {
         const form = document.getElementById('subjectForm');
         const method = document.getElementById('subject_method');
+        const title = document.getElementById('subjectModalTitle');
+        const submit = document.getElementById('subjectSubmit');
+        const modal = document.getElementById('subjectModal');
         const updateRouteTemplate = '{{ route('admin.subject-config.update', ['subject' => '__SUBJECT__']) }}';
 
         if (subject) {
-            document.getElementById('subjectModalTitle').textContent = 'Edit Subject';
+            title.textContent = 'Edit Subject';
+            submit.textContent = 'Update Subject';
             form.action = updateRouteTemplate.replace('__SUBJECT__', subject.subject_ID);
             method.value = 'PUT';
             document.getElementById('subject_code').value = subject.code || '';
@@ -339,62 +519,89 @@
             document.getElementById('subject_type').value = subject.type || '';
             document.getElementById('subject_cluster_id').value = subject.cluster_ID || '';
         } else {
-            document.getElementById('subjectModalTitle').textContent = 'Add Subject';
+            title.textContent = 'Add Subject';
+            submit.textContent = 'Save Subject';
             form.action = '{{ route('admin.subject-config.store') }}';
             method.value = 'POST';
             form.reset();
+            method.value = 'POST';
         }
 
-        document.getElementById('subjectModal').classList.remove('hidden');
-        document.getElementById('subjectModal').classList.add('flex');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal.setAttribute('data-open', 'true');
+        document.getElementById('subject_code').focus();
     }
 
     function closeSubjectModal() {
-        document.getElementById('subjectModal').classList.add('hidden');
-        document.getElementById('subjectModal').classList.remove('flex');
+        const modal = document.getElementById('subjectModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        modal.setAttribute('data-open', 'false');
     }
 
     function openPreferredCourseModal(course = null) {
         const form = document.getElementById('preferredCourseForm');
         const method = document.getElementById('preferred_course_method');
+        const title = document.getElementById('preferredCourseModalTitle');
+        const submit = document.getElementById('preferredCourseSubmit');
+        const modal = document.getElementById('preferredCourseModal');
         const updateRouteTemplate = '{{ route('admin.subject-config.preferred-courses.update', ['preferredCourse' => '__COURSE__']) }}';
 
         if (course) {
-            document.getElementById('preferredCourseModalTitle').textContent = 'Edit Preferred Course';
+            title.textContent = 'Edit Preferred Course';
+            submit.textContent = 'Update Preferred Course';
             form.action = updateRouteTemplate.replace('__COURSE__', course.course_ID);
             method.value = 'PUT';
             document.getElementById('preferred_course_cluster_id').value = course.cluster_ID || '';
             document.getElementById('preferred_course_name').value = course.name || '';
             document.getElementById('preferred_course_description').value = course.description || '';
         } else {
-            document.getElementById('preferredCourseModalTitle').textContent = 'Add Preferred Course';
+            title.textContent = 'Add Preferred Course';
+            submit.textContent = 'Save Preferred Course';
             form.action = '{{ route('admin.subject-config.preferred-courses.store') }}';
             method.value = 'POST';
             form.reset();
+            method.value = 'POST';
         }
 
-        document.getElementById('preferredCourseModal').classList.remove('hidden');
-        document.getElementById('preferredCourseModal').classList.add('flex');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal.setAttribute('data-open', 'true');
+        document.getElementById('preferred_course_cluster_id').focus();
     }
 
     function closePreferredCourseModal() {
-        document.getElementById('preferredCourseModal').classList.add('hidden');
-        document.getElementById('preferredCourseModal').classList.remove('flex');
+        const modal = document.getElementById('preferredCourseModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        modal.setAttribute('data-open', 'false');
     }
 
     document.getElementById('subjectModal').addEventListener('click', function (e) {
-        if (e.target === this) closeSubjectModal();
+        if (e.target === this) {
+            closeSubjectModal();
+        }
     });
 
     document.getElementById('preferredCourseModal').addEventListener('click', function (e) {
-        if (e.target === this) closePreferredCourseModal();
+        if (e.target === this) {
+            closePreferredCourseModal();
+        }
     });
 
-    const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab === 'preferred_courses') {
-        switchSubjectConfigTab('preferred_courses');
-    } else {
-        switchSubjectConfigTab('subjects');
-    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') {
+            return;
+        }
+
+        if (document.getElementById('subjectModal').getAttribute('data-open') === 'true') {
+            closeSubjectModal();
+        }
+
+        if (document.getElementById('preferredCourseModal').getAttribute('data-open') === 'true') {
+            closePreferredCourseModal();
+        }
+    });
 </script>
 @endsection

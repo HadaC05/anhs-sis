@@ -3,234 +3,250 @@
 @section('title', 'Dashboard')
 
 @section('content')
+@if ($profileCompletionRequired ?? false)
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 px-4" role="dialog" aria-modal="true" aria-labelledby="profile-completion-title">
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /></svg>
+            </div>
+            <h2 id="profile-completion-title" class="mt-4 text-xl font-bold text-gray-900">Complete your student profile</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Some required information is still missing. Update and save your student profile before you can access the other parts of the portal.</p>
+            <a href="{{ route('student.profile') }}" class="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-[#296374] px-4 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-[#214e5c]">Update Student Profile</a>
+        </div>
+    </div>
+@endif
+
 @php
     $studentName = optional($application)->last_name
-        ? optional($application)->last_name . ', ' . optional($application)->first_name
-        : Auth::user()->name;
+        ? trim(optional($application)->last_name.', '.optional($application)->first_name.(optional($application)->middle_name ? ' '.optional($application)->middle_name : '').(optional($application)->suffix ? ' '.optional($application)->suffix : ''))
+        : (Auth::user()->name ?? 'Student');
     $firstName = optional($application)->first_name ?: \Illuminate\Support\Str::of(Auth::user()->name)->before(' ');
-    $enrollmentStatus = $currentEnrollment?->enrollment_status
-        ? strtoupper(str_replace('_', ' ', $currentEnrollment->enrollment_status))
+    $enrollmentStatus = $currentEnrollment?->enrollment_status_label
+        ? strtoupper($currentEnrollment->enrollment_status_label)
         : 'NOT ENROLLED';
-    $gradeLabel = $currentEnrollment?->grade_level
-        ? strtoupper(str_replace('grade_', 'Grade ', $currentEnrollment->grade_level))
-        : 'N/A';
+    $gradeLabel = $currentEnrollment?->gradeLevel?->grade_label
+        ?? ($currentEnrollment?->grade_level ? str_replace(['grade_', '_'], ['Grade ', ' '], $currentEnrollment->grade_level) : '—');
     $sectionName = $currentEnrollment?->section?->name ?? 'Not Assigned';
-    $clusterName = $currentEnrollment?->cluster?->name ?? 'N/A';
-    $preferredCourseName = $currentEnrollment?->preferredCourse?->name ?? 'N/A';
-    $semesterLabel = $currentEnrollment?->semester ? ucfirst($currentEnrollment->semester) : 'N/A';
-    $schoolYear = $activeYear?->school_year ?? 'Not Set';
+    $isSeniorHigh = $currentEnrollment?->isSeniorHigh() ?? false;
+    $clusterName = $currentEnrollment?->cluster?->name ?? '—';
+    $preferredCourseName = $currentEnrollment?->preferredCourse?->name ?? '—';
+    $semesterLabel = $currentEnrollment?->semester ? ucfirst($currentEnrollment->semester).' Semester' : null;
+    $schoolYear = $currentEnrollment?->academicYear?->school_year ?? $activeYear?->school_year ?? '—';
     $needsEnrollment = $currentEnrollment === null;
-
-    $statusStyles = match ($currentEnrollment?->enrollment_status) {
-        'enrolled' => [
-            'badge' => 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-            'dot' => 'bg-emerald-500',
-            'panel' => 'from-emerald-500/20 via-white/70 to-white/40',
-        ],
-        'pending' => [
-            'badge' => 'bg-amber-100 text-amber-700 ring-amber-200',
-            'dot' => 'bg-amber-500',
-            'panel' => 'from-amber-500/20 via-white/70 to-white/40',
-        ],
-        'rejected' => [
-            'badge' => 'bg-rose-100 text-rose-700 ring-rose-200',
-            'dot' => 'bg-rose-500',
-            'panel' => 'from-rose-500/20 via-white/70 to-white/40',
-        ],
-        default => [
-            'badge' => 'bg-slate-100 text-slate-700 ring-slate-200',
-            'dot' => 'bg-slate-400',
-            'panel' => 'from-slate-400/20 via-white/70 to-white/40',
-        ],
+    $initials = $student?->initials() ?? strtoupper(\Illuminate\Support\Str::substr($firstName, 0, 1));
+    $placementStatus = $currentEnrollment?->placement_status ?: \App\Models\PlacementStatus::PENDING;
+    $placementStatusLabel = $currentEnrollment?->placement_status_label ?: ($needsEnrollment ? 'Not enrolled' : 'Pending');
+    $showPlacementTest = $placementStatus !== \App\Models\PlacementStatus::AGE_APPROPRIATE;
+    $placementDescription = match (true) {
+        $needsEnrollment => 'Placement test status will appear after you enroll.',
+        $placementStatus === \App\Models\PlacementStatus::AGE_APPROPRIATE => 'Your age is appropriate for the selected grade level. No placement test is required.',
+        $placementStatus === \App\Models\PlacementStatus::RECOMMENDED => 'The Guidance Office recommended a placement test. Please visit the Guidance Office to confirm your schedule.',
+        $placementStatus === \App\Models\PlacementStatus::PASSED => 'You passed the placement test.',
+        $placementStatus === \App\Models\PlacementStatus::FAILED => 'Your placement test was not passed. Please contact the Guidance Office for next steps.',
+        $placementStatus === \App\Models\PlacementStatus::RESOLVED => 'Your placement test has been resolved.',
+        default => 'No placement test is currently required for your enrollment.',
     };
+
+    $infoRows = [
+        ['label' => 'Enrollment Status', 'value' => $enrollmentStatus],
+        ['label' => 'Grade Level', 'value' => $gradeLabel],
+        ['label' => 'Section', 'value' => $sectionName],
+        ['label' => 'School Year', 'value' => $schoolYear],
+    ];
+
+    if ($isSeniorHigh) {
+        if ($semesterLabel) {
+            $infoRows[] = ['label' => 'Semester', 'value' => $semesterLabel];
+        }
+
+        $infoRows[] = ['label' => 'Cluster', 'value' => $clusterName];
+        $infoRows[] = ['label' => 'Preferred Course', 'value' => $preferredCourseName];
+    }
 
     $quickLinks = [
         [
-            'label' => 'Enrollment',
-            'description' => 'Submit or review your enrollment for this school year.',
-            'href' => route('student.enrollment'),
-            'tone' => 'bg-[#296374] text-white shadow-lg shadow-[#296374]/20',
-            'icon' => 'document',
-        ],
-        [
-            'label' => 'My Information',
-            'description' => 'View your student details and personal record.',
+            'label' => 'Student Profile',
             'href' => route('student.profile'),
-            'tone' => 'bg-white/90 text-slate-700 ring-1 ring-slate-200',
+            'card' => 'bg-[#296374] text-white hover:bg-[#214e5c]',
+            'iconWrap' => 'bg-white/15 text-white',
             'icon' => 'user',
         ],
         [
+            'label' => 'Subjects',
+            'href' => route('student.subjects'),
+            'card' => 'bg-emerald-500 text-white hover:bg-emerald-600',
+            'iconWrap' => 'bg-white/15 text-white',
+            'icon' => 'book',
+        ],
+        [
             'label' => 'Grades',
-            'description' => 'Check your released grades.',
             'href' => route('student.grades'),
-            'tone' => 'bg-white/90 text-slate-700 ring-1 ring-slate-200',
+            'card' => 'bg-amber-400 text-amber-950 hover:bg-amber-300',
+            'iconWrap' => 'bg-amber-950/10 text-amber-950',
             'icon' => 'chart',
         ],
         [
             'label' => 'Documents',
-            'description' => 'Open your uploaded documents.',
             'href' => route('student.documents'),
-            'tone' => 'bg-white/90 text-slate-700 ring-1 ring-slate-200',
+            'card' => 'bg-sky-500 text-white hover:bg-sky-600',
+            'iconWrap' => 'bg-white/15 text-white',
             'icon' => 'folder',
         ],
     ];
 @endphp
 
-<div class="space-y-6 md:space-y-8">
-    <section class="relative overflow-hidden rounded-[2rem] border border-white/60 bg-white/82 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(41,99,116,0.22),_transparent_42%),radial-gradient(circle_at_bottom_right,_rgba(251,191,36,0.16),_transparent_28%)]"></div>
-        <div class="absolute -top-20 right-0 h-56 w-56 rounded-full bg-[#296374]/10 blur-3xl"></div>
-        <div class="relative grid gap-8 px-6 py-7 md:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)] md:px-8 md:py-9">
-            <div class="space-y-5">
-                <div class="flex flex-wrap items-center gap-3">
-                    <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#296374] ring-1 ring-[#296374]/15 backdrop-blur-sm bg-white/75">
-                        Student Portal
-                    </span>
-                    <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ $statusStyles['badge'] }}">
-                        <span class="h-2.5 w-2.5 rounded-full {{ $statusStyles['dot'] }}"></span>
-                        {{ $enrollmentStatus }}
-                    </span>
+<div
+    class="space-y-6"
+    x-data="{ placementInstructionsOpen: false }"
+    @keydown.escape.window="placementInstructionsOpen = false"
+>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <div class="space-y-6 lg:col-span-7 xl:col-span-8">
+            <section>
+                <h1 class="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+            </section>
+
+            <section>
+                <div class="mb-4">
+                    <h2 class="text-lg font-bold tracking-tight text-slate-900">Quick Access</h2>
                 </div>
 
-                <div class="max-w-2xl space-y-3">
-                    <p class="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Agusan National High School</p>
-                    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-                        Welcome back, {{ $firstName }}.
-                    </h1>
+                <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                    @foreach ($quickLinks as $link)
+                        <a href="{{ $link['href'] }}" class="group flex h-full min-w-0 flex-col rounded-2xl p-4 shadow-lg transition hover:-translate-y-0.5 sm:p-5 {{ $link['card'] }}">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-xl {{ $link['iconWrap'] }}">
+                                @if ($link['icon'] === 'user')
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5.121 17.804A12.07 12.07 0 0112 15.75c2.54 0 4.897.786 6.879 2.054M15 11a3 3 0 11-6 0 3 3 0 016 0zm6 1a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                @elseif ($link['icon'] === 'book')
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                                @elseif ($link['icon'] === 'chart')
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                @else
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                @endif
+                            </div>
+                            <h3 class="mt-4 text-sm font-bold tracking-tight sm:text-lg">{{ $link['label'] }}</h3>
+                        </a>
+                    @endforeach
                 </div>
-
-                <div class="grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-2xl bg-white/70 px-4 py-4 ring-1 ring-slate-200/70 backdrop-blur-sm">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Student Name</p>
-                        <p class="mt-2 text-sm font-semibold text-slate-900 md:text-base">{{ $studentName }}</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/70 px-4 py-4 ring-1 ring-slate-200/70 backdrop-blur-sm">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">LRN</p>
-                        <p class="mt-2 text-sm font-semibold text-slate-900 md:text-base">{{ optional($student)->lrn ?? 'Not Set' }}</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/70 px-4 py-4 ring-1 ring-slate-200/70 backdrop-blur-sm">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">School Year</p>
-                        <p class="mt-2 text-sm font-semibold text-slate-900 md:text-base">{{ $schoolYear }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rounded-[1.75rem] bg-gradient-to-br {{ $statusStyles['panel'] }} p-[1px] shadow-[0_25px_60px_-40px_rgba(15,23,42,0.22)]">
-                <div class="h-full rounded-[1.7rem] bg-[linear-gradient(145deg,rgba(41,99,116,0.94),rgba(74,129,143,0.92))] px-5 py-6 text-white md:px-6">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">Current Enrollment</p>
-                            <h2 class="mt-2 text-2xl font-semibold tracking-tight">{{ $gradeLabel !== 'N/A' ? $gradeLabel : 'No active grade yet' }}</h2>
-                        </div>
-                        <div class="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-right">
-                            <p class="text-[10px] uppercase tracking-[0.22em] text-white/60">Semester</p>
-                            <p class="mt-1 text-sm font-semibold">{{ $semesterLabel }}</p>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 space-y-3">
-                        <div class="flex items-center justify-between rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
-                            <span class="text-sm text-white/75">Section</span>
-                            <span class="text-sm font-semibold">{{ $sectionName }}</span>
-                        </div>
-                        <div class="flex items-center justify-between rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
-                            <span class="text-sm text-white/75">Cluster</span>
-                            <span class="text-sm font-semibold">{{ $clusterName }}</span>
-                        </div>
-                        <div class="flex items-center justify-between rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
-                            <span class="text-sm text-white/75">Preferred Course</span>
-                            <span class="text-sm font-semibold text-right">{{ $preferredCourseName }}</span>
-                        </div>
-                        <div class="flex items-center justify-between rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
-                            <span class="text-sm text-white/75">School Year</span>
-                            <span class="text-sm font-semibold">{{ $schoolYear }}</span>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 rounded-2xl border border-white/15 bg-white/10 px-4 py-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">Status Note</p>
-                        <p class="mt-2 text-sm leading-6 text-white/85">
-                            {{ $currentEnrollment
-                                ? 'Your latest enrollment record is reflected here so you can quickly confirm your assigned details.'
-                                : 'Once you submit enrollment for the active school year, your assigned details will appear here.' }}
-                        </p>
-                    </div>
-                </div>
-            </div>
+            </section>
         </div>
-    </section>
+
+        <aside class="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24">
+            <section class="overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm">
+                <div class="border-b border-slate-300 bg-[#296374] px-6 py-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.16em] text-white">Student Record</h2>
+                </div>
+
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center border border-slate-300 bg-slate-50 text-sm font-semibold tracking-wide text-slate-800">
+                            {{ $initials }}
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-lg font-semibold tracking-tight text-slate-900">{{ $studentName }}</h3>
+                            <p class="mt-1 text-sm text-slate-600">LRN {{ optional($student)->lrn ?? 'Not Set' }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-b border-slate-200 px-6 py-5">
+                    <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Enrollment snapshot</h3>
+
+                    <dl class="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+                        @foreach ($infoRows as $row)
+                            <div class="flex items-start justify-between gap-4 py-2.5">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ $row['label'] }}</dt>
+                                <dd class="text-right text-sm font-medium text-slate-900">{{ $row['value'] }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                </div>
+
+                @if ($showPlacementTest)
+                    <div class="px-6 py-5">
+                        <div class="flex flex-wrap items-baseline justify-between gap-2">
+                            <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Placement test</h3>
+                            <p class="text-sm font-medium text-slate-900">{{ $placementStatusLabel }}</p>
+                        </div>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ $placementDescription }}</p>
+                        @if ($placementStatus === \App\Models\PlacementStatus::RECOMMENDED)
+                            <button
+                                type="button"
+                                @click="placementInstructionsOpen = true"
+                                class="mt-4 inline-flex items-center justify-center rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#214e5c] focus:outline-none focus:ring-2 focus:ring-[#296374] focus:ring-offset-2"
+                                data-test="placement-test-instructions-button"
+                            >
+                                View next steps
+                            </button>
+                        @endif
+                    </div>
+                @endif
+            </section>
+        </aside>
+    </div>
 
     @if ($needsEnrollment)
-        <section class="rounded-[1.8rem] border border-amber-200/80 bg-[linear-gradient(135deg,rgba(255,251,235,0.96),rgba(255,255,255,0.92))] p-5 shadow-[0_18px_40px_-34px_rgba(245,158,11,0.55)] backdrop-blur-xl md:p-6">
+        <section class="rounded-md border border-slate-300 bg-white px-6 py-5 shadow-sm">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div class="flex items-start gap-4">
-                    <div class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4m0 4h.01M10.29 3.86l-7.4 12.82A1 1 0 003.75 18h16.5a1 1 0 00.86-1.5l-7.4-12.82a1 1 0 00-1.72 0z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">Enrollment Needed</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-slate-900">You have not enrolled yet.</h2>
-                        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                            Submit your enrollment for the active school year so your section and academic details can appear here.
-                        </p>
-                    </div>
+                <div>
+                    <h2 class="text-lg font-semibold tracking-tight text-slate-900">You have not enrolled yet.</h2>
+                    <p class="mt-1 text-sm text-slate-600">
+                        Check Student Profile for your current enrollment status, or contact the guidance office if you still need to complete registration.
+                    </p>
                 </div>
-
-                <a href="{{ route('student.enrollment') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#296374] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#296374]/20 transition hover:bg-[#214e5c]">
-                    <span>Go to Enrollment</span>
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 7h4m0 0v4m0-4L10 14"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 5h6v6H5zM5 13h6v6H5zM13 13h6v6h-6z"></path>
-                    </svg>
+                <a href="{{ route('student.profile') }}" class="inline-flex items-center justify-center rounded-md bg-[#296374] px-5 py-2.5 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#214e5c]">
+                    View Student Profile
                 </a>
             </div>
         </section>
     @endif
 
-    <section>
-        <div class="rounded-[1.8rem] border border-white/60 bg-white/86 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl md:p-7">
-            <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Quick Access</p>
-                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Common student tasks</h2>
-            </div>
-
-            <div class="mt-6 space-y-3">
-                @foreach ($quickLinks as $link)
-                    <a href="{{ $link['href'] }}" class="group flex items-center justify-between gap-4 rounded-[1.4rem] px-4 py-4 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_30px_-28px_rgba(15,23,42,0.5)] {{ $link['tone'] }}">
-                        <div class="flex min-w-0 items-center gap-4">
-                            <div class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ str_contains($link['tone'], 'text-white') ? 'bg-white/12 text-white' : 'bg-[#296374]/10 text-[#296374]' }}">
-                                @if ($link['icon'] === 'document')
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                @elseif ($link['icon'] === 'user')
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5.121 17.804A12.07 12.07 0 0112 15.75c2.54 0 4.897.786 6.879 2.054M15 11a3 3 0 11-6 0 3 3 0 016 0zm6 1a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                @elseif ($link['icon'] === 'chart')
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                    </svg>
-                                @else
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                                    </svg>
-                                @endif
-                            </div>
-                            <div class="min-w-0">
-                                <h3 class="text-base font-semibold tracking-tight {{ str_contains($link['tone'], 'text-white') ? 'text-white' : 'text-slate-900' }}">{{ $link['label'] }}</h3>
-                                <p class="mt-1 text-sm leading-6 {{ str_contains($link['tone'], 'text-white') ? 'text-white/75' : 'text-slate-600' }}">{{ $link['description'] }}</p>
-                            </div>
+    @if ($placementStatus === \App\Models\PlacementStatus::RECOMMENDED)
+        <template x-teleport="body">
+            <div
+                x-cloak
+                x-show="placementInstructionsOpen"
+                x-transition.opacity
+                class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="placement-test-instructions-title"
+                data-test="placement-test-instructions-modal"
+            >
+                <div class="absolute inset-0 bg-slate-900/55" @click="placementInstructionsOpen = false"></div>
+                <div class="relative max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl" @click.stop>
+                    <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#296374]">Placement test</p>
+                            <h2 id="placement-test-instructions-title" class="mt-1 text-xl font-bold tracking-tight text-slate-900">What to do next</h2>
                         </div>
-                        <div class="shrink-0 text-sm font-medium {{ str_contains($link['tone'], 'text-white') ? 'text-white/80' : 'text-slate-400' }} transition group-hover:translate-x-1">
-                            Open
+                        <button type="button" @click="placementInstructionsOpen = false" class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close placement test instructions">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"></path></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-5 px-6 py-5 text-sm leading-6 text-slate-600">
+                        <p>Your placement test helps the school confirm the grade level that best matches your current skills. Start with the Guidance Office so they can guide you through the process.</p>
+                        <ol class="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-[#296374]">
+                            <li><span class="font-semibold text-slate-800">Visit or contact the Guidance Office.</span> Confirm your test date, time, venue, and any requirements before going to the testing area.</li>
+                            <li><span class="font-semibold text-slate-800">Bring your LRN and a valid school or government-issued ID.</span> Ask the counselor in advance if you need to submit any other enrollment documents.</li>
+                            <li><span class="font-semibold text-slate-800">Arrive at least 15 minutes early.</span> Bring basic writing materials if the Guidance Office asks you to, and follow the testing instructions provided on the day.</li>
+                            <li><span class="font-semibold text-slate-800">Ask for support early.</span> Tell the Guidance Office before your schedule if you need an accommodation or have a concern about attending.</li>
+                            <li><span class="font-semibold text-slate-800">Wait for the result to be recorded.</span> The Guidance Office will update your placement-test status and advise you on the next enrollment step.</li>
+                        </ol>
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                            <span class="font-semibold">Important:</span> Your test schedule is confirmed by the Guidance Office. Please do not assume a schedule until you have spoken with them.
                         </div>
-                    </a>
-                @endforeach
+                    </div>
+                    <div class="flex justify-end border-t border-slate-200 px-6 py-4">
+                        <button type="button" @click="placementInstructionsOpen = false" class="rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#214e5c]">Got it</button>
+                    </div>
+                </div>
             </div>
-        </div>
-    </section>
+        </template>
+    @endif
 </div>
 @endsection

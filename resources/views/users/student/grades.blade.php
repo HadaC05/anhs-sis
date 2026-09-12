@@ -4,172 +4,255 @@
 
 @section('content')
 @php
-    $studentName = optional($application)->last_name ? optional($application)->last_name . ', ' . optional($application)->first_name : Auth::user()->name;
+    $enrollment = $selectedEnrollment;
+    $gradingPeriods = collect($gradingTerms ?? [])->pluck('label', 'key')->all();
+    $periodKeys = array_keys($gradingPeriods);
+    $formatGrade = fn ($value) => $value === null || $value === '' ? '—' : number_format((float) $value, 0);
+    $gradeRemarks = fn ($value) => $value === null || $value === '' ? '—' : ((float) $value >= 75 ? 'PASSED' : 'FAILED');
+    $sessionLabel = function ($item): string {
+        $schoolYear = $item?->academicYear?->school_year ?? 'N/A';
+        $semester = $item?->isSeniorHigh() && $item?->semester
+            ? strtoupper(ucfirst($item->semester)).' SEM'
+            : null;
+        $grade = $item?->gradeLevel?->grade_label
+            ?? ($item?->grade_level ? strtoupper(str_replace('grade_', 'Grade ', $item->grade_level)) : null);
+
+        return collect(["SY {$schoolYear}", $semester, $grade])->filter()->implode(' · ');
+    };
 @endphp
-<div class="space-y-6">
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">My Grades</h1>
-        <p class="text-gray-600 text-sm md:text-base">View your academic performance and enrolled subjects.</p>
-    </div>
 
-    <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-[#296374] uppercase tracking-wider">Student Information</h3>
-            <div class="text-sm text-gray-600">
-                <span class="font-semibold">Name:</span> {{ $studentName }} | 
-                <span class="font-semibold">LRN:</span> {{ optional($student)->lrn ?? 'Not Set' }}
+<div class="space-y-5">
+    @include('users.student.partials.enrollment-summary', [
+        'student' => $student,
+        'application' => $application,
+        'enrollment' => $enrollment,
+        'activeYear' => $enrollment?->academicYear,
+    ])
+
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-200 px-6 py-5">
+            <h1 class="text-2xl font-bold tracking-tight text-gray-800">Grade</h1>
+
+            <form method="GET" action="{{ route('student.grades') }}" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div class="min-w-0 flex-1 sm:max-w-sm">
+                    <label for="session" class="mb-1.5 block text-sm text-gray-500">
+                        <span class="text-red-500">*</span> Academic Session
+                    </label>
+                    <select
+                        id="session"
+                        name="session"
+                        onchange="this.form.submit()"
+                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15"
+                        @disabled($enrollments->isEmpty())
+                    >
+                        @forelse ($enrollments as $item)
+                            <option value="{{ $item->enrollment_ID }}" @selected($enrollment?->enrollment_ID === $item->enrollment_ID)>
+                                {{ $sessionLabel($item) }}
+                            </option>
+                        @empty
+                            <option value="">No academic sessions available</option>
+                        @endforelse
+                    </select>
+                </div>
+                <button
+                    type="button"
+                    id="toggleGradeReport"
+                    class="inline-flex items-center justify-center rounded-md border border-[#296374] bg-white px-4 py-2.5 text-sm font-semibold text-[#296374] transition hover:bg-[#296374]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    @disabled(! $enrollment)
+                >
+                    Grade Report
+                </button>
+            </form>
+        </div>
+
+        @if (! $enrollment)
+            <div class="px-6 py-16 text-center">
+                <svg class="mx-auto mb-4 h-14 w-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-700">No Enrollments Found</h3>
+                <p class="mt-2 text-sm text-gray-500">Check Student Profile for your enrollment status, or contact the guidance office.</p>
             </div>
-        </div>
-    </div>
+        @elseif ($enrollment->subjectAssignments->isEmpty())
+            <div class="px-6 py-16 text-center">
+                <h3 class="text-lg font-semibold text-gray-700">No Subjects Found</h3>
+                <p class="mt-2 text-sm text-gray-500">Assigned subjects for this academic session will appear here once they are available.</p>
+            </div>
+        @else
+            @php
+                $finalRatings = [];
+                $semesterName = $enrollment->semester
+                    ? strtoupper(substr($enrollment->semester, 0, 1)).'S'
+                    : ($enrollment->gradeLevel?->grade_label ?? strtoupper(str_replace('grade_', 'G', (string) $enrollment->grade_level)));
+            @endphp
+            <div class="overflow-x-auto">
+                <table class="min-w-full border-collapse text-sm text-gray-800">
+                    <thead>
+                        <tr class="bg-[#dbeaf1] text-left text-xs font-bold uppercase tracking-wide text-gray-700">
+                            <th class="border border-gray-200 px-3 py-3 text-center w-16">Action</th>
+                            <th class="border border-gray-200 px-3 py-3 whitespace-nowrap">Semester</th>
+                            <th class="border border-gray-200 px-3 py-3 whitespace-nowrap">Subject Code</th>
+                            <th class="border border-gray-200 px-3 py-3">Subject Name</th>
+                            <th class="border border-gray-200 px-3 py-3 whitespace-nowrap">Subject Type</th>
+                            <th class="border border-gray-200 px-3 py-3 text-center whitespace-nowrap">Final Grade</th>
+                            <th class="border border-gray-200 px-3 py-3 text-center whitespace-nowrap">Grade Remark</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($enrollment->subjectAssignments as $index => $assignment)
+                            @php
+                                $grades = $assignment->grades->keyBy('grading_period');
+                                $subject = $assignment->curriculumSubject?->subject;
+                                $subjectCode = $subject?->code ?? '—';
+                                $subjectTitle = $subject?->title ?? 'N/A';
+                                $subjectType = $subject?->type ? ucwords(str_replace('_', ' ', $subject->type)) : '—';
+                                $periodValues = collect($periodKeys)
+                                    ->mapWithKeys(fn ($periodKey) => [$periodKey => $grades->get($periodKey)?->numeric_grade]);
+                                $availableGrades = $periodValues->filter(fn ($grade) => $grade !== null && $grade !== '');
+                                $finalRating = $availableGrades->isNotEmpty() ? round($availableGrades->avg()) : null;
+                                $finalRatings[] = $finalRating;
+                                $rowId = 'grade-detail-'.$assignment->assignment_ID;
+                            @endphp
+                            <tr class="{{ $index % 2 === 0 ? 'bg-white' : 'bg-gray-50' }}">
+                                <td class="border border-gray-200 px-3 py-2.5 text-center">
+                                    <button
+                                        type="button"
+                                        class="grade-expand inline-flex h-7 w-7 items-center justify-center rounded border border-[#296374] bg-white text-base font-bold leading-none text-[#296374] transition hover:bg-[#296374] hover:text-white"
+                                        data-target="{{ $rowId }}"
+                                        aria-expanded="false"
+                                        aria-label="Show term grades"
+                                    >+</button>
+                                </td>
+                                <td class="border border-gray-200 px-3 py-2.5 whitespace-nowrap">{{ $semesterName }}</td>
+                                <td class="border border-gray-200 px-3 py-2.5 font-medium whitespace-nowrap">{{ $subjectCode }}</td>
+                                <td class="border border-gray-200 px-3 py-2.5 font-semibold uppercase">{{ $subjectTitle }}</td>
+                                <td class="border border-gray-200 px-3 py-2.5 whitespace-nowrap">{{ $subjectType }}</td>
+                                <td class="border border-gray-200 px-3 py-2.5 text-center font-bold">{{ $formatGrade($finalRating) }}</td>
+                                <td class="border border-gray-200 px-3 py-2.5 text-center font-semibold {{ $finalRating !== null && (float) $finalRating < 75 ? 'text-red-600' : 'text-emerald-700' }}">
+                                    {{ $gradeRemarks($finalRating) }}
+                                </td>
+                            </tr>
+                            <tr id="{{ $rowId }}" class="hidden bg-[#f8fbfd]">
+                                <td colspan="7" class="border border-gray-200 px-4 py-3">
+                                    @if ($availableGrades->isEmpty())
+                                        <p class="text-sm text-gray-500">There are no grades yet.</p>
+                                    @else
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-[420px] text-xs">
+                                                <thead>
+                                                    <tr class="text-left text-gray-500">
+                                                        @foreach ($periodKeys as $periodKey)
+                                                            <th class="px-2 py-1 font-semibold">{{ $gradingPeriods[$periodKey] ?? $periodKey }}</th>
+                                                        @endforeach
+                                                        <th class="px-2 py-1 font-semibold">Final Rating</th>
+                                                        <th class="px-2 py-1 font-semibold">Remarks</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr class="text-gray-800">
+                                                        @foreach ($periodKeys as $periodKey)
+                                                            <td class="px-2 py-1 font-semibold">{{ $formatGrade($periodValues[$periodKey] ?? null) }}</td>
+                                                        @endforeach
+                                                        <td class="px-2 py-1 font-bold">{{ $formatGrade($finalRating) }}</td>
+                                                        <td class="px-2 py-1 font-semibold">{{ $gradeRemarks($finalRating) }}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                        @php
+                            $generalAverageGrades = collect($finalRatings)->filter(fn ($grade) => $grade !== null);
+                            $generalAverage = $generalAverageGrades->isNotEmpty() ? round($generalAverageGrades->avg()) : null;
+                        @endphp
+                        <tr class="bg-[#eef5f8]">
+                            <td colspan="5" class="border border-gray-200 px-3 py-3 text-right text-sm font-bold uppercase tracking-wide text-gray-700">
+                                General Average
+                            </td>
+                            <td class="border border-gray-200 px-3 py-3 text-center text-sm font-bold text-gray-900">
+                                {{ $formatGrade($generalAverage) }}
+                            </td>
+                            <td class="border border-gray-200 px-3 py-3 text-center text-sm font-bold {{ $generalAverage !== null && (float) $generalAverage < 75 ? 'text-red-600' : 'text-emerald-700' }}">
+                                {{ $gradeRemarks($generalAverage) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
-    @if($enrollments->isEmpty())
-        <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-12 text-center">
-            <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
-            </svg>
-            <h3 class="text-xl font-semibold text-gray-700 mb-2">No Enrollments Found</h3>
-            <p class="text-gray-600">You don't have any enrollments yet. Please complete your enrollment first.</p>
-        </div>
-    @else
-        @foreach($enrollments as $schoolYear => $yearEnrollments)
-            @foreach($yearEnrollments as $enrollment)
-                <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6 mb-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-[#296374] uppercase tracking-wider">
-                            {{ $schoolYear }}
-                        </h3>
-                        <div class="flex items-center gap-4 text-sm text-gray-600">
-                            <span class="font-semibold">Grade Level:</span> 
-                            {{ strtoupper(str_replace('grade_', 'Grade ', $enrollment->grade_level)) }}
-                            @if($enrollment->semester)
-                                <span class="font-semibold">| Semester:</span> {{ ucfirst($enrollment->semester) }}
-                            @endif
-                            <span class="font-semibold">| Section:</span> 
-                            {{ $enrollment->section->name ?? 'Not Assigned' }}
+            <div id="gradeReportLegend" class="hidden border-t border-gray-200 px-6 py-5">
+                <div class="grid gap-6 text-sm text-gray-700 md:grid-cols-3">
+                    <div>
+                        <h5 class="mb-2 font-bold text-gray-800">Descriptors</h5>
+                        <div class="space-y-1">
+                            <p>Outstanding</p>
+                            <p>Very Satisfactory</p>
+                            <p>Satisfactory</p>
+                            <p>Fairly Satisfactory</p>
+                            <p>Did Not Meet Expectations</p>
                         </div>
                     </div>
-                    
-                    @if($enrollment->subjectAssignments->isEmpty())
-                        <div class="text-center py-8 text-gray-500">
-                            <p>No subjects assigned for this enrollment.</p>
+                    <div>
+                        <h5 class="mb-2 font-bold text-gray-800">Grading Scale</h5>
+                        <div class="space-y-1">
+                            <p>90-100</p>
+                            <p>85-89</p>
+                            <p>80-84</p>
+                            <p>75-79</p>
+                            <p>Below 75</p>
                         </div>
-                    @else
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="border-b-2 border-gray-200">
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Subject</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Teacher</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Grading Period</th>
-                                        <th class="text-center py-3 px-4 font-semibold text-gray-700">Grade</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Remarks</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Posted By</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Date Posted</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($enrollment->subjectAssignments as $assignment)
-                                        @php
-                                            $grades = $assignment->grades->keyBy('grading_period');
-                                            $gradingPeriods = ['q1', 'q2', 'q3', 'q4'];
-                                        @endphp
-                                        
-                                        @foreach($gradingPeriods as $period)
-                                            @php
-                                                $grade = $grades->get($period);
-                                                $periodName = match($period) {
-                                                    'q1' => 'First',
-                                                    'q2' => 'Second', 
-                                                    'q3' => 'Third',
-                                                    'q4' => 'Fourth',
-                                                    default => ucfirst($period)
-                                                };
-                                            @endphp
-                                            <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                                <td class="py-3 px-4">
-                                                    <div class="font-medium text-gray-900">
-                                                        {{ $assignment->curriculumSubject->subject->subject_name ?? 'N/A' }}
-                                                        @if($loop->first)
-                                                            <div class="text-xs text-gray-500 mt-1">
-                                                                {{ $assignment->section->name ?? 'No Section' }}
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </td>
-                                                <td class="py-3 px-4">
-                                                    @if($loop->first)
-                                                        {{ $assignment->staff->first_name . ' ' . $assignment->staff->last_name ?? 'Not Assigned' }}
-                                                    @else
-                                                        -
-                                                    @endif
-                                                </td>
-                                                <td class="py-3 px-4">
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                        {{ $periodName }}
-                                                    </span>
-                                                </td>
-                                                <td class="py-3 px-4 text-center">
-                                                    @if($grade)
-                                                        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold
-                                                            {{ $grade->numeric_grade >= 90 ? 'bg-green-100 text-green-800' : 
-                                                               ($grade->numeric_grade >= 85 ? 'bg-blue-100 text-blue-800' : 
-                                                               ($grade->numeric_grade >= 80 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')) }}">
-                                                            {{ number_format($grade->numeric_grade, 2) }}
-                                                        </span>
-                                                    @else
-                                                        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
-                                                            Not Posted
-                                                        </span>
-                                                    @endif
-                                                </td>
-                                                <td class="py-3 px-4">
-                                                    @if($grade)
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                            {{ $grade->remarks === 'Passed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                                            {{ $grade->remarks }}
-                                                        </span>
-                                                    @else
-                                                        <span class="text-gray-400">-</span>
-                                                    @endif
-                                                </td>
-                                                <td class="py-3 px-4">
-                                                    @if($grade)
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                            {{ $grade->status === 'released' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
-                                                            {{ ucfirst($grade->status) }}
-                                                        </span>
-                                                    @else
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                                            Pending
-                                                        </span>
-                                                    @endif
-                                                </td>
-                                                <td class="py-3 px-4 text-gray-600">
-                                                    {{ $grade->postedBy->name ?? '-' }}
-                                                </td>
-                                                <td class="py-3 px-4 text-gray-600">
-                                                    {{ $grade->reviewed_at ? $grade->reviewed_at->format('M d, Y') : '-' }}
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    @endforeach
-                                </tbody>
-                            </table>
+                    </div>
+                    <div>
+                        <h5 class="mb-2 font-bold text-gray-800">Remarks</h5>
+                        <div class="space-y-1">
+                            <p>Passed</p>
+                            <p>Passed</p>
+                            <p>Passed</p>
+                            <p>Passed</p>
+                            <p>Failed</p>
                         </div>
-                    @endif
+                    </div>
                 </div>
-            @endforeach
-        @endforeach
-    @endif
+            </div>
+        @endif
+    </div>
 
-    <div class="flex justify-center">
-        <a href="{{ route('student.dashboard') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold text-white uppercase tracking-wide shadow-lg transition-all hover:-translate-y-1" style="background-color: #296374;">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex justify-center pt-1">
+        <a href="{{ route('student.dashboard') }}" class="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:opacity-90" style="background-color: #296374;">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
             </svg>
             Back to Dashboard
         </a>
     </div>
 </div>
+
+<script>
+    (function () {
+        document.querySelectorAll('.grade-expand').forEach((button) => {
+            button.addEventListener('click', () => {
+                const target = document.getElementById(button.dataset.target);
+                if (!target) {
+                    return;
+                }
+
+                const isHidden = target.classList.contains('hidden');
+                target.classList.toggle('hidden', !isHidden);
+                button.textContent = isHidden ? '−' : '+';
+                button.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+            });
+        });
+
+        const reportButton = document.getElementById('toggleGradeReport');
+        const legend = document.getElementById('gradeReportLegend');
+        reportButton?.addEventListener('click', () => {
+            if (!legend) {
+                return;
+            }
+            legend.classList.toggle('hidden');
+        });
+    })();
+</script>
 @endsection

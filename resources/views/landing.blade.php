@@ -55,14 +55,19 @@
                     {{-- <p class="mb-8 text-lg leading-relaxed text-white/85 sm:text-xl">
                         Start your application, review enrollment information, and check your approval status from one place.
                     </p> --}}
+                    <div class="mt-8 flex flex-wrap items-center gap-4">
+                        <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-bold uppercase tracking-wide text-[#0C2C55] shadow-lg transition hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-white/40">
+                            Enroll Now
+                        </a>
+                        <button type="button"
+                            @click="showStatusModal = true"
+                            class="inline-flex items-center justify-center rounded-full border border-white/70 px-7 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-white/30">
+                            Check Status
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-        <button type="button"
-            @click="showStatusModal = true"
-            class="fixed bottom-6 left-6 z-50 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-3 rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
-            Check Application Status
-        </button>
     </div>
 
     <div x-show="showStatusModal"
@@ -108,13 +113,13 @@
                 @csrf
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2" for="status_lrn">LRN</label>
-                    <input id="status_lrn" name="status_lrn" type="text" minlength="12" maxlength="12" inputmode="numeric" pattern="\d{12}" required
+                    <input id="status_lrn" name="status_lrn" type="text" minlength="12" maxlength="12" inputmode="numeric" pattern="\d{12}" autocomplete="off" required
                         value="{{ old('status_lrn') }}"
                         class="shadow-sm appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
                 </div>
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2" for="status_birthdate">Birthdate</label>
-                    <input id="status_birthdate" name="status_birthdate" type="date" required
+                    <input id="status_birthdate" name="status_birthdate" type="date" min="{{ \App\Models\StudentApplication::EARLIEST_BIRTHDATE }}" max="{{ \App\Models\StudentApplication::LATEST_BIRTHDATE }}" required
                         value="{{ old('status_birthdate') }}"
                         class="shadow-sm appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
                 </div>
@@ -318,6 +323,12 @@
         </div>
     </section>
 
+    <script>
+        document.getElementById('status_lrn')?.addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '').slice(0, 12);
+        });
+    </script>
+    <x-auth-session-sync />
 </body>
 
 </html>

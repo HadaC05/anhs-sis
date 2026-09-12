@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ChecksAccountStatus;
+use App\Models\Concerns\HasTypedNotifications;
+use App\Models\Concerns\ResolvesAccountRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,11 +15,20 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class Staff extends Authenticatable
 {
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use ChecksAccountStatus, HasFactory, HasTypedNotifications, Notifiable, ResolvesAccountRole, TwoFactorAuthenticatable {
+        HasTypedNotifications::notifications insteadof Notifiable;
+    }
+
+    public const EARLIEST_BIRTHDATE = '1925-01-01';
+
+    public const LATEST_BIRTHDATE = '2020-12-31';
 
     protected $table = 'staffs';
+
     protected $primaryKey = 'staff_id';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
 
     protected $fillable = [
@@ -96,5 +108,10 @@ class Staff extends Authenticatable
     public function sections(): HasMany
     {
         return $this->hasMany(Section::class, 'staff_ID', 'staff_id');
+    }
+
+    public function teacherSubjectAssignments(): HasMany
+    {
+        return $this->hasMany(TeacherSubjectAssignment::class, 'staff_ID', 'staff_id');
     }
 }

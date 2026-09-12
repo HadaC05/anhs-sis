@@ -225,6 +225,7 @@
             updateState();
         })();
     </script>
+    <x-idle-session-timeout />
 </body>
 
 </html>

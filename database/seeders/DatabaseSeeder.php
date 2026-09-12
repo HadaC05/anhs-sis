@@ -20,16 +20,32 @@ class DatabaseSeeder extends Seeder
         $this->call(SubjectSeeder::class);
         $this->call(CurriculumSeeder::class);
         $this->call(CurriculumSubjectSeeder::class);
+        $this->call(MonthSeeder::class);
         $this->call(AcademicYearSeeder::class);
         $this->call(SectionSeeder::class);
+        $this->call(TeacherSubjectAssignmentSeeder::class);
         $this->call(MovementReasonSeeder::class);
+        $this->call(DocumentReturnReasonSeeder::class);
+        $this->call(DocumentTypeSeeder::class);
+        $this->call(DocumentStatusSeeder::class);
+        $this->call(ReligionSeeder::class);
+        $this->call(EnrollmentStatusSeeder::class);
+        $this->call(PlacementStatusSeeder::class);
+        $this->call(PromotionStatusSeeder::class);
+        $this->call(LearnerTypeSeeder::class);
+        $this->call(GradingPeriodStatusSeeder::class);
+        $this->call(GradingSemesterSeeder::class);
+        $this->call(GradeStatusSeeder::class);
+        $this->call(NotificationTypeSeeder::class);
 
-        foreach ([
-            ['reason_name' => 'LRN not found in LIS', 'description' => 'No matching learner record was found in LIS.'],
-            ['reason_name' => 'Name mismatch with LIS', 'description' => 'Submitted name does not match LIS record.'],
-            ['reason_name' => 'Birthdate mismatch with LIS', 'description' => 'Submitted birthdate does not match LIS record.'],
-            ['reason_name' => 'Duplicate approved record', 'description' => 'An account for this learner already exists.'],
-        ] as $reason) {
+        foreach (
+            [
+                ['reason_name' => 'LRN not found in LIS', 'description' => 'No matching learner record was found in LIS.'],
+                ['reason_name' => 'Name mismatch with LIS', 'description' => 'Submitted name does not match LIS record.'],
+                ['reason_name' => 'Birthdate mismatch with LIS', 'description' => 'Submitted birthdate does not match LIS record.'],
+                ['reason_name' => 'Duplicate approved record', 'description' => 'An account for this learner already exists.'],
+            ] as $reason
+        ) {
             RejectionReason::query()->firstOrCreate(
                 ['reason_name' => $reason['reason_name']],
                 ['description' => $reason['description'], 'status' => true],

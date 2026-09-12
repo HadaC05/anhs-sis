@@ -59,13 +59,15 @@ return new class extends Migration
         });
 
         if (Schema::hasColumn($table, 'grade_level')) {
-            DB::statement("
-                UPDATE {$table}
-                INNER JOIN grade_level ON grade_level.grade_label = CONCAT('Grade ', SUBSTRING({$table}.grade_level, 7))
-                SET {$table}.grade_ID = grade_level.grade_ID
-            ");
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement("
+                    UPDATE {$table}
+                    INNER JOIN grade_level ON grade_level.grade_label = CONCAT('Grade ', SUBSTRING({$table}.grade_level, 7))
+                    SET {$table}.grade_ID = grade_level.grade_ID
+                ");
 
-            DB::statement("ALTER TABLE {$table} MODIFY grade_ID INT UNSIGNED NOT NULL");
+                DB::statement("ALTER TABLE {$table} MODIFY grade_ID INT UNSIGNED NOT NULL");
+            }
 
             Schema::table($table, function (Blueprint $schema) use ($table) {
                 $schema->foreign('grade_ID', "{$table}_grade_id_foreign")
@@ -90,13 +92,15 @@ return new class extends Migration
                 ->after('grade_ID');
         });
 
-        DB::statement("
-            UPDATE {$table}
-            INNER JOIN grade_level ON grade_level.grade_ID = {$table}.grade_ID
-            SET {$table}.grade_level = CONCAT('grade_', SUBSTRING(grade_level.grade_label, 7))
-        ");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("
+                UPDATE {$table}
+                INNER JOIN grade_level ON grade_level.grade_ID = {$table}.grade_ID
+                SET {$table}.grade_level = CONCAT('grade_', SUBSTRING(grade_level.grade_label, 7))
+            ");
 
-        DB::statement("ALTER TABLE {$table} MODIFY grade_level ENUM('grade_7','grade_8','grade_9','grade_10','grade_11','grade_12') NOT NULL");
+            DB::statement("ALTER TABLE {$table} MODIFY grade_level ENUM('grade_7','grade_8','grade_9','grade_10','grade_11','grade_12') NOT NULL");
+        }
 
         Schema::table($table, function (Blueprint $schema) {
             $schema->dropColumn('grade_ID');
