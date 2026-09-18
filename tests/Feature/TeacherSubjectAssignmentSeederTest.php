@@ -13,7 +13,6 @@ use App\Models\TeacherSubjectAssignment;
 use Database\Seeders\AcademicYearSeeder;
 use Database\Seeders\ClusterSeeder;
 use Database\Seeders\CurriculumSeeder;
-use Database\Seeders\CurriculumSubjectSeeder;
 use Database\Seeders\DefaultNonStudentUsersSeeder;
 use Database\Seeders\GradeLevelSeeder;
 use Database\Seeders\RoleSeeder;
@@ -232,7 +231,7 @@ test('teacher subject assignment seeder shares specialists across sections and k
         ->and($sectionB->fresh()->staff_ID)->toBe($scienceTeacher->staff_id);
 });
 
-test('default seeders give each section one adviser and share subject teachers across the grade', function () {
+test('default seeders do not create curriculum subject or teacher assignments', function () {
     $this->seed([
         RoleSeeder::class,
         DefaultNonStudentUsersSeeder::class,
@@ -240,7 +239,6 @@ test('default seeders give each section one adviser and share subject teachers a
         GradeLevelSeeder::class,
         SubjectSeeder::class,
         CurriculumSeeder::class,
-        CurriculumSubjectSeeder::class,
         AcademicYearSeeder::class,
         SectionSeeder::class,
         TeacherSubjectAssignmentSeeder::class,
@@ -248,29 +246,8 @@ test('default seeders give each section one adviser and share subject teachers a
 
     $academicYearId = AcademicYear::query()->where('status', true)->value('SY_ID');
     $sections = Section::query()->where('SY_ID', $academicYearId)->get();
-    $g7Sections = $sections->filter(fn (Section $section): bool => str_starts_with($section->name, 'G7-'));
-
-    $mathSubject = CurriculumSubject::query()
-        ->whereHas('subject', fn ($query) => $query->where('code', 'MATH7'))
-        ->first();
-
-    $mathTeachers = TeacherSubjectAssignment::query()
-        ->where('curr_subj_ID', $mathSubject->curr_subj_ID)
-        ->whereIn('section_ID', $g7Sections->pluck('section_ID'))
-        ->pluck('staff_ID')
-        ->unique()
-        ->values();
-
-    $g7AdviserIds = $g7Sections->pluck('staff_ID')->sort()->values();
-    $g7SubjectTeacherIds = TeacherSubjectAssignment::query()
-        ->whereIn('section_ID', $g7Sections->pluck('section_ID'))
-        ->pluck('staff_ID')
-        ->unique()
-        ->sort()
-        ->values();
 
     expect($sections->pluck('staff_ID')->filter()->unique())->toHaveCount(30)
-        ->and($mathTeachers)->toHaveCount(1)
-        ->and($mathTeachers->first())->toBe($g7Sections->firstWhere('name', 'G7-A')?->staff_ID)
-        ->and($g7SubjectTeacherIds->all())->toBe($g7AdviserIds->all());
+        ->and(CurriculumSubject::query()->count())->toBe(0)
+        ->and(TeacherSubjectAssignment::query()->count())->toBe(0);
 });

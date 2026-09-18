@@ -21,6 +21,7 @@ use App\Models\StudentDocument;
 use App\Models\StudentGuardian;
 use App\Models\StudentProfile;
 use App\Models\StudentSubjectGrade;
+use App\Models\StudentSubject;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\StudentDocumentUploader;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -312,7 +313,7 @@ class StudentDashboardController extends Controller
             $assignments = $this->subjectAssignmentsForEnrollment($enrollment);
 
             $grades = StudentSubjectGrade::query()
-                ->where('enrollment_ID', $enrollment->enrollment_ID)
+                ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
                 ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
                 ->whereStatus(GradeStatus::RELEASED)
                 ->get()
@@ -400,6 +401,7 @@ class StudentDashboardController extends Controller
         if ($isSeniorHigh) {
             $semesters = GradingSemester::query()
                 ->active()
+                ->whereIn('key', [GradingSemester::FIRST, GradingSemester::SECOND])
                 ->orderBy('sort_order')
                 ->orderBy('semester_ID')
                 ->get();
@@ -486,9 +488,8 @@ class StudentDashboardController extends Controller
             ->where('SY_ID', $enrollment->SY_ID)
             ->when($semesterKey, function ($query) use ($semesterKey): void {
                 $query->whereHas('curriculumSubject', function ($subjectQuery) use ($semesterKey): void {
-                    $subjectQuery->where(function ($nestedQuery) use ($semesterKey): void {
-                        $nestedQuery->whereNull('semester')
-                            ->orWhere('semester', $semesterKey);
+                    $subjectQuery->whereHas('gradingSemester', function ($semesterQuery) use ($semesterKey): void {
+                        $semesterQuery->whereIn('key', [\App\Models\GradingSemester::FULL_YEAR, $semesterKey]);
                     });
                 });
             })

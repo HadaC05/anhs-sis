@@ -10,8 +10,11 @@ class GradeLevel extends Model
     use HasFactory;
 
     protected $table = 'grade_level';
+
     protected $primaryKey = 'grade_ID';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
 
     protected $fillable = [
@@ -55,6 +58,7 @@ class GradeLevel extends Model
             ->map(fn (self $grade): array => [
                 'value' => $grade->value,
                 'label' => $grade->grade_label,
+                'category' => $grade->category,
             ])
             ->all();
     }

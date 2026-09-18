@@ -102,7 +102,8 @@ class TeacherDashboardController extends Controller
         $temporaryStatusId = EnrollmentStatus::idFor(EnrollmentStatus::TEMPORARILY_ENROLLED);
 
         $enrollmentByGrade = DB::table('enrollments')
-            ->join('grade_level', 'enrollments.grade_ID', '=', 'grade_level.grade_ID')
+            ->join('curriculum_grade_levels', 'enrollments.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
+            ->join('grade_level', 'curriculum_grade_levels.grade_ID', '=', 'grade_level.grade_ID')
             ->when($syId, fn ($query) => $query->where('enrollments.SY_ID', $syId))
             ->when(
                 $sectionIds->isNotEmpty(),
@@ -110,7 +111,7 @@ class TeacherDashboardController extends Controller
                 fn ($query) => $query->whereRaw('1 = 0')
             )
             ->whereIn('enrollments.enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->when($enrollmentGradeId, fn ($query) => $query->where('enrollments.grade_ID', $enrollmentGradeId))
+            ->when($enrollmentGradeId, fn ($query) => $query->where('curriculum_grade_levels.grade_ID', $enrollmentGradeId))
             ->select('grade_level.grade_ID')
             ->selectRaw('grade_level.grade_label as label')
             ->selectRaw('SUM(CASE WHEN enrollments.enrollment_status_ID = ? THEN 1 ELSE 0 END) as enrolled', [$enrolledStatusId])

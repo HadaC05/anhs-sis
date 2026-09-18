@@ -343,9 +343,8 @@ class PrincipalDashboardController extends Controller
             'academicYear',
             'grades' => function ($query) use ($status): void {
                 $query->whereStatus($status)
-                    ->with(['enrollment.student.application'])
-                    ->orderBy('enrollment_ID')
-                    ->orderBy('grading_period');
+                    ->with(['enrollment.student.application', 'term'])
+                    ->orderBy('term_ID');
             },
         ]);
 

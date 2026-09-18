@@ -36,7 +36,7 @@ test('admin can view the restyled grading terms page', function () {
     $response->assertSee('Term settings');
     $response->assertSee('Add new term');
     $response->assertSee('Edit maximum terms');
-    $response->assertSee('Set as Active');
+    $response->assertSee('Change status');
     $response->assertSee('Current grading term');
     $response->assertSee('id="addTermModal"', false);
     $response->assertSee('id="maxTermsModal"', false);
@@ -47,31 +47,45 @@ test('admin can view the restyled grading terms page', function () {
     $response->assertSee('title="Edit"', false);
     $response->assertSee('Term 1');
     $response->assertSee('Term 2');
-    $response->assertDontSee('Update Active Term');
+    $response->assertDontSee('Set as Active');
     $response->assertDontSee('Active Grading Term');
     $response->assertDontSee('<select name="open_terms_count"', false);
     $response->assertDontSee('Open Through');
     $response->assertDontSee('form="update-term-', false);
-    $response->assertDontSee('Archive this term');
-    $response->assertDontSee('>Archive</button>', false);
+    $response->assertSee('Archive');
 });
 
-test('admin can set the current grading term from a table row', function () {
+test('admin can set the one open junior high term from the status action', function () {
     $admin = createGradingTermAdmin('admin.grading.set.active');
     $termTwo = GradingTerm::query()->where('key', 'term_2')->firstOrFail();
 
     $response = $this->actingAs($admin)
         ->from(route('admin.grading-term-config.index'))
-        ->put(route('admin.grading-term-config.open-term.update'), [
-            'open_terms_count' => 2,
+        ->put(route('admin.grading-term-config.junior-high-status.update', $termTwo), [
+            'status' => 'open',
         ]);
 
     $response->assertRedirect(route('admin.grading-term-config.index'));
     $response->assertSessionHas('success');
 
-    expect(GradingTermSetting::current()->open_terms_count)->toBe(2)
-        ->and(GradingTerm::currentEditablePeriodKey())->toBe($termTwo->key)
+    expect(GradingTerm::currentEditablePeriodKey())->toBe($termTwo->key)
         ->and(GradingTerm::currentEditablePeriodLabel())->toBe('Term 2');
+});
+
+test('admin can close a junior high term', function () {
+    $admin = createGradingTermAdmin('admin.grading.close.jhs');
+    $term = GradingTerm::query()->where('key', 'term_1')->firstOrFail();
+
+    $this->actingAs($admin)
+        ->from(route('admin.grading-term-config.index'))
+        ->put(route('admin.grading-term-config.junior-high-status.update', $term), [
+            'status' => 'closed',
+        ])
+        ->assertRedirect(route('admin.grading-term-config.index'))
+        ->assertSessionHas('success');
+
+    expect($term->fresh()->isJuniorHighOpen())->toBeFalse()
+        ->and($term->fresh()->juniorHighStatus?->name)->toBe('Closed');
 });
 
 test('admin can add a term from the settings modal', function () {
@@ -129,7 +143,7 @@ test('admin can edit a term label and order from the modal', function () {
         ->and($term->sort_order)->toBe(2);
 });
 
-test('lowering the maximum terms deactivates extra terms and raising it reactivates them', function () {
+test('lowering the maximum terms archives extra terms and raising it restores them', function () {
     $admin = createGradingTermAdmin('admin.grading.sync.status');
     $fourthTerm = GradingTerm::query()->where('key', 'term_4')->firstOrFail();
 
@@ -142,8 +156,8 @@ test('lowering the maximum terms deactivates extra terms and raising it reactiva
         ->assertRedirect(route('admin.grading-term-config.index'));
 
     expect(GradingTermSetting::current()->max_terms)->toBe(3)
-        ->and($fourthTerm->fresh()->isActive())->toBeFalse()
-        ->and(GradingTerm::query()->active()->count())->toBe(3);
+        ->and($fourthTerm->fresh()->isJuniorHighArchived())->toBeTrue()
+        ->and(GradingTerm::query()->juniorHighAvailable()->count())->toBe(3);
 
     $this->actingAs($admin)
         ->from(route('admin.grading-term-config.index'))
@@ -154,8 +168,8 @@ test('lowering the maximum terms deactivates extra terms and raising it reactiva
         ->assertRedirect(route('admin.grading-term-config.index'));
 
     expect(GradingTermSetting::current()->max_terms)->toBe(4)
-        ->and($fourthTerm->fresh()->isActive())->toBeTrue()
-        ->and(GradingTerm::query()->active()->count())->toBe(4);
+        ->and($fourthTerm->fresh()->isJuniorHighActive())->toBeTrue()
+        ->and(GradingTerm::query()->juniorHighAvailable()->count())->toBe(4);
 });
 
 test('adding a term reopens the add term modal when validation fails', function () {
@@ -221,15 +235,15 @@ test('admin can view the senior high school grading tab', function () {
     $response->assertSee('Term 2');
     $response->assertSee('Term 3');
     $response->assertSee('Active Semester');
-    $response->assertSee('Active Term');
+    $response->assertSee('Term Status');
     $response->assertSee('Active semester');
     $response->assertSee('Active term');
     $response->assertSee('Set Active');
-    $response->assertDontSee('Maximum Terms');
+    $response->assertSee('Maximum Terms');
     $response->assertDontSee('Current Quarter');
     $response->assertDontSee('Quarter 1');
     $response->assertDontSee('Semesters and Quarters');
-    $response->assertDontSee('>Terms</h2>', false);
+    $response->assertSee('>Terms</h2>', false);
 });
 
 test('admin can set senior high semester and term independently from their lookup tables', function () {

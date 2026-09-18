@@ -15,7 +15,7 @@
 
 <div class="overflow-hidden rounded-xl border border-[#296374]/35 bg-[#eef5f7] shadow-md shadow-[#296374]/10">
 
-    @if($isObservedLocked)<div class="border-b border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:px-6">Observed values have been submitted and are locked for teacher editing.</div>@endif
+    @if($isObservedLocked)<div class="border-b border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:px-6">{{ ($gradingInputClosed ?? false) ? 'This grading term is closed for teacher input.' : 'Observed values have been submitted and are locked for teacher editing.' }}</div>@endif
 
     <div class="border-b border-gray-100 px-4 py-4 lg:px-6">
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">

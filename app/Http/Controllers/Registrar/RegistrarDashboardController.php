@@ -155,7 +155,7 @@ class RegistrarDashboardController extends Controller
         $schoolDaysByMonth = Sf9AttendanceSummary::schoolDaysForSection($section);
 
         $grades = StudentSubjectGrade::query()
-            ->where('enrollment_ID', $enrollment->enrollment_ID)
+            ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->get()
             ->groupBy('assignment_ID')
@@ -248,9 +248,8 @@ class RegistrarDashboardController extends Controller
             'academicYear',
             'grades' => function ($query) use ($status): void {
                 $query->whereStatus($status)
-                    ->with(['enrollment.student.application'])
-                    ->orderBy('enrollment_ID')
-                    ->orderBy('grading_period');
+                    ->with(['enrollment.student.application', 'term'])
+                    ->orderBy('term_ID');
             },
         ]);
 
@@ -357,8 +356,9 @@ class RegistrarDashboardController extends Controller
         $assignmentScope = function ($query): void {
             $query->with(['curriculumSubject.subject', 'staff'])
                 ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
+                ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
                 ->leftJoin('subjects', 'curriculum_subjects.subject_ID', '=', 'subjects.subject_ID')
-                ->orderBy('curriculum_subjects.semester')
+                ->orderBy('curriculum_grade_levels.semester_ID')
                 ->orderBy('subjects.title')
                 ->select('teacher_subject_assignments.*');
         };

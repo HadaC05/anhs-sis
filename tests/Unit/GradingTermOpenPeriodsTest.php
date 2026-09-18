@@ -6,39 +6,36 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('returns open grading periods based on admin setting', function () {
-    GradingTermSetting::query()->where('id', 1)->update([
-        'open_terms_count' => 2,
-    ]);
-
-    expect(GradingTerm::gradingOpenPeriods())->toHaveCount(2)
+it('returns all included grading periods while only the open status is editable', function () {
+    expect(GradingTerm::gradingOpenPeriods())->toHaveCount(4)
         ->and(GradingTerm::gradingOpenPeriods()[0]['key'])->toBe('term_1')
         ->and(GradingTerm::gradingOpenPeriods()[1]['key'])->toBe('term_2')
-        ->and(GradingTerm::lockedGradingPeriodKeys())->toBe(['term_1'])
-        ->and(GradingTerm::currentEditablePeriodKey())->toBe('term_2')
-        ->and(GradingTerm::currentEditablePeriodLabel())->toBe('Term 2');
+        ->and(GradingTerm::lockedGradingPeriodKeys())->toBe(['term_2', 'term_3', 'term_4'])
+        ->and(GradingTerm::currentEditablePeriodKey())->toBe('term_1')
+        ->and(GradingTerm::currentEditablePeriodLabel())->toBe('Term 1');
 });
 
-it('keeps only the current term editable when one term is open', function () {
-    GradingTermSetting::query()->where('id', 1)->update([
-        'open_terms_count' => 1,
-    ]);
+it('keeps only one junior high term open at a time', function () {
+    $termTwo = GradingTerm::query()->where('key', 'term_2')->firstOrFail();
+    $termOne = GradingTerm::query()->where('key', 'term_1')->firstOrFail();
 
-    expect(GradingTerm::gradingOpenPeriods())->toHaveCount(1)
-        ->and(GradingTerm::lockedGradingPeriodKeys())->toBe([])
-        ->and(GradingTerm::currentEditablePeriodKey())->toBe('term_1');
+    $termOne->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::activeId()]);
+    $termTwo->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+
+    expect(GradingTerm::currentEditablePeriodKey())->toBe('term_2')
+        ->and(GradingTerm::isCurrentJuniorHighPeriodOpen())->toBeTrue();
 });
 
-it('deactivates terms beyond the maximum and reactivates them when the limit is restored', function () {
+it('archives terms beyond the maximum and restores them when the limit is raised', function () {
     GradingTerm::syncActiveStatus(3);
 
-    expect(GradingTerm::query()->where('key', 'term_4')->first()?->isActive())->toBeFalsy()
-        ->and(GradingTerm::query()->active()->count())->toBe(3);
+    expect(GradingTerm::query()->where('key', 'term_4')->first()?->isJuniorHighArchived())->toBeTrue()
+        ->and(GradingTerm::query()->juniorHighAvailable()->count())->toBe(3);
 
     GradingTerm::syncActiveStatus(4);
 
-    expect(GradingTerm::query()->where('key', 'term_4')->first()?->isActive())->toBeTruthy()
-        ->and(GradingTerm::query()->active()->count())->toBe(4);
+    expect(GradingTerm::query()->where('key', 'term_4')->first()?->isJuniorHighActive())->toBeTruthy()
+        ->and(GradingTerm::query()->juniorHighAvailable()->count())->toBe(4);
 });
 
 it('returns senior high periods with semester and term labels', function () {

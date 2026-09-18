@@ -64,7 +64,7 @@ test('admin can view the restyled curriculum page', function () {
     $response->assertOk();
     $response->assertSee('Curriculum');
     $response->assertSee('Add Curriculum');
-    $response->assertSee('Configure curricula and assign subjects by grade level and semester.');
+    $response->assertDontSee('Configure curricula and assign subjects by grade level and semester.');
     $response->assertSee('Total Curricula');
     $response->assertSee('Assigned Subjects');
     $response->assertSee('DepEd SHS - STEM');
@@ -77,7 +77,7 @@ test('admin can view the restyled curriculum page', function () {
     $response->assertSee('M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', false);
     $response->assertSee('M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4', false);
     $response->assertDontSee('Curriculum Configuration');
-    $response->assertDontSee('>Edit</button>', false);
+    $response->assertSee('>Edit</button>', false);
     $response->assertDontSee('>Archive</button>', false);
 });
 
@@ -92,10 +92,9 @@ test('admin can view curriculum subjects on the restyled page', function () {
     $response->assertSee('Pre-Calculus');
     $response->assertSee('Grade 11');
     $response->assertSee('First');
-    $response->assertSee('title="Remove"', false);
-    $response->assertDontSee('>Edit</button>', false);
+    $response->assertSee('>Edit</button>', false);
     $response->assertDontSee('>Remove</button>', false);
-    $response->assertDontSee('Curriculum Subjects');
+    $response->assertSee('Curriculum Subjects');
 });
 
 test('admin can view the curriculum overview tab', function () {
@@ -165,12 +164,20 @@ test('admin can assign a junior high subject without a cluster', function () {
         'status' => 'active',
     ]);
 
+    $science = Subject::query()->create([
+        'cluster_ID' => null,
+        'code' => 'SCI7',
+        'title' => 'Science 7',
+        'type' => 'core',
+        'status' => 'active',
+    ]);
+
     $this->actingAs($admin)
         ->from(route('admin.curriculum-config.index', ['tab' => 'curriculum_subjects']))
         ->post(route('admin.curriculum-config.subjects.store'), [
             '_form' => 'curriculum_subject',
             'curriculum_ID' => $curriculum->curriculum_ID,
-            'subject_ID' => $subject->subject_ID,
+            'subject_ID' => [$subject->subject_ID, $science->subject_ID],
             'grade_level' => 'grade_7',
             'semester' => 'first',
         ])
@@ -184,5 +191,41 @@ test('admin can assign a junior high subject without a cluster', function () {
 
     expect($assigned)->not->toBeNull()
         ->and($assigned->cluster_ID)->toBeNull()
-        ->and($assigned->grade_level)->toBe('grade_7');
+        ->and($assigned->grade_level)->toBe('grade_7')
+        ->and(CurriculumSubject::query()->where('curriculum_ID', $curriculum->curriculum_ID)->count())->toBe(2);
+});
+
+test('admin can assign multiple senior high subjects for a selected cluster and semester', function () {
+    ['admin' => $admin, 'cluster' => $cluster, 'curriculum' => $curriculum] = createCurriculumPageFixtures('admin.curriculum.shs.subjects');
+
+    $secondSubject = Subject::query()->create([
+        'cluster_ID' => $cluster->cluster_ID,
+        'code' => 'GENMATH11',
+        'title' => 'General Mathematics',
+        'type' => 'core',
+        'status' => 'active',
+    ]);
+
+    $secondSemesterId = \App\Models\GradingSemester::idFor('second');
+    $grade11Id = \App\Models\GradeLevel::idForValue('grade_11');
+    $firstSubjectId = Subject::query()->where('code', 'PRECAL11')->value('subject_ID');
+
+    $this->actingAs($admin)
+        ->from(route('admin.curriculum-config.index', ['tab' => 'curriculum_subjects']))
+        ->post(route('admin.curriculum-config.subjects.store'), [
+            '_form' => 'curriculum_subject',
+            'curriculum_ID' => $curriculum->curriculum_ID,
+            'subject_ID' => [$firstSubjectId, $secondSubject->subject_ID],
+            'cluster_ID' => $cluster->cluster_ID,
+            'grade_ID' => $grade11Id,
+            'semester_ID' => $secondSemesterId,
+        ])
+        ->assertRedirect(route('admin.curriculum-config.index', ['tab' => 'curriculum_subjects']))
+        ->assertSessionHasNoErrors();
+
+    expect(CurriculumSubject::query()
+        ->where('curriculum_ID', $curriculum->curriculum_ID)
+        ->whereIn('subject_ID', [$firstSubjectId, $secondSubject->subject_ID])
+        ->where('semester_ID', $secondSemesterId)
+        ->count())->toBe(2);
 });

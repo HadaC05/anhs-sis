@@ -11,12 +11,9 @@
             </svg>
         </div>
 
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-3 tracking-tight">Enrollment Application Submitted</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-3 tracking-tight">Enrollment Submitted Successfully</h1>
         <p class="text-gray-600 text-sm md:text-base leading-6">
-            {{ session('status', 'You are temporarily enrolled. Check your email for login instructions, then sign in to upload your required documents.') }}
-        </p>
-        <p class="mt-4 text-sm text-gray-500 leading-6">
-            Username is your LRN. Your default password uses the first 2 letters of your first name, the first 2 letters of your last name, the school year, and anhs.
+            {{ session('status', 'Your enrollment has been submitted successfully.') }}
         </p>
 
         <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3">

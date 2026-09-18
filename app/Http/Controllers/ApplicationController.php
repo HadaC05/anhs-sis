@@ -45,7 +45,7 @@ class ApplicationController extends Controller
 
         return redirect()->route('register')
             ->with('registration_submitted', true)
-            ->with('status', 'You are temporarily enrolled. Check your email for login instructions, then sign in to upload your required documents.');
+            ->with('status', 'Your enrollment has been submitted successfully.');
     }
 
     public function checkStatus(CheckApplicationStatusRequest $request): RedirectResponse

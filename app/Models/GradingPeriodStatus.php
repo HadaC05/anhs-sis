@@ -14,7 +14,16 @@ class GradingPeriodStatus extends Model
 
     public const ACTIVE = 'active';
 
-    public const INACTIVE = 'inactive';
+    public const CLOSED = 'closed';
+
+    public const ARCHIVED = 'archived';
+
+    public const OPEN = 'open';
+
+    /**
+     * Backwards-compatible alias for integrations that still use the old name.
+     */
+    public const INACTIVE = self::CLOSED;
 
     protected $table = 'grading_period_statuses';
 
@@ -47,7 +56,9 @@ class GradingPeriodStatus extends Model
     {
         return [
             ['slug' => self::ACTIVE, 'name' => 'Active', 'sort_order' => 1],
-            ['slug' => self::INACTIVE, 'name' => 'Inactive', 'sort_order' => 2],
+            ['slug' => self::CLOSED, 'name' => 'Closed', 'sort_order' => 2],
+            ['slug' => self::OPEN, 'name' => 'Open', 'sort_order' => 3],
+            ['slug' => self::ARCHIVED, 'name' => 'Archived', 'sort_order' => 4],
         ];
     }
 
@@ -94,7 +105,22 @@ class GradingPeriodStatus extends Model
 
     public static function inactiveId(): ?int
     {
-        return self::idFor(self::INACTIVE);
+        return self::closedId();
+    }
+
+    public static function closedId(): ?int
+    {
+        return self::idFor(self::CLOSED);
+    }
+
+    public static function openId(): ?int
+    {
+        return self::idFor(self::OPEN);
+    }
+
+    public static function archivedId(): ?int
+    {
+        return self::idFor(self::ARCHIVED);
     }
 
     public static function slugFor(?int $id): ?string
@@ -143,9 +169,20 @@ class GradingPeriodStatus extends Model
         self::$idsBySlug = null;
     }
 
+    public function juniorHighTerms(): HasMany
+    {
+        return $this->hasMany(GradingTerm::class, 'junior_high_grading_period_status_ID', 'grading_period_status_ID');
+    }
+
+    /** @deprecated Use juniorHighTerms(). */
     public function terms(): HasMany
     {
-        return $this->hasMany(GradingTerm::class, 'grading_period_status_ID', 'grading_period_status_ID');
+        return $this->juniorHighTerms();
+    }
+
+    public function seniorHighTerms(): HasMany
+    {
+        return $this->hasMany(GradingTerm::class, 'senior_high_grading_period_status_ID', 'grading_period_status_ID');
     }
 
     public function semesters(): HasMany

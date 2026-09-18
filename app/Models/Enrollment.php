@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -26,11 +28,8 @@ class Enrollment extends Model
         'student_ID',
         'section_ID',
         'SY_ID',
-        'cluster_ID',
+        'curriculum_grade_level_ID',
         'course_ID',
-        'grade_ID',
-        'grade_level',
-        'semester',
         'learner_type',
         'learner_type_ID',
         'last_grade_level_completed',
@@ -61,6 +60,12 @@ class Enrollment extends Model
     protected static function booted(): void
     {
         static::creating(function (Enrollment $enrollment): void {
+            if (empty($enrollment->attributes['curriculum_grade_level_ID']) && ! empty($enrollment->attributes['section_ID'])) {
+                $enrollment->attributes['curriculum_grade_level_ID'] = Section::query()
+                    ->where('section_ID', $enrollment->attributes['section_ID'])
+                    ->value('curriculum_ID');
+            }
+
             if (empty($enrollment->attributes['learner_type_ID'])) {
                 $enrollment->attributes['learner_type_ID'] = LearnerType::idFor(LearnerType::REGULAR);
             }
@@ -71,6 +76,12 @@ class Enrollment extends Model
 
             if (empty($enrollment->attributes['promotion_status_ID'])) {
                 $enrollment->attributes['promotion_status_ID'] = PromotionStatus::idFor(PromotionStatus::PENDING);
+            }
+        });
+
+        static::created(function (Enrollment $enrollment): void {
+            if ($enrollment->curriculum_grade_level_ID) {
+                \App\Support\StudentSubjectRoster::sync($enrollment);
             }
         });
     }
@@ -90,9 +101,28 @@ class Enrollment extends Model
         return $this->belongsTo(AcademicYear::class, 'SY_ID', 'SY_ID');
     }
 
-    public function cluster(): BelongsTo
+    public function curriculumGradeLevel(): BelongsTo
     {
-        return $this->belongsTo(Cluster::class, 'cluster_ID', 'cluster_ID');
+        return $this->belongsTo(Curriculum::class, 'curriculum_grade_level_ID', 'curriculum_ID');
+    }
+
+    public function cluster(): HasOneThrough
+    {
+        return $this->hasOneThrough(Cluster::class, Curriculum::class, 'curriculum_ID', 'cluster_ID', 'curriculum_grade_level_ID', 'cluster_ID');
+    }
+
+    public function gradingSemester(): HasOneThrough
+    {
+        return $this->hasOneThrough(GradingSemester::class, Curriculum::class, 'curriculum_ID', 'semester_ID', 'curriculum_grade_level_ID', 'semester_ID');
+    }
+
+    public function getSemesterAttribute(): ?string
+    {
+        $semester = $this->relationLoaded('gradingSemester')
+            ? $this->getRelation('gradingSemester')
+            : $this->gradingSemester()->first();
+
+        return $semester?->key === GradingSemester::FULL_YEAR ? null : $semester?->key;
     }
 
     public function preferredCourse(): BelongsTo
@@ -318,9 +348,9 @@ class Enrollment extends Model
         return true;
     }
 
-    public function gradeLevel(): BelongsTo
+    public function gradeLevel(): HasOneThrough
     {
-        return $this->belongsTo(GradeLevel::class, 'grade_ID', 'grade_ID');
+        return $this->hasOneThrough(GradeLevel::class, Curriculum::class, 'curriculum_ID', 'grade_ID', 'curriculum_grade_level_ID', 'grade_ID');
     }
 
     public function getGradeLevelAttribute(): string
@@ -332,6 +362,26 @@ class Enrollment extends Model
         return GradeLevel::labelToValue($gradeLevel?->grade_label);
     }
 
+    /** Derived from the selected curriculum-grade-level offering. */
+    public function getGradeIdAttribute(): ?int
+    {
+        $offering = $this->relationLoaded('curriculumGradeLevel')
+            ? $this->getRelation('curriculumGradeLevel')
+            : $this->curriculumGradeLevel()->first();
+
+        return $offering?->grade_ID;
+    }
+
+    /** Derived from the selected curriculum-grade-level offering. */
+    public function getClusterIdAttribute(): ?int
+    {
+        $offering = $this->relationLoaded('curriculumGradeLevel')
+            ? $this->getRelation('curriculumGradeLevel')
+            : $this->curriculumGradeLevel()->first();
+
+        return $offering?->cluster_ID;
+    }
+
     public function isSeniorHigh(): bool
     {
         return in_array($this->grade_level, ['grade_11', 'grade_12'], true);
@@ -339,12 +389,24 @@ class Enrollment extends Model
 
     public function setGradeLevelAttribute(string $value): void
     {
-        $this->attributes['grade_ID'] = GradeLevel::idForValue($value);
+        // Grade level is defined by curriculum_grade_level_ID.
     }
 
-    public function grades(): HasMany
+    public function studentSubjects(): HasMany
     {
-        return $this->hasMany(StudentSubjectGrade::class, 'enrollment_ID', 'enrollment_ID');
+        return $this->hasMany(StudentSubject::class, 'enrollment_ID', 'enrollment_ID');
+    }
+
+    public function grades(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            StudentSubjectGrade::class,
+            StudentSubject::class,
+            'enrollment_ID',
+            'student_subject_ID',
+            'enrollment_ID',
+            'student_subject_ID',
+        );
     }
 
     public function placementAssessmentRecommendation(): ?array

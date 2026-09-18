@@ -46,7 +46,8 @@ class EnrollmentDashboardData
             ->all();
 
         $clusterDistribution = DB::table('enrollments')
-            ->leftJoin('clusters', 'enrollments.cluster_ID', '=', 'clusters.cluster_ID')
+            ->leftJoin('curriculum_grade_levels', 'enrollments.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
+            ->leftJoin('clusters', 'curriculum_grade_levels.cluster_ID', '=', 'clusters.cluster_ID')
             ->when($syId, fn ($query) => $query->where('enrollments.SY_ID', $syId))
             ->whereIn('enrollments.enrollment_status_ID', EnrollmentStatus::activeIds())
             ->selectRaw("COALESCE(clusters.name, 'Junior High School') as label")
@@ -68,10 +69,11 @@ class EnrollmentDashboardData
         $temporaryStatusId = EnrollmentStatus::idFor(EnrollmentStatus::TEMPORARILY_ENROLLED);
 
         $enrollmentByGrade = DB::table('enrollments')
-            ->join('grade_level', 'enrollments.grade_ID', '=', 'grade_level.grade_ID')
+            ->join('curriculum_grade_levels', 'enrollments.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
+            ->join('grade_level', 'curriculum_grade_levels.grade_ID', '=', 'grade_level.grade_ID')
             ->when($syId, fn ($query) => $query->where('enrollments.SY_ID', $syId))
             ->whereIn('enrollments.enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->when($enrollmentGradeId, fn ($query) => $query->where('enrollments.grade_ID', $enrollmentGradeId))
+            ->when($enrollmentGradeId, fn ($query) => $query->where('curriculum_grade_levels.grade_ID', $enrollmentGradeId))
             ->select('grade_level.grade_ID')
             ->selectRaw('grade_level.grade_label as label')
             ->selectRaw('SUM(CASE WHEN enrollments.enrollment_status_ID = ? THEN 1 ELSE 0 END) as enrolled', [$enrolledStatusId])

@@ -384,10 +384,11 @@ class LearnerPermanentRecordBuilder
             ->all();
 
         $gradesByEnrollment = \App\Models\StudentSubjectGrade::query()
-            ->whereIn('enrollment_ID', $allEnrollments->pluck('enrollment_ID'))
+            ->with('studentSubject')
+            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $allEnrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->get()
-            ->groupBy('enrollment_ID')
+            ->groupBy(fn (\App\Models\StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->all();
 
         return $selectedEnrollments->map(function (Enrollment $enrollment) use ($allEnrollments, $assignmentsBySectionYear, $gradesByEnrollment) {

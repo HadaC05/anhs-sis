@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -22,11 +23,9 @@ class StudentSubjectGrade extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'enrollment_ID',
+        'student_subject_ID',
         'assignment_ID',
         'term_ID',
-        'semester_ID',
-        'grading_period',
         'numeric_grade',
         'remarks',
         'status',
@@ -51,14 +50,25 @@ class StudentSubjectGrade extends Model
             if (empty($grade->grade_status_ID) && $grade->status === '') {
                 $grade->status = GradeStatus::DRAFT;
             }
-
-            $grade->syncPeriodReferences();
         });
     }
 
-    public function enrollment(): BelongsTo
+    public function studentSubject(): BelongsTo
     {
-        return $this->belongsTo(Enrollment::class, 'enrollment_ID', 'enrollment_ID');
+        return $this->belongsTo(StudentSubject::class, 'student_subject_ID', 'student_subject_ID');
+    }
+
+    /** Compatibility relation; enrollment is derived through student_subjects. */
+    public function enrollment(): HasOneThrough
+    {
+        return $this->hasOneThrough(Enrollment::class, StudentSubject::class, 'student_subject_ID', 'enrollment_ID', 'student_subject_ID', 'enrollment_ID');
+    }
+
+    public function getEnrollmentIdAttribute(): ?int
+    {
+        $enrollment = $this->relationLoaded('enrollment') ? $this->getRelation('enrollment') : $this->enrollment()->first();
+
+        return $enrollment?->enrollment_ID;
     }
 
     public function assignment(): BelongsTo
@@ -69,11 +79,6 @@ class StudentSubjectGrade extends Model
     public function term(): BelongsTo
     {
         return $this->belongsTo(GradingTerm::class, 'term_ID', 'term_ID');
-    }
-
-    public function semester(): BelongsTo
-    {
-        return $this->belongsTo(GradingSemester::class, 'semester_ID', 'semester_ID');
     }
 
     public function gradeStatus(): BelongsTo
@@ -163,75 +168,57 @@ class StudentSubjectGrade extends Model
         return in_array($this->status, GradeStatus::teacherLockedSlugs(), true);
     }
 
-    public function isJuniorHigh(): bool
-    {
-        return $this->term_ID !== null && $this->semester_ID === null;
-    }
-
     public function isSeniorHigh(): bool
     {
-        return $this->semester_ID !== null;
+        return $this->enrollment?->semester !== null;
     }
 
-    /**
-     * @return array{term_ID: int|null, semester_ID: int|null}
-     */
-    public static function referencesForPeriodKey(?string $periodKey): array
+    public function isJuniorHigh(): bool
     {
-        $empty = [
-            'term_ID' => null,
-            'semester_ID' => null,
-        ];
-
-        if (! $periodKey) {
-            return $empty;
-        }
-
-        if (str_starts_with($periodKey, 'shs_')) {
-            $seniorHighPeriod = GradingTerm::findSeniorHighPeriodByKey($periodKey);
-
-            if ($seniorHighPeriod !== null) {
-                return [
-                    'term_ID' => isset($seniorHighPeriod['term_ID']) ? (int) $seniorHighPeriod['term_ID'] : null,
-                    'semester_ID' => isset($seniorHighPeriod['semester_ID'])
-                        ? (int) $seniorHighPeriod['semester_ID']
-                        : GradingSemester::idFor($seniorHighPeriod['semester'] ?? null),
-                ];
-            }
-        }
-
-        if (Schema::hasTable('grading_terms')) {
-            $termId = GradingTerm::query()->where('key', $periodKey)->value('term_ID');
-
-            if ($termId) {
-                return [
-                    'term_ID' => (int) $termId,
-                    'semester_ID' => null,
-                ];
-            }
-        }
-
-        return $empty;
+        return ! $this->isSeniorHigh();
     }
 
-    public function syncPeriodReferences(): void
+    /** Derived from the enrollment's curriculum-grade-level offering. */
+    public function getSemesterIdAttribute(): ?int
     {
-        $periodKey = $this->attributes['grading_period'] ?? $this->grading_period;
+        return $this->enrollment?->curriculumGradeLevel?->semester_ID;
+    }
 
-        if (! is_string($periodKey) || $periodKey === '') {
-            return;
+    /** Resolve the legacy/UI period key through the canonical grading term. */
+    public function getGradingPeriodAttribute(): string
+    {
+        $termKey = $this->term?->key ?? '';
+        $semester = $this->studentSubject?->enrollment?->semester;
+
+        return $semester ? GradingTerm::seniorHighPeriodKey($semester, $termKey) : $termKey;
+    }
+
+    public function setGradingPeriodAttribute(?string $periodKey): void
+    {
+        $termId = self::termIdForPeriodKey($periodKey);
+
+        if (! $termId) {
+            throw new InvalidArgumentException("Unknown grading period [{$periodKey}].");
         }
 
-        $seniorHighPeriod = str_starts_with($periodKey, 'shs_')
+        $this->attributes['term_ID'] = $termId;
+    }
+
+    /** @param  Builder<self>  $query */
+    public function scopeForPeriodKey(Builder $query, string $periodKey): Builder
+    {
+        $termId = self::termIdForPeriodKey($periodKey);
+
+        return $query->where($this->qualifyColumn('term_ID'), $termId ?: 0);
+    }
+
+    public static function termIdForPeriodKey(?string $periodKey): ?int
+    {
+        $period = $periodKey && str_starts_with($periodKey, 'shs_')
             ? GradingTerm::findSeniorHighPeriodByKey($periodKey)
             : null;
+        $termId = $period['term_ID'] ?? ($periodKey ? GradingTerm::query()->where('key', $periodKey)->value('term_ID') : null);
 
-        if ($seniorHighPeriod !== null && $seniorHighPeriod['key'] !== $periodKey) {
-            $this->attributes['grading_period'] = $seniorHighPeriod['key'];
-        }
-
-        foreach (self::referencesForPeriodKey($this->attributes['grading_period'] ?? $periodKey) as $column => $value) {
-            $this->attributes[$column] = $value;
-        }
+        return $termId ? (int) $termId : null;
     }
 }

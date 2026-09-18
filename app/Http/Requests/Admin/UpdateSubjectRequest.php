@@ -14,15 +14,6 @@ class UpdateSubjectRequest extends FormRequest
         return $this->user() instanceof Staff;
     }
 
-    protected function prepareForValidation(): void
-    {
-        $clusterId = $this->input('cluster_ID');
-
-        $this->merge([
-            'cluster_ID' => ($clusterId === '' || $clusterId === null) ? null : $clusterId,
-        ]);
-    }
-
     /**
      * @return array<string, mixed>
      */
@@ -31,7 +22,7 @@ class UpdateSubjectRequest extends FormRequest
         $subject = $this->route('subject');
 
         return [
-            'cluster_ID' => ['nullable', 'integer', Rule::exists('clusters', 'cluster_ID')],
+            'school_level' => ['required', Rule::in(['Junior High School', 'Senior High School'])],
             'code' => [
                 'required',
                 'string',
@@ -39,7 +30,7 @@ class UpdateSubjectRequest extends FormRequest
                 Rule::unique('subjects', 'code')->ignore($subject instanceof Subject ? $subject->subject_ID : null, 'subject_ID'),
             ],
             'title' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::in(['core', 'applied', 'specialized'])],
+            'type' => ['required', 'string', Rule::exists('subject_types', 'key')],
         ];
     }
 
@@ -48,8 +39,6 @@ class UpdateSubjectRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'cluster_ID.exists' => 'Selected cluster is invalid.',
-        ];
+        return [];
     }
 }

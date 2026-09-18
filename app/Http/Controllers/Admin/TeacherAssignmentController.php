@@ -15,6 +15,8 @@ use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -36,6 +38,11 @@ class TeacherAssignmentController extends Controller
         if (! in_array($advisoryPerPage, [10, 15, 25, 50], true)) {
             $advisoryPerPage = 10;
         }
+
+        $advisoryGradeLevel = $request->string('advisory_grade_level')->toString();
+        $advisoryGradeId = GradeLevel::idForValue($advisoryGradeLevel);
+        $advisorySchoolYearId = $request->string('advisory_SY_ID')->toString();
+        $advisorySearch = trim($request->string('advisory_search')->toString());
 
         $assignments = TeacherSubjectAssignment::query()
             ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff.role'])
@@ -76,6 +83,17 @@ class TeacherAssignmentController extends Controller
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
             }])
             ->whereNotNull('staff_ID')
+            ->when($advisorySearch !== '', function ($query) use ($advisorySearch): void {
+                $query->where(function ($inner) use ($advisorySearch): void {
+                    $inner->where('name', 'like', "%{$advisorySearch}%")
+                        ->orWhereHas('adviser', function ($teacherQuery) use ($advisorySearch): void {
+                            $teacherQuery->where('first_name', 'like', "%{$advisorySearch}%")
+                                ->orWhere('last_name', 'like', "%{$advisorySearch}%");
+                        });
+                });
+            })
+            ->when($advisoryGradeId, fn ($query) => $query->where('grade_ID', $advisoryGradeId))
+            ->when($advisorySchoolYearId !== '', fn ($query) => $query->where('SY_ID', $advisorySchoolYearId))
             ->orderByDesc('SY_ID')
             ->orderBy('grade_ID')
             ->orderBy('name')
@@ -83,10 +101,56 @@ class TeacherAssignmentController extends Controller
             ->withQueryString();
 
         $curriculumSubjects = CurriculumSubject::query()
-            ->with('subject')
-            ->orderBy('grade_level')
-            ->orderBy('semester')
+            ->with(['subject', 'gradeLevel', 'gradingSemester'])
+            ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
+            ->orderBy('curriculum_grade_levels.grade_ID')
+            ->orderBy('curriculum_grade_levels.semester_ID')
+            ->select('curriculum_subjects.*')
             ->get();
+
+        $subjectAssignmentRows = TeacherSubjectAssignment::query()
+            ->with(['section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff'])
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($inner) use ($search): void {
+                    $inner->whereHas('section', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('curriculumSubject.subject', fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                        ->orWhereHas('staff', fn ($q) => $q->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
+                });
+            })
+            ->when($gradeId, fn ($q) => $q->whereHas('section', fn ($s) => $s->where('grade_ID', $gradeId)))
+            ->when($clusterId !== '', fn ($q) => $q->whereHas('section', fn ($s) => $s->where('cluster_ID', $clusterId)))
+            ->when($schoolYearId !== '', fn ($q) => $q->where('SY_ID', $schoolYearId))
+            ->get()
+            ->groupBy('curr_subj_ID');
+
+        $subjectRows = $curriculumSubjects
+            ->when($gradeLevel !== '', fn ($items) => $items->where('grade_ID', $gradeId))
+            ->when($clusterId !== '', fn ($items) => $items->where('cluster_ID', $clusterId))
+            ->groupBy('subject_ID')
+            ->map(function ($subjectCurriculumRows) use ($subjectAssignmentRows, $search) {
+                $allAssignments = $subjectCurriculumRows
+                    ->flatMap(fn ($row) => $subjectAssignmentRows->get($row->curr_subj_ID, collect()));
+                $subject = $subjectCurriculumRows->first()->subject;
+
+                return (object) [
+                    'subject' => $subject,
+                    'assignments' => $allAssignments,
+                    'matches_search' => $search === '' || str_contains(strtolower(($subject?->code ?? '').' '.($subject?->title ?? '')), strtolower($search)) || $allAssignments->isNotEmpty(),
+                ];
+            })
+            ->filter(fn ($row) => $row->matches_search)
+            ->sortBy(fn ($row) => $row->subject?->code ?? '')
+            ->values();
+
+        $subjectPage = LengthAwarePaginator::resolveCurrentPage('subject_page');
+        $subjectRows = new LengthAwarePaginator(
+            $subjectRows->forPage($subjectPage, $perPage)->values(),
+            $subjectRows->count(),
+            $perPage,
+            $subjectPage,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName' => 'subject_page']
+        );
+        $subjectRows->withQueryString();
 
         $teachers = Staff::query()
             ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
@@ -99,6 +163,7 @@ class TeacherAssignmentController extends Controller
 
         return view('users.admin.teacher-assignments', [
             'assignments' => $assignments,
+            'subjectRows' => $subjectRows,
             'sections' => $sections,
             'advisorySections' => $advisorySections,
             'curriculumSubjects' => $curriculumSubjects,
@@ -112,6 +177,9 @@ class TeacherAssignmentController extends Controller
             'unassignedSectionCount' => Section::query()->whereNull('staff_ID')->count(),
             'assignmentCount' => TeacherSubjectAssignment::query()->count(),
             'teacherCount' => $teachers->count(),
+            'advisoryGradeLevel' => $advisoryGradeLevel,
+            'advisorySchoolYearId' => $advisorySchoolYearId,
+            'advisorySearch' => $advisorySearch,
         ]);
     }
 
@@ -313,13 +381,47 @@ class TeacherAssignmentController extends Controller
         return back()->with('status', 'Advisory section assigned successfully.');
     }
 
-    public function removeAdvisory(Section $section)
+    public function updateAdvisory(Request $request, Section $section)
     {
-        $section->update([
-            'staff_ID' => null,
+        $validated = $request->validate([
+            'target_section_ID' => ['nullable', 'integer', 'exists:sections,section_ID'],
         ]);
 
-        return back()->with('status', 'Advisory assignment removed.');
+        $teacher = $section->adviser;
+        $targetSectionId = $validated['target_section_ID'] ?? null;
+
+        if (! $targetSectionId || (int) $targetSectionId === (int) $section->section_ID) {
+            $section->update(['staff_ID' => $targetSectionId ? $teacher?->staff_id : null]);
+
+            return back()->with('status', $targetSectionId ? 'Advisory assignment updated successfully.' : 'Teacher is no longer assigned as an adviser.');
+        }
+
+        $targetSection = Section::query()->findOrFail($targetSectionId);
+
+        if ($targetSection->staff_ID) {
+            throw ValidationException::withMessages([
+                'target_section_ID' => 'The selected section already has an adviser.',
+            ]);
+        }
+
+        $existingAdvisory = Section::query()
+            ->where('staff_ID', $teacher?->staff_id)
+            ->where('SY_ID', $targetSection->SY_ID)
+            ->where('section_ID', '!=', $section->section_ID)
+            ->first();
+
+        if ($existingAdvisory) {
+            throw ValidationException::withMessages([
+                'staff_ID' => "This teacher is already adviser of {$existingAdvisory->name} for the same school year.",
+            ]);
+        }
+
+        DB::transaction(function () use ($section, $targetSection, $teacher): void {
+            $section->update(['staff_ID' => null]);
+            $targetSection->update(['staff_ID' => $teacher->staff_id]);
+        });
+
+        return back()->with('status', 'Advisory assignment updated successfully.');
     }
 
     public function unlockGrades(TeacherSubjectAssignment $assignment)
@@ -353,7 +455,7 @@ class TeacherAssignmentController extends Controller
     private function curriculumSubjectMatchesSection(Section $section, CurriculumSubject $curriculumSubject): bool
     {
         if ($curriculumSubject->curriculum_ID !== $section->curriculum_ID ||
-            $curriculumSubject->grade_level !== $section->grade_level) {
+            $curriculumSubject->grade_ID !== $section->grade_ID) {
             return false;
         }
 

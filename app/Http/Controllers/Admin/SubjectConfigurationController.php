@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateSubjectRequest;
 use App\Models\Cluster;
 use App\Models\PreferredCourse;
 use App\Models\Subject;
+use App\Models\SubjectType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,7 +26,7 @@ class SubjectConfigurationController extends Controller
         $search = trim($request->string('search')->toString());
         $status = $request->string('status')->toString();
         $type = $request->string('type')->toString();
-        $clusterFilter = $request->string('cluster_ID')->toString();
+        $schoolLevel = $request->string('school_level')->toString();
         $preferredCoursesPerPage = (int) $request->integer('preferred_courses_per_page', 10);
         if (! in_array($preferredCoursesPerPage, [5, 10, 15, 25, 50], true)) {
             $preferredCoursesPerPage = 10;
@@ -35,7 +36,7 @@ class SubjectConfigurationController extends Controller
         $preferredClusterId = $request->integer('preferred_courses_cluster_ID');
 
         $subjects = Subject::query()
-            ->with('cluster')
+            ->with('subjectType')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('code', 'like', "%{$search}%")
@@ -45,14 +46,11 @@ class SubjectConfigurationController extends Controller
             ->when(in_array($status, ['active', 'archived'], true), function ($query) use ($status): void {
                 $query->where('status', $status);
             })
-            ->when(in_array($type, ['core', 'applied', 'specialized'], true), function ($query) use ($type): void {
-                $query->where('type', $type);
+            ->when(SubjectType::idForKey($type), function ($query) use ($type): void {
+                $query->whereHas('subjectType', fn ($typeQuery) => $typeQuery->where('key', $type));
             })
-            ->when($clusterFilter === 'none', function ($query): void {
-                $query->whereNull('cluster_ID');
-            })
-            ->when(ctype_digit($clusterFilter) && (int) $clusterFilter > 0, function ($query) use ($clusterFilter): void {
-                $query->where('cluster_ID', (int) $clusterFilter);
+            ->when(in_array($schoolLevel, ['Junior High School', 'Senior High School'], true), function ($query) use ($schoolLevel): void {
+                $query->where('school_level', $schoolLevel);
             })
             ->orderBy('code')
             ->paginate($perPage)
@@ -73,10 +71,6 @@ class SubjectConfigurationController extends Controller
             ->paginate($preferredCoursesPerPage, ['*'], 'preferred_courses_page')
             ->withQueryString();
 
-        $clusters = Cluster::query()
-            ->orderBy('name')
-            ->get(['cluster_ID', 'name']);
-
         $preferredClusters = Cluster::query()
             ->whereIn('name', [
                 'Arts, Social Sciences, And Humanities',
@@ -89,7 +83,7 @@ class SubjectConfigurationController extends Controller
         return view('users.admin.subject-config', [
             'subjects' => $subjects,
             'preferredCourses' => $preferredCourses,
-            'clusters' => $clusters,
+            'subjectTypes' => SubjectType::query()->orderBy('sort_order')->get(['subject_type_ID', 'key', 'label']),
             'preferredClusters' => $preferredClusters,
             'perPage' => $perPage,
             'preferredCoursesPerPage' => $preferredCoursesPerPage,

@@ -11,6 +11,7 @@ use App\Http\Requests\Guidance\UpdateEnrollmentStatusRequest;
 use App\Http\Requests\Guidance\UpdatePlacementStatusRequest;
 use App\Models\AcademicYear;
 use App\Models\Cluster;
+use App\Models\Curriculum;
 use App\Models\DocumentReturnReason;
 use App\Models\DocumentStatus;
 use App\Models\Enrollment;
@@ -667,7 +668,6 @@ class GuidanceDashboardController extends Controller
     {
         $validated = $request->validated();
 
-        $validated['grade_ID'] = GradeLevel::idForValue($validated['grade_level']);
         $isSeniorHigh = in_array($validated['grade_level'], ['grade_11', 'grade_12'], true);
 
         if (! $isSeniorHigh) {
@@ -681,6 +681,9 @@ class GuidanceDashboardController extends Controller
         }
 
         $validated['curriculum_ID'] = $curriculumId;
+        $offering = Curriculum::query()->findOrFail($curriculumId);
+        $validated['grade_ID'] = $offering->grade_ID;
+        $validated['cluster_ID'] = $offering->cluster_ID;
 
         unset($validated['grade_level']);
 

@@ -21,6 +21,7 @@ use App\Models\StudentGuardian;
 use App\Models\StudentObservedValue;
 use App\Models\StudentProfile;
 use App\Models\StudentSubjectGrade;
+use App\Models\StudentSubject;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\ClassListSpreadsheet;
@@ -57,8 +58,9 @@ class TeacherSectionController extends Controller
                 $query->with(['curriculumSubject.subject'])
                     ->where('staff_ID', $staff->staff_id)
                     ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
+                    ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
                     ->leftJoin('subjects', 'curriculum_subjects.subject_ID', '=', 'subjects.subject_ID')
-                    ->orderBy('curriculum_subjects.semester')
+                    ->orderBy('curriculum_grade_levels.semester_ID')
                     ->orderBy('subjects.title')
                     ->select('teacher_subject_assignments.*');
             };
@@ -198,10 +200,11 @@ class TeacherSectionController extends Controller
         }
 
         $grades = StudentSubjectGrade::query()
-            ->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID'))
+            ->with('studentSubject')
+            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->get()
-            ->groupBy('enrollment_ID')
+            ->groupBy(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->map(fn ($studentGrades) => $studentGrades
                 ->groupBy('assignment_ID')
                 ->map(fn ($assignmentGrades) => $assignmentGrades->keyBy('grading_period')));
@@ -570,10 +573,11 @@ class TeacherSectionController extends Controller
         $schoolDaysByMonth = Sf9AttendanceSummary::schoolDaysForSection($section);
 
         $grades = StudentSubjectGrade::query()
-            ->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID'))
+            ->with('studentSubject')
+            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->get()
-            ->groupBy('enrollment_ID')
+            ->groupBy(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->map(fn ($studentGrades) => $studentGrades
                 ->groupBy('assignment_ID')
                 ->map(fn ($assignmentGrades) => $assignmentGrades->keyBy('grading_period')));
@@ -682,6 +686,7 @@ class TeacherSectionController extends Controller
             ->whereIn('enrollment_ID', $allEnrollmentIds)
             ->where('status', 'submitted')
             ->exists();
+        $isGradingInputOpen = $this->isGradingInputOpen($section);
         $periods = $this->gradingInputPeriods($section);
         $lockedPeriodKeys = GradingTerm::lockedPeriodKeysForSection($section);
         $editablePeriodKey = GradingTerm::currentEditablePeriodKeyForSection($section);
@@ -695,7 +700,8 @@ class TeacherSectionController extends Controller
             'activeCoreValue' => $activeCoreValue,
             'periods' => $periods,
             'markings' => Sf9ReportCardBuilder::observedValueMarkings(),
-            'isObservedLocked' => $isObservedLocked,
+            'isObservedLocked' => $isObservedLocked || ! $isGradingInputOpen,
+            'gradingInputClosed' => ! $isGradingInputOpen,
             'lockedPeriodKeys' => $lockedPeriodKeys,
             'editablePeriodKey' => $editablePeriodKey,
             'editablePeriodLabel' => $editablePeriodLabel,
@@ -734,6 +740,10 @@ class TeacherSectionController extends Controller
 
         if ($hasSubmittedValues) {
             return back()->withErrors(['markings' => 'Submitted observed values are locked and can no longer be edited.']);
+        }
+
+        if (! $this->isGradingInputOpen($section)) {
+            return back()->withErrors(['markings' => 'This grading term is closed for teacher input.']);
         }
 
         if ($editablePeriodKey === null) {
@@ -800,6 +810,7 @@ class TeacherSectionController extends Controller
         if (in_array($activeCoreValue, array_column(Sf9ReportCardBuilder::observedValueStatements(), 'core_value'), true)) {
             $parameters['core'] = $activeCoreValue;
         }
+
         return redirect()->route('teacher.advisory.observed-values', $parameters)
             ->with('status', "{$saved} observed value marking(s) saved. {$removed} marking(s) cleared.");
     }
@@ -827,6 +838,10 @@ class TeacherSectionController extends Controller
 
         if ($validated['grading_period'] !== $editablePeriodKey) {
             return back()->withErrors(['marking' => 'Only the current school grading term can be edited.']);
+        }
+
+        if (! $this->isGradingInputOpen($section)) {
+            return back()->withErrors(['marking' => 'This grading term is closed for teacher input.']);
         }
 
         $enrollmentIds = Enrollment::query()
@@ -873,6 +888,10 @@ class TeacherSectionController extends Controller
     {
         $this->authorizeAdvisorySection($request, $section);
 
+        if (! $this->isGradingInputOpen($section)) {
+            return back()->withErrors(['markings' => 'This grading term is closed for teacher input.']);
+        }
+
         $enrollmentIds = Enrollment::query()
             ->where('section_ID', $section->section_ID)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
@@ -911,24 +930,27 @@ class TeacherSectionController extends Controller
             ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
             ->values();
 
-        $periods = $this->gradingInputPeriods($section, $semester);
-        $periodKeys = array_column($periods, 'key');
+        $periods = GradingTerm::periodsForSection($section, $semester);
+        $inputPeriods = $this->gradingInputPeriods($section, $semester);
+        $periodKeys = array_column($inputPeriods, 'key');
         $editablePeriodKeys = AssignmentGradeTermUnlocker::editablePeriodKeysFor($assignment->assignment_ID);
         $editablePeriodKeys = array_values(array_intersect($editablePeriodKeys, $periodKeys));
         $lockedPeriodKeys = AssignmentGradeTermUnlocker::lockedPeriodKeysForAssignment($assignment->assignment_ID, $periodKeys);
         $editablePeriodKey = GradingTerm::currentEditablePeriodKeyForSection($section, $semester);
         $editablePeriodLabel = GradingTerm::currentEditablePeriodLabelForSection($section, $semester);
         $grades = StudentSubjectGrade::query()
+            ->with('studentSubject')
             ->where('assignment_ID', $assignment->assignment_ID)
-            ->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID'))
+            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->get()
-            ->groupBy('enrollment_ID')
+            ->groupBy(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->map(fn ($items) => $items->keyBy('grading_period'));
 
         $editablePeriodGrades = collect($editablePeriodKeys)
             ->flatMap(fn (string $periodKey) => $grades->flatten(1)->where('grading_period', $periodKey));
 
-        $canEditCurrentTerm = $editablePeriodKeys !== []
+        $canEditCurrentTerm = $this->isGradingInputOpen($section, $semester)
+            && $editablePeriodKeys !== []
             && ($editablePeriodGrades->isEmpty() || $editablePeriodGrades->contains(fn (StudentSubjectGrade $grade): bool => ! $grade->isTeacherLocked()));
 
         $summaries = $this->buildSummaries($enrollments, $grades, $periods);
@@ -938,6 +960,7 @@ class TeacherSectionController extends Controller
             'section' => $section,
             'enrollments' => $enrollments,
             'periods' => $periods,
+            'inputPeriods' => $inputPeriods,
             'grades' => $grades,
             'summaries' => $summaries,
             'lockedPeriodKeys' => $lockedPeriodKeys,
@@ -966,6 +989,10 @@ class TeacherSectionController extends Controller
             ->pluck('enrollment_ID')
             ->toArray();
 
+        if (! $this->isGradingInputOpen($section, $semester)) {
+            return back()->withErrors(['grades' => 'This grading term is closed for teacher input.']);
+        }
+
         if ($editablePeriodKeys === []) {
             return back()->withErrors(['grades' => 'No grading term is currently open for input.']);
         }
@@ -989,10 +1016,19 @@ class TeacherSectionController extends Controller
                     continue;
                 }
 
-                $existingGrade = StudentSubjectGrade::query()
+                $studentSubject = StudentSubject::query()
                     ->where('enrollment_ID', $enrollmentId)
+                    ->where('curr_subj_ID', $assignment->curr_subj_ID)
+                    ->first();
+
+                if (! $studentSubject) {
+                    continue;
+                }
+
+                $existingGrade = StudentSubjectGrade::query()
+                    ->where('student_subject_ID', $studentSubject->student_subject_ID)
                     ->where('assignment_ID', $assignment->assignment_ID)
-                    ->where('grading_period', $periodKey)
+                    ->forPeriodKey($periodKey)
                     ->first();
 
                 if ($existingGrade?->isTeacherLocked()) {
@@ -1007,9 +1043,9 @@ class TeacherSectionController extends Controller
 
                 StudentSubjectGrade::query()->updateOrCreate(
                     [
-                        'enrollment_ID' => $enrollmentId,
+                        'student_subject_ID' => $studentSubject->student_subject_ID,
                         'assignment_ID' => $assignment->assignment_ID,
-                        'grading_period' => $periodKey,
+                        'term_ID' => StudentSubjectGrade::termIdForPeriodKey($periodKey),
                     ],
                     [
                         'numeric_grade' => $numericGrade,
@@ -1285,14 +1321,18 @@ class TeacherSectionController extends Controller
 
         $editablePeriodKeys = AssignmentGradeTermUnlocker::editablePeriodKeysFor($assignment->assignment_ID);
 
+        if (! $this->isGradingInputOpen($section, $semester)) {
+            return back()->withErrors(['grades' => 'This grading term is closed for teacher input.']);
+        }
+
         if ($editablePeriodKeys === []) {
             return back()->withErrors(['grades' => 'No grading term is currently open for submission.']);
         }
 
         $updated = StudentSubjectGrade::query()
             ->where('assignment_ID', $assignment->assignment_ID)
-            ->whereIn('enrollment_ID', $enrollmentIds)
-            ->whereIn('grading_period', $editablePeriodKeys)
+            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollmentIds))
+            ->whereIn('term_ID', array_map(StudentSubjectGrade::termIdForPeriodKey(...), $editablePeriodKeys))
             ->whereStatus(GradeStatus::teacherEditableSlugs())
             ->where(function ($query): void {
                 $query->whereNotNull('numeric_grade')
@@ -1329,10 +1369,11 @@ class TeacherSectionController extends Controller
 
         $periods = $this->gradingInputPeriods($section, $semester);
         $grades = StudentSubjectGrade::query()
+            ->with('studentSubject')
             ->where('assignment_ID', $assignment->assignment_ID)
-            ->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID'))
+            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->get()
-            ->groupBy('enrollment_ID')
+            ->groupBy(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->map(fn ($items) => $items->keyBy('grading_period'));
 
         $summaries = $this->buildSummaries($enrollments, $grades, $periods);
@@ -1355,7 +1396,27 @@ class TeacherSectionController extends Controller
      */
     private function gradingInputPeriods(?Section $section = null, ?string $semester = null): array
     {
-        return GradingTerm::openPeriodsForSection($section, $semester);
+        $editableKey = GradingTerm::currentEditablePeriodKeyForSection($section, $semester);
+
+        if ($editableKey === null) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            GradingTerm::openPeriodsForSection($section, $semester),
+            fn (array $period): bool => $period['key'] === $editableKey,
+        ));
+    }
+
+    private function isGradingInputOpen(?Section $section, ?string $semester = null): bool
+    {
+        if (! GradingTerm::isSeniorHighSection($section)) {
+            return GradingTerm::isCurrentJuniorHighPeriodOpen();
+        }
+
+        $period = GradingTerm::currentSeniorHighPeriod();
+
+        return (! $semester || $period['semester'] === $semester) && GradingTerm::isCurrentSeniorHighPeriodOpen();
     }
 
     private function buildSummaries($enrollments, $grades, array $periods): array

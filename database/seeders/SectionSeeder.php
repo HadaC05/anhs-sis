@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\AcademicYear;
-use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\GradeLevel;
 use App\Models\Section;
@@ -34,15 +33,6 @@ class SectionSeeder extends Seeder
             if (! isset($juniorHighCurriculumIds[$curriculumName])) {
                 throw new RuntimeException("Missing curriculum: {$curriculumName}. Run CurriculumSeeder first.");
             }
-        }
-
-        $seniorHighCurriculumId = Curriculum::query()
-            ->whereIn('name', Cluster::query()->pluck('name'))
-            ->orderBy('name')
-            ->value('curriculum_ID');
-
-        if (! $seniorHighCurriculumId) {
-            throw new RuntimeException('Missing senior high cluster curriculum. Run ClusterSeeder and CurriculumSeeder first.');
         }
 
         $gradeMap = GradeLevel::query()
@@ -78,7 +68,13 @@ class SectionSeeder extends Seeder
             $isJuniorHigh = isset(CurriculumSeeder::JUNIOR_HIGH_NAMES[$section['grade_level']]);
             $curriculumId = $isJuniorHigh
                 ? $juniorHighCurriculumIds[CurriculumSeeder::JUNIOR_HIGH_NAMES[$section['grade_level']]]
-                : $seniorHighCurriculumId;
+                : Curriculum::query()
+                    ->where('name', CurriculumSeeder::seniorHighCurriculumName(
+                        (int) str_replace('grade_', '', $section['grade_level']),
+                        'First',
+                        CurriculumSeeder::SENIOR_HIGH_TRACKS[0],
+                    ))
+                    ->value('curriculum_ID');
 
             if (! $curriculumId) {
                 throw new RuntimeException("Unable to resolve curriculum for {$section['grade_level']}.");

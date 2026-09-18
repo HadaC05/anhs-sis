@@ -86,9 +86,9 @@ class TeacherSubjectAssignmentSeeder extends Seeder
     private function curriculumSubjectsForSection(Section $section): Collection
     {
         return CurriculumSubject::query()
-            ->with('subject')
+            ->with(['subject', 'gradingSemester'])
             ->where('curriculum_ID', $section->curriculum_ID)
-            ->where('grade_level', $section->grade_level)
+            ->where('grade_ID', $section->grade_ID)
             ->when($section->cluster_ID, function ($query) use ($section): void {
                 $query->where(function ($inner) use ($section): void {
                     $inner->whereNull('cluster_ID')

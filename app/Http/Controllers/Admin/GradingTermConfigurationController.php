@@ -26,7 +26,7 @@ class GradingTermConfigurationController extends Controller
         return view('users.admin.grading-term-config', [
             'activeTab' => $activeTab,
             'terms' => GradingTerm::query()
-                ->with('status')
+                ->with(['juniorHighStatus', 'seniorHighStatus'])
                 ->orderBy('sort_order')
                 ->orderBy('term_ID')
                 ->get(),
@@ -37,11 +37,12 @@ class GradingTermConfigurationController extends Controller
             'seniorHighSemesters' => GradingSemester::query()
                 ->with('status')
                 ->active()
+                ->whereIn('key', [GradingSemester::FIRST, GradingSemester::SECOND])
                 ->orderBy('sort_order')
                 ->orderBy('semester_ID')
                 ->get(),
             'seniorHighTerms' => GradingTerm::query()
-                ->with('status')
+                ->with('seniorHighStatus')
                 ->whereIn('term_ID', array_values(array_filter(array_column(GradingTerm::seniorHighTerms(), 'term_ID'))))
                 ->orderBy('sort_order')
                 ->orderBy('term_ID')
@@ -56,10 +57,6 @@ class GradingTermConfigurationController extends Controller
         $settings = GradingTermSetting::current();
         $termCount = GradingTerm::query()->count();
 
-        if ($termCount >= $settings->max_terms) {
-            return back()->withErrors(['term' => 'The maximum number of terms has already been reached.']);
-        }
-
         $validated = $request->validate([
             'label' => ['required', 'string', 'max:50', 'unique:grading_terms,label'],
         ]);
@@ -71,7 +68,8 @@ class GradingTermConfigurationController extends Controller
             'key' => 'term_'.$nextTermNumber,
             'label' => $validated['label'],
             'sort_order' => $nextOrder,
-            'grading_period_status_ID' => GradingPeriodStatus::activeId(),
+            'junior_high_grading_period_status_ID' => GradingPeriodStatus::archivedId(),
+            'senior_high_grading_period_status_ID' => GradingPeriodStatus::archivedId(),
         ]);
 
         GradingTerm::syncActiveStatus();
@@ -86,6 +84,88 @@ class GradingTermConfigurationController extends Controller
         GradingTerm::syncActiveStatus();
 
         return back()->with('success', 'Term updated successfully.');
+    }
+
+    public function updateJuniorHighStatus(Request $request, GradingTerm $term): RedirectResponse
+    {
+        $validated = $this->validateTermStatus($request);
+
+        if (! $this->isWithinJuniorHighLimit($term) && $validated['status'] !== GradingPeriodStatus::ARCHIVED) {
+            return back()->withErrors(['status' => 'Increase the maximum terms before making this term available.']);
+        }
+
+        if ($this->isWithinJuniorHighLimit($term) && $validated['status'] === GradingPeriodStatus::ARCHIVED) {
+            return back()->withErrors(['status' => 'Reduce the maximum terms to archive this term.']);
+        }
+
+        if ($validated['status'] === GradingPeriodStatus::OPEN) {
+            GradingTerm::query()
+                ->where('term_ID', '!=', $term->term_ID)
+                ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::openId())
+                ->update(['junior_high_grading_period_status_ID' => GradingPeriodStatus::activeId()]);
+        }
+
+        $term->update([
+            'junior_high_grading_period_status_ID' => GradingPeriodStatus::idFor($validated['status']),
+        ]);
+
+        GradingTerm::syncActiveStatus();
+
+        return back()->with('success', "{$term->label} is now ".GradingPeriodStatus::nameFor($validated['status']).'.');
+    }
+
+    public function updateSeniorHighStatus(Request $request, GradingTerm $term): RedirectResponse
+    {
+        $validated = $this->validateTermStatus($request);
+        $seniorHighTermIds = array_values(array_filter(array_column(GradingTerm::seniorHighTerms(), 'term_ID')));
+
+        if (! in_array((int) $term->term_ID, $seniorHighTermIds, true) && $validated['status'] !== GradingPeriodStatus::ARCHIVED) {
+            return back()->withErrors(['status' => 'Only the first three terms can be used for Senior High.']);
+        }
+
+        if ($validated['status'] === GradingPeriodStatus::OPEN) {
+            GradingTerm::query()
+                ->where('term_ID', '!=', $term->term_ID)
+                ->where('senior_high_grading_period_status_ID', GradingPeriodStatus::openId())
+                ->update(['senior_high_grading_period_status_ID' => GradingPeriodStatus::activeId()]);
+            GradingTermSetting::current()->update(['term_ID' => $term->term_ID]);
+        }
+
+        $term->update([
+            'senior_high_grading_period_status_ID' => GradingPeriodStatus::idFor($validated['status']),
+        ]);
+
+        return back()->with('success', "Senior High {$term->label} is now ".GradingPeriodStatus::nameFor($validated['status']).'.');
+    }
+
+    /** @return array{status: string} */
+    private function validateTermStatus(Request $request): array
+    {
+        return $request->validate([
+            'status' => ['required', 'string', 'in:'.implode(',', GradingPeriodStatus::slugs())],
+        ]);
+    }
+
+    private function isWithinJuniorHighLimit(GradingTerm $term): bool
+    {
+        return GradingTerm::query()
+            ->orderBy('sort_order')
+            ->orderBy('term_ID')
+            ->limit(GradingTermSetting::current()->max_terms)
+            ->pluck('term_ID')
+            ->contains($term->term_ID);
+    }
+
+    private function openSeniorHighTerm(int $termId): void
+    {
+        GradingTerm::query()
+            ->where('term_ID', '!=', $termId)
+            ->where('senior_high_grading_period_status_ID', GradingPeriodStatus::openId())
+            ->update(['senior_high_grading_period_status_ID' => GradingPeriodStatus::activeId()]);
+
+        GradingTerm::query()->where('term_ID', $termId)->update([
+            'senior_high_grading_period_status_ID' => GradingPeriodStatus::openId(),
+        ]);
     }
 
     public function updateSettings(UpdateGradingTermSettingsRequest $request): RedirectResponse
@@ -142,6 +222,7 @@ class GradingTermConfigurationController extends Controller
             ]);
         }
 
+        $this->openSeniorHighTerm((int) ($period['term_ID'] ?? 0));
         GradingTermSetting::current()->setSeniorHighPeriod($semester, $termNumber);
 
         $currentLabel = GradingTerm::currentSeniorHighPeriodLabel();
@@ -163,6 +244,7 @@ class GradingTermConfigurationController extends Controller
 
         $semester = GradingSemester::query()
             ->active()
+            ->whereIn('key', [GradingSemester::FIRST, GradingSemester::SECOND])
             ->findOrFail($validated['semester_ID']);
 
         GradingTermSetting::current()->update(['semester_ID' => $semester->semester_ID]);
@@ -189,6 +271,7 @@ class GradingTermConfigurationController extends Controller
             ->whereIn('term_ID', $seniorHighTermIds)
             ->findOrFail($validated['term_ID']);
 
+        $this->openSeniorHighTerm((int) $term->term_ID);
         GradingTermSetting::current()->update(['term_ID' => $term->term_ID]);
 
         $current = GradingTerm::currentSeniorHighPeriod();

@@ -33,9 +33,9 @@ class PromotionEligibility
         }
 
         $grades = StudentSubjectGrade::query()
-            ->where('enrollment_ID', $enrollment->enrollment_ID)
+            ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
-            ->whereIn('grading_period', $periodKeys)
+            ->whereIn('term_ID', $periodKeys->map(fn (string $key) => StudentSubjectGrade::termIdForPeriodKey($key)))
             ->where('grade_status_ID', GradeStatus::idFor(GradeStatus::RELEASED))
             ->get()
             ->groupBy('assignment_ID');

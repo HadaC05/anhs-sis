@@ -17,9 +17,11 @@ class DatabaseSeeder extends Seeder
         $this->call(ClusterSeeder::class);
         $this->call(PreferredCourseSeeder::class);
         $this->call(GradeLevelSeeder::class);
+        $this->call(DataStatusSeeder::class);
+        $this->call(GradingSemesterSeeder::class);
+        $this->call(SubjectTypeSeeder::class);
         $this->call(SubjectSeeder::class);
         $this->call(CurriculumSeeder::class);
-        $this->call(CurriculumSubjectSeeder::class);
         $this->call(MonthSeeder::class);
         $this->call(AcademicYearSeeder::class);
         $this->call(SectionSeeder::class);
@@ -34,7 +36,6 @@ class DatabaseSeeder extends Seeder
         $this->call(PromotionStatusSeeder::class);
         $this->call(LearnerTypeSeeder::class);
         $this->call(GradingPeriodStatusSeeder::class);
-        $this->call(GradingSemesterSeeder::class);
         $this->call(GradeStatusSeeder::class);
         $this->call(NotificationTypeSeeder::class);
 

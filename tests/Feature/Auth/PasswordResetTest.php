@@ -3,11 +3,13 @@
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Notifications\PasswordResetOtp;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Symfony\Component\Mailer\Exception\TransportException;
 
 function createPasswordResetStaff(array $overrides = []): Staff
@@ -47,11 +49,50 @@ test('login screen includes a forgot password link', function () {
         ->assertSee('Forgot password?');
 });
 
-test('reset password link screen can be rendered', function () {
+test('reset password OTP screen can be rendered', function () {
     $this->get(route('password.request'))
         ->assertOk()
         ->assertSee('Email Address')
-        ->assertSee('Email password reset link');
+        ->assertSee('Send OTP')
+        ->assertSee('formnovalidate', false)
+        ->assertSee('One-Time Password')
+        ->assertSee('Verify OTP');
+});
+
+test('a password reset OTP can be requested for an account email', function () {
+    Notification::fake();
+
+    $user = createPasswordResetStudent();
+
+    $this->from(route('password.request'))
+        ->post(route('password.otp.send'), ['email' => $user->email])
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('status', 'A one-time password has been sent to your email address.')
+        ->assertSessionHas('password_reset_otp.email', $user->email)
+        ->assertRedirect(route('password.request'));
+
+    Notification::assertSentTo($user, PasswordResetOtp::class);
+});
+
+test('a correct password reset OTP redirects to the new password screen', function () {
+    $user = createPasswordResetStudent();
+    $otp = '123456';
+    $token = Password::broker()->createToken($user);
+
+    session()->put('password_reset_otp', [
+        'email' => $user->email,
+        'hash' => Hash::make($otp),
+        'expires_at' => now()->addMinutes(10)->timestamp,
+        'reset_token' => $token,
+    ]);
+
+    $this->post(route('password.otp.verify'), [
+        'email' => $user->email,
+        'otp' => $otp,
+    ])->assertRedirect(route('password.reset', [
+        'token' => $token,
+        'email' => $user->email,
+    ]));
 });
 
 test('a reset link can be requested for an account email', function (string $account) {

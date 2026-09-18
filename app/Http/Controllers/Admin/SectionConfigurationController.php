@@ -68,7 +68,10 @@ class SectionConfigurationController extends Controller
 
         $clusters = Cluster::query()->orderBy('name')->get(['cluster_ID', 'name']);
         $academicYears = AcademicYear::query()->orderByDesc('SY_ID')->get(['SY_ID', 'school_year', 'status']);
-        $curriculums = Curriculum::query()->where('status', true)->orderBy('name')->get(['curriculum_ID', 'name']);
+        $curriculums = Curriculum::query()
+            ->whereHas('dataStatus', fn ($status) => $status->where('key', 'active'))
+            ->orderBy('name')
+            ->get(['curriculum_ID', 'name']);
         $staffs = Staff::query()
             ->where('status', 'active')
             ->orderBy('last_name')
@@ -123,7 +126,12 @@ class SectionConfigurationController extends Controller
      */
     private function sectionAttributes(array $validated): array
     {
-        $validated['grade_ID'] = GradeLevel::idForValue($validated['grade_level']);
+        $offering = Curriculum::query()->findOrFail($validated['curriculum_ID']);
+
+        // A section always belongs to one curriculum-grade-level offering.
+        // Copy its context rather than trusting duplicated form values.
+        $validated['grade_ID'] = $offering->grade_ID;
+        $validated['cluster_ID'] = $offering->cluster_ID;
         unset($validated['grade_level']);
 
         return $validated;

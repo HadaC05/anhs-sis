@@ -556,7 +556,7 @@ test('registration rejects an invalid religion', function () {
     $response->assertSessionHasErrors(['religion']);
 });
 
-test('successful registration shows confirmation modal with home and login options', function () {
+test('successful registration shows a generic confirmation modal with home and login options', function () {
     createStudentRegistrationFixtures();
 
     $response = $this->followingRedirects()->post(route('register.store'), studentRegistrationPayload([
@@ -564,7 +564,8 @@ test('successful registration shows confirmation modal with home and login optio
     ]));
 
     $response->assertOk();
-    $response->assertSee('Enrollment Application Submitted');
+    $response->assertSee('Enrollment Submitted Successfully');
+    $response->assertSee('Your enrollment has been submitted successfully.');
     $response->assertSee('Back to Home');
     $response->assertSee('Go to Login');
     $response->assertSee(route('home'), false);

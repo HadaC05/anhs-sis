@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\SectionConfigurationController;
 use App\Http\Controllers\Admin\SubjectConfigurationController;
 use App\Http\Controllers\Admin\TeacherAssignmentController;
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\Auth\PasswordResetOtpController;
 use App\Http\Controllers\ForcePasswordController;
 use App\Http\Controllers\Guidance\GuidanceDashboardController;
 use App\Http\Controllers\Guidance\GuidanceEnrollmentController;
@@ -37,6 +38,8 @@ Route::get('/register/check-email', [ApplicationController::class, 'checkEmail']
 Route::post('/register', [ApplicationController::class, 'store'])->name('register.store');
 Route::post('/applications', [ApplicationController::class, 'store'])->name('applications.store');
 Route::post('/applications/status', [ApplicationController::class, 'checkStatus'])->name('applications.status');
+Route::post('/forgot-password/send-otp', [PasswordResetOtpController::class, 'send'])->name('password.otp.send');
+Route::post('/forgot-password/verify-otp', [PasswordResetOtpController::class, 'verify'])->name('password.otp.verify');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/force-password', [ForcePasswordController::class, 'edit'])->name('force-password.edit');
@@ -117,6 +120,12 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::put('/admin/grading-term-configuration/senior-high/term', [GradingTermConfigurationController::class, 'updateSeniorHighTerm'])
         ->middleware('admin')
         ->name('admin.grading-term-config.senior-high.term.update');
+    Route::put('/admin/grading-term-configuration/{term}/junior-high-status', [GradingTermConfigurationController::class, 'updateJuniorHighStatus'])
+        ->middleware('admin')
+        ->name('admin.grading-term-config.junior-high-status.update');
+    Route::put('/admin/grading-term-configuration/{term}/senior-high-status', [GradingTermConfigurationController::class, 'updateSeniorHighStatus'])
+        ->middleware('admin')
+        ->name('admin.grading-term-config.senior-high-status.update');
     Route::put('/admin/grading-term-configuration/{term}', [GradingTermConfigurationController::class, 'update'])
         ->middleware('admin')
         ->name('admin.grading-term-config.update');
@@ -159,6 +168,18 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/admin/curriculum-configuration', [CurriculumConfigurationController::class, 'index'])
         ->middleware('admin')
         ->name('admin.curriculum-config.index');
+    Route::post('/admin/curriculum-configuration/curricula', [CurriculumConfigurationController::class, 'storeMasterCurriculum'])
+        ->middleware('admin')
+        ->name('admin.curriculum-config.curricula.store');
+    Route::put('/admin/curriculum-configuration/curricula/{curricula}', [CurriculumConfigurationController::class, 'updateMasterCurriculum'])
+        ->middleware('admin')
+        ->name('admin.curriculum-config.curricula.update');
+    Route::patch('/admin/curriculum-configuration/curricula/{curricula}/toggle-status', [CurriculumConfigurationController::class, 'toggleMasterCurriculumStatus'])
+        ->middleware('admin')
+        ->name('admin.curriculum-config.curricula.toggle-status');
+    Route::get('/admin/curriculum-configuration/curricula/{curricula}/report', [CurriculumConfigurationController::class, 'curriculumReport'])
+        ->middleware('admin')
+        ->name('admin.curriculum-config.curricula.report');
     Route::post('/admin/curriculum-configuration', [CurriculumConfigurationController::class, 'storeCurriculum'])
         ->middleware('admin')
         ->name('admin.curriculum-config.store');
@@ -211,9 +232,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/admin/teacher-assignments/advisory', [TeacherAssignmentController::class, 'assignAdvisory'])
         ->middleware('admin')
         ->name('admin.teacher-assignments.advisory.assign');
-    Route::delete('/admin/teacher-assignments/advisory/{section}', [TeacherAssignmentController::class, 'removeAdvisory'])
+    Route::put('/admin/teacher-assignments/advisory/{section}', [TeacherAssignmentController::class, 'updateAdvisory'])
         ->middleware('admin')
-        ->name('admin.teacher-assignments.advisory.remove');
+        ->name('admin.teacher-assignments.advisory.update');
     Route::put('/admin/teacher-assignments/{assignment}', [TeacherAssignmentController::class, 'update'])
         ->middleware('admin')
         ->name('admin.teacher-assignments.update');

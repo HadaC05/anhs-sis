@@ -6,14 +6,21 @@ use App\Models\GradingTerm;
 use App\Models\GradingTermSetting;
 use Illuminate\Support\Facades\Schema;
 
-test('grading period statuses are the shared active inactive list', function () {
+test('grading period statuses support active, closed, open, and archived terms', function () {
     expect(Schema::hasTable('grading_period_statuses'))->toBeTrue()
         ->and(Schema::hasColumn('grading_terms', 'is_active'))->toBeFalse()
-        ->and(Schema::hasColumn('grading_terms', 'grading_period_status_ID'))->toBeTrue()
+        ->and(Schema::hasColumn('grading_terms', 'grading_period_status_ID'))->toBeFalse()
+        ->and(Schema::hasColumn('grading_terms', 'junior_high_grading_period_status_ID'))->toBeTrue()
+        ->and(Schema::hasColumn('grading_terms', 'senior_high_grading_period_status_ID'))->toBeTrue()
         ->and(Schema::hasColumn('grading_semesters', 'grading_period_status_ID'))->toBeTrue()
         ->and(Schema::hasTable('grading_quarters'))->toBeFalse()
         ->and(GradingPeriodStatus::query()->orderBy('sort_order')->pluck('slug')->all())
-        ->toBe([GradingPeriodStatus::ACTIVE, GradingPeriodStatus::INACTIVE]);
+        ->toBe([
+            GradingPeriodStatus::ACTIVE,
+            GradingPeriodStatus::CLOSED,
+            GradingPeriodStatus::OPEN,
+            GradingPeriodStatus::ARCHIVED,
+        ]);
 });
 
 test('senior high periods reuse junior high terms across two semesters', function () {
@@ -51,11 +58,15 @@ test('grading term settings keep max terms and reference the current senior high
         ->and($settings->seniorHighTerm())->toBe(1);
 });
 
-test('junior high terms use the shared status table instead of a boolean column', function () {
+test('grading terms keep independent junior and senior high status references', function () {
     $term = GradingTerm::query()->where('key', 'term_1')->firstOrFail();
 
-    expect($term->grading_period_status_ID)->toBe(GradingPeriodStatus::activeId())
-        ->and($term->isActive())->toBeTrue()
-        ->and($term->status?->name)->toBe('Active')
-        ->and(GradingTerm::query()->active()->count())->toBe(4);
+    expect($term->junior_high_grading_period_status_ID)->toBe(GradingPeriodStatus::openId())
+        ->and($term->senior_high_grading_period_status_ID)->toBe(GradingPeriodStatus::openId())
+        ->and($term->isJuniorHighOpen())->toBeTrue()
+        ->and($term->isSeniorHighOpen())->toBeTrue()
+        ->and($term->juniorHighStatus?->name)->toBe('Open')
+        ->and($term->seniorHighStatus?->name)->toBe('Open')
+        ->and(GradingTerm::query()->juniorHighAvailable()->count())->toBe(4)
+        ->and(GradingTerm::query()->seniorHighAvailable()->count())->toBe(3);
 });

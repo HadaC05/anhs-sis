@@ -103,16 +103,14 @@
                 </div>
                 <select name="type" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                     <option value="">All types</option>
-                    <option value="core" @selected(request('type') === 'core')>Core</option>
-                    <option value="applied" @selected(request('type') === 'applied')>Applied</option>
-                    <option value="specialized" @selected(request('type') === 'specialized')>Specialized</option>
-                </select>
-                <select name="cluster_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
-                    <option value="">All clusters</option>
-                    <option value="none" @selected(request('cluster_ID') === 'none')>No cluster</option>
-                    @foreach ($clusters as $cluster)
-                        <option value="{{ $cluster->cluster_ID }}" @selected((string) request('cluster_ID') === (string) $cluster->cluster_ID)>{{ $cluster->name }}</option>
+                    @foreach ($subjectTypes as $subjectType)
+                        <option value="{{ $subjectType->key }}" @selected(request('type') === $subjectType->key)>{{ $subjectType->label }}</option>
                     @endforeach
+                </select>
+                <select name="school_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                    <option value="">All school levels</option>
+                    <option value="Junior High School" @selected(request('school_level') === 'Junior High School')>Junior High School</option>
+                    <option value="Senior High School" @selected(request('school_level') === 'Senior High School')>Senior High School</option>
                 </select>
                 <select name="status" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                     <option value="">All statuses</option>
@@ -125,7 +123,7 @@
                     @endforeach
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
-                @if (request()->hasAny(['search', 'type', 'cluster_ID', 'status', 'per_page']))
+                @if (request()->hasAny(['search', 'type', 'school_level', 'status', 'per_page']))
                     <a href="{{ route('admin.subject-config.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
             </form>
@@ -138,7 +136,7 @@
                         <th class="border-r border-gray-200 px-5 py-4">Code</th>
                         <th class="border-r border-gray-200 px-5 py-4">Title</th>
                         <th class="border-r border-gray-200 px-5 py-4">Type</th>
-                        <th class="border-r border-gray-200 px-5 py-4">Cluster</th>
+                        <th class="border-r border-gray-200 px-5 py-4">School Level</th>
                         <th class="border-r border-gray-200 px-5 py-4">Status</th>
                         <th class="px-5 py-4 text-right">Actions</th>
                     </tr>
@@ -151,7 +149,7 @@
                                 'code' => $subject->code,
                                 'title' => $subject->title,
                                 'type' => $subject->type,
-                                'cluster_ID' => $subject->cluster_ID,
+                                'school_level' => $subject->school_level,
                             ];
                             $typeBadge = match ($subject->type) {
                                 'core' => 'bg-[#296374]/10 text-[#296374] ring-[#296374]/20',
@@ -167,7 +165,7 @@
                                     {{ $subject->type }}
                                 </span>
                             </td>
-                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ optional($subject->cluster)->name ?? '—' }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $subject->school_level }}</td>
                             <td class="border-r border-gray-100 px-5 py-4">
                                 <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $subject->status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">
                                     {{ ucfirst($subject->status ?? 'active') }}
@@ -348,9 +346,9 @@
                         <select id="subject_type" name="type" required
                             class="{{ $fieldClass }} {{ $errors->has('type') ? 'border-red-300' : 'border-gray-200' }}">
                             <option value="">Select type</option>
-                            <option value="core" @selected(old('type') === 'core')>Core</option>
-                            <option value="applied" @selected(old('type') === 'applied')>Applied</option>
-                            <option value="specialized" @selected(old('type') === 'specialized')>Specialized</option>
+                            @foreach ($subjectTypes as $subjectType)
+                                <option value="{{ $subjectType->key }}" @selected(old('type') === $subjectType->key)>{{ $subjectType->label }}</option>
+                            @endforeach
                         </select>
                         @error('type')
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
@@ -366,15 +364,14 @@
                     @enderror
                 </div>
                 <div>
-                    <label for="subject_cluster_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Cluster</label>
-                    <select id="subject_cluster_id" name="cluster_ID"
-                        class="{{ $fieldClass }} {{ $errors->has('cluster_ID') ? 'border-red-300' : 'border-gray-200' }}">
-                        <option value="">No cluster (Junior High)</option>
-                        @foreach ($clusters as $cluster)
-                            <option value="{{ $cluster->cluster_ID }}" @selected((string) old('cluster_ID') === (string) $cluster->cluster_ID)>{{ $cluster->name }}</option>
-                        @endforeach
+                    <label for="subject_school_level" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">School Level <span class="text-red-500">*</span></label>
+                    <select id="subject_school_level" name="school_level" required
+                        class="{{ $fieldClass }} {{ $errors->has('school_level') ? 'border-red-300' : 'border-gray-200' }}">
+                        <option value="">Select school level</option>
+                        <option value="Junior High School" @selected(old('school_level') === 'Junior High School')>Junior High School</option>
+                        <option value="Senior High School" @selected(old('school_level') === 'Senior High School')>Senior High School</option>
                     </select>
-                    @error('cluster_ID')
+                    @error('school_level')
                         <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
@@ -517,7 +514,7 @@
             document.getElementById('subject_code').value = subject.code || '';
             document.getElementById('subject_title').value = subject.title || '';
             document.getElementById('subject_type').value = subject.type || '';
-            document.getElementById('subject_cluster_id').value = subject.cluster_ID || '';
+            document.getElementById('subject_school_level').value = subject.school_level || '';
         } else {
             title.textContent = 'Add Subject';
             submit.textContent = 'Save Subject';

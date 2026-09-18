@@ -20,16 +20,32 @@ class Subject extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'cluster_ID',
+        'school_level',
+        'subject_type_ID',
         'code',
         'title',
         'type',
         'status',
     ];
 
-    public function cluster(): BelongsTo
+    public function subjectType(): BelongsTo
     {
-        return $this->belongsTo(Cluster::class, 'cluster_ID', 'cluster_ID');
+        return $this->belongsTo(SubjectType::class, 'subject_type_ID', 'subject_type_ID');
+    }
+
+    /** Compatibility accessor for callers using the previous enum value. */
+    public function getTypeAttribute(): ?string
+    {
+        $type = $this->relationLoaded('subjectType')
+            ? $this->getRelation('subjectType')
+            : $this->subjectType()->first();
+
+        return $type?->key;
+    }
+
+    public function setTypeAttribute(?string $value): void
+    {
+        $this->attributes['subject_type_ID'] = SubjectType::idForKey($value);
     }
 
     public function curriculumSubjects(): HasMany

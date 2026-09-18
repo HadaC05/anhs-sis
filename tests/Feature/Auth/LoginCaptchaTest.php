@@ -38,7 +38,10 @@ test('the login page limits the math check answer to three numeric digits', func
         ->assertSee('inputmode="numeric"', false)
         ->assertSee('pattern="\d{1,3}"', false)
         ->assertSee('maxlength="3"', false)
-        ->assertSee("this.value.replace(/\\D/g, '').slice(0, 3)", false);
+        ->assertSee("this.value.replace(/\\D/g, '').slice(0, 3)", false)
+        ->assertSee('data-expected-answer=', false)
+        ->assertSee('captcha-answer-correct', false)
+        ->assertSee('captcha-answer-incorrect', false);
 });
 
 test('login rejects a non-numeric math check answer', function (mixed $answer) {

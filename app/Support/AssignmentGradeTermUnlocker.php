@@ -69,7 +69,7 @@ class AssignmentGradeTermUnlocker
 
             return StudentSubjectGrade::query()
                 ->where('assignment_ID', $assignment->assignment_ID)
-                ->where('grading_period', $gradingPeriod)
+                ->forPeriodKey($gradingPeriod)
                 ->whereStatus(StudentSubjectGrade::teacherLockedStatuses())
                 ->update([
                     'grade_status_ID' => GradeStatus::idFor(GradeStatus::DRAFT),
@@ -87,7 +87,7 @@ class AssignmentGradeTermUnlocker
     {
         $grades = StudentSubjectGrade::query()
             ->where('assignment_ID', $assignment->assignment_ID)
-            ->where('grading_period', $period['key'])
+            ->forPeriodKey($period['key'])
             ->get();
 
         $section = $assignment->section;

@@ -116,7 +116,7 @@ class VacantSectionAssigner
 
         return Curriculum::query()
             ->where('name', $curriculumName)
-            ->where('status', true)
+            ->whereHas('dataStatus', fn ($status) => $status->where('key', 'active'))
             ->value('curriculum_ID');
     }
 

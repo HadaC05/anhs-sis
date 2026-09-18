@@ -222,7 +222,7 @@
                         <td class="border-r border-gray-100 px-5 py-4 font-medium text-gray-700">{{ $enrollment->created_at?->format('M d, Y') ?? '-' }}</td>
                         <td class="px-5 py-4">
                             <div class="flex justify-end gap-1.5">
-                                <a href="{{ route('guidance.enrollments.show', $enrollment) }}" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                <a href="{{ route('guidance.enrollments.show', $enrollment) }}" target="_blank" rel="noopener" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.46 12C3.73 7.94 7.52 5 12 5s8.27 2.94 9.54 7c-1.27 4.06-5.06 7-9.54 7S3.73 16.06 2.46 12z"></path></svg>
                                 </a>
                                 <a href="{{ route('guidance.enrollments.edit', $enrollment) }}" title="Edit enrollment details" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">

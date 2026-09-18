@@ -8,11 +8,10 @@
     $addTermModalOpen = old('_form') === 'add_term' && $errors->any();
     $maxTermsModalOpen = old('_form') === 'max_terms' && $errors->any();
     $editTermModalOpen = old('_form') === 'edit_term' && $errors->any();
-    $activeTermKeys = collect($configuredPeriods)->pluck('key')->values();
-    $currentEditableKey = collect($openPeriods)->last()['key'] ?? null;
-    $atTermLimit = $terms->count() >= $settings->max_terms;
-    $currentTermLabel = collect($openPeriods)->last()['label'] ?? 'Term 1';
-    $activeTermCount = $terms->filter(fn ($term) => $term->isActive())->count();
+    $currentEditableKey = \App\Models\GradingTerm::currentEditablePeriodKey();
+    $atTermLimit = false;
+    $currentTermLabel = \App\Models\GradingTerm::currentEditablePeriodLabel() ?? 'No open term';
+    $activeTermCount = $terms->filter(fn ($term) => ! $term->isJuniorHighArchived())->count();
     $editingTermId = old('_form') === 'edit_term' ? old('term_id') : null;
     $editFormAction = $editingTermId
         ? route('admin.grading-term-config.update', ['term' => $editingTermId])
@@ -22,14 +21,19 @@
     $currentSeniorHighSemesterLabel = $currentSeniorHighPeriod['semester_label'] ?? 'First Semester';
     $currentSeniorHighTermLabel = $currentSeniorHighPeriod['term_label'] ?? 'Term 1';
     $lockedSeniorHighPeriodKeys = $lockedSeniorHighPeriodKeys ?? [];
+    $statusBadgeClass = fn (?string $slug) => match ($slug) {
+        'open' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+        'active' => 'bg-sky-50 text-sky-700 ring-sky-200',
+        'closed' => 'bg-amber-50 text-amber-700 ring-amber-200',
+        default => 'bg-gray-100 text-gray-600 ring-gray-200',
+    };
 @endphp
 
 <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Grading Terms</h1>
-        <p class="mt-1 text-sm text-gray-500">Manage junior high terms and senior high semesters and terms.</p>
+        <h1 class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl">Grading Terms</h1>
     </div>
-    <div class="relative {{ $isJuniorHighTab ? '' : 'hidden' }}" id="gradingTermSettings">
+    <div class="relative" id="gradingTermSettings">
         <button type="button" id="gradingTermSettingsButton" onclick="toggleGradingTermSettingsMenu()"
             class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-[#296374]/30 hover:text-[#296374]"
             aria-haspopup="true" aria-expanded="false" aria-controls="gradingTermSettingsMenu" title="Term settings">
@@ -73,26 +77,9 @@
     </div>
 @endif
 
-<div class="mb-6 border-b border-gray-200">
-    <nav class="flex gap-1" aria-label="Grading term tabs">
-        <a href="{{ route('admin.grading-term-config.index', ['tab' => 'junior_high']) }}"
-            class="relative px-4 py-3 text-sm font-bold transition {{ $isJuniorHighTab ? 'text-[#296374]' : 'text-gray-500 hover:text-gray-700' }}">
-            Junior High School
-            @if ($isJuniorHighTab)
-                <span class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-[#296374]"></span>
-            @endif
-        </a>
-        <a href="{{ route('admin.grading-term-config.index', ['tab' => 'senior_high']) }}"
-            class="relative px-4 py-3 text-sm font-bold transition {{ ! $isJuniorHighTab ? 'text-[#296374]' : 'text-gray-500 hover:text-gray-700' }}">
-            Senior High School
-            @if (! $isJuniorHighTab)
-                <span class="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-[#296374]"></span>
-            @endif
-        </a>
-    </nav>
-</div>
-
-@if ($isJuniorHighTab)
+<div class="grid grid-cols-1 gap-6 2xl:grid-cols-2">
+<section>
+    <h2 class="mb-4 text-base font-bold text-gray-800">Junior High School</h2>
 <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Current Term</p>
@@ -105,9 +92,9 @@
         <p class="mt-1 text-xs text-gray-500">Allowed terms for grading</p>
     </div>
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Active Terms</p>
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Included Terms</p>
         <p class="mt-2 text-3xl font-bold text-gray-900">{{ $activeTermCount }} / {{ $terms->count() }}</p>
-        <p class="mt-1 text-xs text-gray-500">Status follows the maximum terms limit</p>
+        <p class="mt-1 text-xs text-gray-500">Open, active, and closed terms are included</p>
     </div>
 </div>
 
@@ -115,40 +102,34 @@
     <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <h2 class="text-lg font-bold text-gray-900">Terms</h2>
-            <p class="mt-1 text-sm text-gray-500">Set the current grading term from a row. Earlier terms lock automatically.</p>
+            <p class="mt-1 text-sm text-gray-500">Open is the one editable term. Active and Closed are included; Archived is excluded from school operations.</p>
         </div>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[720px] border-collapse text-left">
+        <table class="w-full min-w-[560px] border-collapse text-left">
             <thead>
                 <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                    <th class="border-r border-gray-200 px-5 py-4">Key</th>
                     <th class="border-r border-gray-200 px-5 py-4">Label</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Order</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Status</th>
+                    <th class="border-r border-gray-200 px-5 py-4">JHS Status</th>
                     <th class="px-5 py-4 text-right">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm">
                 @forelse ($terms as $term)
                     @php
-                        $activeIndex = $activeTermKeys->search($term->key);
-                        $termNumber = $activeIndex === false ? null : $activeIndex + 1;
-                        $isCurrentTerm = $term->isActive() && $term->key === $currentEditableKey;
+                        $isCurrentTerm = $term->key === $currentEditableKey;
                     @endphp
                     <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                         <td class="border-r border-gray-100 px-5 py-4">
-                            <p class="font-semibold text-gray-900">{{ $term->key }}</p>
+                            <p class="font-semibold text-gray-900">{{ $term->label }}</p>
                             @if ($isCurrentTerm)
                                 <p class="mt-0.5 text-xs font-semibold text-[#296374]">Current grading term</p>
                             @endif
                         </td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $term->label }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $term->sort_order }}</td>
                         <td class="border-r border-gray-100 px-5 py-4">
-                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $term->isActive() ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">
-                                {{ $term->status?->name ?? ($term->isActive() ? 'Active' : 'Inactive') }}
+                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($term->juniorHighStatus?->slug) }}">
+                                {{ $term->juniorHighStatus?->name ?? 'Archived' }}
                             </span>
                         </td>
                         <td class="px-5 py-4">
@@ -159,30 +140,34 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                 </button>
-                                @if ($term->isActive() && $termNumber !== null && ! $isCurrentTerm)
-                                    <form action="{{ route('admin.grading-term-config.open-term.update') }}" method="POST" class="inline"
-                                        onsubmit="return confirm('Set {{ $term->label }} as the current grading term? Teachers will enter grades for this term, and earlier terms will be locked.');">
-                                        @csrf
-                                        @method('PUT')
-                                        <input type="hidden" name="open_terms_count" value="{{ $termNumber }}">
-                                        <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50">
-                                            Set as Active
-                                        </button>
-                                    </form>
-                                @endif
+                                <details class="relative">
+                                    <summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary>
+                                    <div class="absolute right-0 z-20 mt-2 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                                        @foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)
+                                            <form action="{{ route('admin.grading-term-config.junior-high-status.update', $term) }}" method="POST">
+                                                @csrf
+                                                @method('PUT')
+                                                <input type="hidden" name="status" value="{{ $status }}">
+                                                <button type="submit" class="block w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $label }}</button>
+                                            </form>
+                                        @endforeach
+                                    </div>
+                                </details>
                             </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-16 text-center text-gray-500">No terms configured.</td>
+                        <td colspan="3" class="px-6 py-16 text-center text-gray-500">No terms configured.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 </div>
-@else
+</section>
+<section>
+    <h2 class="mb-4 text-base font-bold text-gray-800">Senior High School</h2>
 <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Current Semester</p>
@@ -201,7 +186,7 @@
     </div>
 </div>
 
-<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+<div class="grid grid-cols-1 gap-6">
     <section class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
         <div class="border-b border-gray-100 px-6 py-5">
             <h2 class="text-lg font-bold text-gray-900">Active Semester</h2>
@@ -226,8 +211,8 @@
 
     <section class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
         <div class="border-b border-gray-100 px-6 py-5">
-            <h2 class="text-lg font-bold text-gray-900">Active Term</h2>
-            <p class="mt-1 text-sm text-gray-500">Select the current term independently of the active semester.</p>
+            <h2 class="text-lg font-bold text-gray-900">Term Status</h2>
+            <p class="mt-1 text-sm text-gray-500">Open is the current editable term. Active and Closed remain included; Archived is excluded.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full min-w-[420px] border-collapse text-left">
@@ -237,8 +222,8 @@
                         @php $isCurrentTerm = (int) $settings->term_ID === (int) $term->term_ID; @endphp
                         <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                             <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $term->label }} @if ($isCurrentTerm)<p class="mt-0.5 text-xs font-semibold text-[#296374]">Active term</p>@endif</td>
-                            <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $term->isActive() ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">{{ $term->status?->name ?? ($term->isActive() ? 'Active' : 'Inactive') }}</span></td>
-                            <td class="px-5 py-4 text-right">@if (! $isCurrentTerm)<form action="{{ route('admin.grading-term-config.senior-high.term.update') }}" method="POST" class="inline" onsubmit="return confirm('Set {{ $term->label }} as the active Senior High term?');">@csrf @method('PUT')<input type="hidden" name="term_ID" value="{{ $term->term_ID }}"><button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Set Active</button></form>@endif</td>
+                            <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($term->seniorHighStatus?->slug) }}">{{ $term->seniorHighStatus?->name ?? 'Archived' }}</span></td>
+                            <td class="px-5 py-4 text-right"><details class="relative inline-block"><summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary><div class="absolute right-0 z-20 mt-2 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">@foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)<form action="{{ route('admin.grading-term-config.senior-high-status.update', $term) }}" method="POST">@csrf @method('PUT')<input type="hidden" name="status" value="{{ $status }}"><button type="submit" class="block w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $label }}</button></form>@endforeach</div></details></td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -246,7 +231,8 @@
         </div>
     </section>
 </div>
-@endif
+</section>
+</div>
 
 <div id="addTermModal" role="dialog" aria-modal="true" aria-labelledby="addTermModalTitle" data-open="{{ $addTermModalOpen ? 'true' : 'false' }}"
     class="fixed inset-0 z-[100] {{ $addTermModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
@@ -338,7 +324,7 @@
                     <label for="max_terms" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Allowed terms <span class="text-red-500">*</span></label>
                     <input id="max_terms" name="max_terms" type="number" min="2" max="12" value="{{ old('_form') === 'max_terms' ? old('max_terms') : $settings->max_terms }}" required
                         class="{{ $fieldClass }} {{ $maxTermsModalOpen && $errors->has('max_terms') ? 'border-red-300' : 'border-gray-200' }}">
-                    <p class="mt-1 text-xs text-gray-500">Minimum: 2. Extra terms stay saved but become inactive when they are beyond this limit.</p>
+                    <p class="mt-1 text-xs text-gray-500">Minimum: 2. Terms beyond this limit are archived.</p>
                     @error('max_terms')
                         @if (old('_form') === 'max_terms')
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>

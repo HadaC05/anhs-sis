@@ -12,6 +12,7 @@ use App\Models\StudentAddress;
 use App\Models\StudentApplication;
 use App\Models\StudentGuardian;
 use App\Models\StudentProfile;
+use App\Models\Curriculum;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -31,18 +32,12 @@ class StudentEnrollmentRegistrar
             ]);
         }
 
-        $gradeId = GradeLevel::idForValue('grade_'.$validated['grade_level']);
         $isSeniorHigh = in_array($validated['grade_level'], ['11', '12'], true);
-
-        if (! $gradeId) {
-            throw ValidationException::withMessages([
-                'grade_level' => 'Selected grade level is not configured.',
-            ]);
-        }
+        $curriculumGradeLevelId = self::curriculumGradeLevelId($validated);
 
         $createdEnrollmentId = null;
 
-        DB::transaction(function () use ($validated, $academicYear, $gradeId, $isSeniorHigh, &$createdEnrollmentId): void {
+        DB::transaction(function () use ($validated, $academicYear, $curriculumGradeLevelId, $isSeniorHigh, &$createdEnrollmentId): void {
             $student = StudentApplication::query()->create([
                 'lrn' => $validated['LRN'],
                 'first_name' => $validated['first_name'],
@@ -64,10 +59,8 @@ class StudentEnrollmentRegistrar
                 'student_ID' => $student->id,
                 'section_ID' => null,
                 'SY_ID' => $academicYear->SY_ID,
-                'cluster_ID' => $isSeniorHigh ? $validated['cluster_ID'] : null,
+                'curriculum_grade_level_ID' => $curriculumGradeLevelId,
                 'course_ID' => $isSeniorHigh ? $validated['course_ID'] : null,
-                'grade_ID' => $gradeId,
-                'semester' => $isSeniorHigh ? $validated['semester'] : null,
                 'learner_type' => $validated['learner_type'],
                 'last_grade_level_completed' => $validated['last_grade_level_completed'] ?? null,
                 'last_school_year_completed' => $validated['last_school_year_completed'] ?? null,
@@ -80,6 +73,8 @@ class StudentEnrollmentRegistrar
             if ($section) {
                 $enrollment->update(['section_ID' => $section->section_ID]);
             }
+
+            StudentSubjectRoster::sync($enrollment);
 
             $studentModel = Student::query()->findOrFail($student->id);
             $enrollment->setRelation('student', $studentModel);
@@ -118,18 +113,12 @@ class StudentEnrollmentRegistrar
             ]);
         }
 
-        $gradeId = GradeLevel::idForValue('grade_'.$validated['grade_level']);
         $isSeniorHigh = in_array($validated['grade_level'], ['11', '12'], true);
-
-        if (! $gradeId) {
-            throw ValidationException::withMessages([
-                'grade_level' => 'Selected grade level is not configured.',
-            ]);
-        }
+        $curriculumGradeLevelId = self::curriculumGradeLevelId($validated);
 
         $previousPlacementStatus = $enrollment->placement_status;
 
-        DB::transaction(function () use ($enrollment, $student, $validated, $gradeId, $isSeniorHigh): void {
+        DB::transaction(function () use ($enrollment, $student, $validated, $curriculumGradeLevelId, $isSeniorHigh): void {
             $oldLrn = (string) $student->lrn;
             $newLrn = (string) $validated['LRN'];
             $username = $student->username;
@@ -160,15 +149,12 @@ class StudentEnrollmentRegistrar
                 'religion' => $validated['religion'] ?? null,
             ]);
 
-            $previousGradeId = (int) $enrollment->grade_ID;
-            $previousClusterId = $enrollment->cluster_ID ? (int) $enrollment->cluster_ID : null;
+            $previousCurriculumGradeLevelId = (int) $enrollment->curriculum_grade_level_ID;
             $newClusterId = $isSeniorHigh ? ($validated['cluster_ID'] ? (int) $validated['cluster_ID'] : null) : null;
 
             $enrollment->update([
-                'cluster_ID' => $newClusterId,
+                'curriculum_grade_level_ID' => $curriculumGradeLevelId,
                 'course_ID' => $isSeniorHigh ? ($validated['course_ID'] ?? null) : null,
-                'grade_ID' => $gradeId,
-                'semester' => $isSeniorHigh ? ($validated['semester'] ?? null) : null,
                 'learner_type' => $validated['learner_type'],
                 'last_grade_level_completed' => $validated['last_grade_level_completed'] ?? null,
                 'last_school_year_completed' => $validated['last_school_year_completed'] ?? null,
@@ -176,17 +162,21 @@ class StudentEnrollmentRegistrar
                 'school_id_from_previous_school' => $validated['school_id_from_previous_school'] ?? null,
             ]);
 
-            $gradeOrClusterChanged = $previousGradeId !== (int) $gradeId || $previousClusterId !== $newClusterId;
+            $curriculumGradeLevelChanged = $previousCurriculumGradeLevelId !== $curriculumGradeLevelId;
             $section = $enrollment->section;
             $sectionMatches = $section
-                && (int) $section->grade_ID === (int) $gradeId
+                && (int) $section->grade_ID === (int) $enrollment->gradeLevel?->grade_ID
                 && ($section->cluster_ID ? (int) $section->cluster_ID : null) === $newClusterId
                 && (int) $section->SY_ID === (int) $enrollment->SY_ID;
 
-            if ($gradeOrClusterChanged || ! $sectionMatches) {
+            if ($curriculumGradeLevelChanged || ! $sectionMatches) {
                 $enrollment->unsetRelation('section');
                 $assigned = VacantSectionAssigner::resolve($enrollment->fresh(['gradeLevel', 'cluster', 'academicYear']) ?? $enrollment);
                 $enrollment->update(['section_ID' => $assigned?->section_ID]);
+            }
+
+            if ($curriculumGradeLevelChanged) {
+                StudentSubjectRoster::sync($enrollment->fresh() ?? $enrollment);
             }
 
             self::syncRelatedRecords($student->id, $validated);
@@ -226,6 +216,35 @@ class StudentEnrollmentRegistrar
     /**
      * @param  array<string, mixed>  $validated
      */
+    /**
+     * Resolve the selected grade/track/semester to its single curriculum offering.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private static function curriculumGradeLevelId(array $validated): int
+    {
+        $gradeId = GradeLevel::idForValue('grade_'.$validated['grade_level']);
+        $isSeniorHigh = in_array($validated['grade_level'], ['11', '12'], true);
+
+        $offering = Curriculum::query()
+            ->where('grade_ID', $gradeId)
+            ->when(
+                $isSeniorHigh,
+                fn ($query) => $query->where('cluster_ID', $validated['cluster_ID']),
+                fn ($query) => $query->whereNull('cluster_ID'),
+            )
+            ->whereHas('gradingSemester', fn ($query) => $query->where('key', $isSeniorHigh ? $validated['semester'] : 'full_year'))
+            ->value('curriculum_ID');
+
+        if (! $offering) {
+            throw ValidationException::withMessages([
+                'grade_level' => 'No active curriculum offering matches the selected grade level, track, and semester.',
+            ]);
+        }
+
+        return (int) $offering;
+    }
+
     private static function syncRelatedRecords(int $studentId, array $validated): void
     {
         StudentProfile::query()->updateOrCreate(

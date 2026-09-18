@@ -77,6 +77,16 @@
         background: #f8fafc;
     }
 
+    .enrollment-clean-shell .field-invalid {
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+    }
+
+    .enrollment-clean-shell .choice-group.field-invalid {
+        outline: 1px solid #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    }
+
     .enrollment-progress {
         overflow-x: auto;
     }
@@ -275,13 +285,10 @@
             </div>
 
             <h2 id="registrationSuccessTitle" class="text-2xl font-bold tracking-tight text-gray-700">
-                Enrollment Application Submitted
+                Enrollment Submitted Successfully
             </h2>
             <p class="mt-3 text-sm leading-6 text-gray-600 md:text-base">
-                {{ session('status', 'You are temporarily enrolled. Check your email for login instructions, then sign in to upload your required documents.') }}
-            </p>
-            <p class="mt-4 text-sm leading-6 text-gray-500">
-                Username is your LRN. Your default password uses the first 2 letters of your first name, the first 2 letters of your last name, the school year, and anhs.
+                {{ session('status', 'Your enrollment has been submitted successfully.') }}
             </p>
 
             <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -855,9 +862,6 @@
                 </button>
                 <button type="submit" id="wizardSubmit" class="{{ $isGuidanceEdit ? 'inline-flex' : 'hidden' }} items-center justify-center gap-2 rounded-md px-9 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60" style="background-color: #4bb878;" {{ ! $activeYear || $hasEnrollment ? 'disabled' : '' }}>
                     {{ $submitLabel ?? 'Submit Enrollment' }}
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
-                    </svg>
                 </button>
             </div>
         </div>
@@ -909,6 +913,35 @@
     let isSubmitting = false;
     let availableLrn = null;
     let availableEmail = null;
+
+    const serverErrorFields = @json($errors->keys());
+
+    function invalidTargets(field) {
+        if (!field) {
+            return [];
+        }
+
+        if (field.type === 'radio' || field.type === 'checkbox') {
+            return Array.from(enrollmentForm.querySelectorAll(`[name="${CSS.escape(field.name)}"]`));
+        }
+
+        return [field];
+    }
+
+    function setFieldInvalid(field, invalid = true) {
+        invalidTargets(field).forEach((target) => {
+            target.classList.toggle('field-invalid', invalid);
+            target.closest('.choice-group')?.classList.toggle('field-invalid', invalid);
+        });
+    }
+
+    function markServerErrors() {
+        serverErrorFields.forEach((name) => {
+            const field = enrollmentForm.querySelector(`[name="${CSS.escape(name)}"]`)
+                || document.getElementById(`${name}_select`);
+            setFieldInvalid(field);
+        });
+    }
 
     if (isSinglePageEdit) {
         document.body.classList.add('sidebar-collapsed');
@@ -1645,11 +1678,12 @@
         const fields = Array.from(section.querySelectorAll('input, select, textarea'))
             .filter((field) => !field.disabled);
 
-        for (const field of fields) {
-            if (!field.checkValidity()) {
-                field.reportValidity();
-                return false;
-            }
+        const invalidFields = fields.filter((field) => !field.checkValidity());
+        invalidFields.forEach((field) => setFieldInvalid(field));
+
+        if (invalidFields.length) {
+            invalidFields[0].reportValidity();
+            return false;
         }
 
         if (stepIndex === 0 && !(await ensureLrnAvailable())) {
@@ -1859,6 +1893,23 @@
         isSubmitting = true;
         HTMLFormElement.prototype.submit.call(enrollmentForm);
     });
+
+    enrollmentForm.querySelectorAll('input, select, textarea').forEach((field) => {
+        const clearInvalidState = () => {
+            if (field.checkValidity()) {
+                setFieldInvalid(field, false);
+            }
+        };
+
+        field.addEventListener('input', clearInvalidState);
+        field.addEventListener('change', clearInvalidState);
+    });
+
+    enrollmentForm.addEventListener('invalid', (event) => {
+        setFieldInvalid(event.target);
+    }, true);
+
+    markServerErrors();
 
     function setBirthdateRestriction() {
         const birthdateInput = document.getElementById('birthdateInput');

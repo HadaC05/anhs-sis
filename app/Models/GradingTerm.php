@@ -2,16 +2,15 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\HasGradingPeriodStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
 
 class GradingTerm extends Model
 {
     use HasFactory;
-    use HasGradingPeriodStatus;
 
     public const SENIOR_HIGH_TERMS_PER_SEMESTER = 3;
 
@@ -23,7 +22,8 @@ class GradingTerm extends Model
         'key',
         'label',
         'sort_order',
-        'grading_period_status_ID',
+        'junior_high_grading_period_status_ID',
+        'senior_high_grading_period_status_ID',
     ];
 
     protected function casts(): array
@@ -38,6 +38,111 @@ class GradingTerm extends Model
         return $this->hasMany(StudentSubjectGrade::class, 'term_ID', 'term_ID');
     }
 
+    public function juniorHighStatus(): BelongsTo
+    {
+        return $this->belongsTo(GradingPeriodStatus::class, 'junior_high_grading_period_status_ID', 'grading_period_status_ID');
+    }
+
+    public function seniorHighStatus(): BelongsTo
+    {
+        return $this->belongsTo(GradingPeriodStatus::class, 'senior_high_grading_period_status_ID', 'grading_period_status_ID');
+    }
+
+    /** @deprecated Use juniorHighStatus(). */
+    public function status(): BelongsTo
+    {
+        return $this->juniorHighStatus();
+    }
+
+    public function isJuniorHighActive(): bool
+    {
+        return $this->hasJuniorHighStatus(GradingPeriodStatus::ACTIVE);
+    }
+
+    public function isSeniorHighActive(): bool
+    {
+        return $this->hasSeniorHighStatus(GradingPeriodStatus::ACTIVE);
+    }
+
+    public function isJuniorHighOpen(): bool
+    {
+        return $this->hasJuniorHighStatus(GradingPeriodStatus::OPEN);
+    }
+
+    public function isSeniorHighOpen(): bool
+    {
+        return $this->hasSeniorHighStatus(GradingPeriodStatus::OPEN);
+    }
+
+    public function isJuniorHighArchived(): bool
+    {
+        return $this->hasJuniorHighStatus(GradingPeriodStatus::ARCHIVED);
+    }
+
+    public function isSeniorHighArchived(): bool
+    {
+        return $this->hasSeniorHighStatus(GradingPeriodStatus::ARCHIVED);
+    }
+
+    /** @deprecated Use isJuniorHighActive(). */
+    public function isActive(): bool
+    {
+        return $this->isJuniorHighActive();
+    }
+
+    public function scopeJuniorHighActive($query)
+    {
+        return $query->where('junior_high_grading_period_status_ID', GradingPeriodStatus::activeId());
+    }
+
+    public function scopeSeniorHighActive($query)
+    {
+        return $query->where('senior_high_grading_period_status_ID', GradingPeriodStatus::activeId());
+    }
+
+    public function scopeJuniorHighAvailable($query)
+    {
+        return $query->whereIn('junior_high_grading_period_status_ID', array_filter([
+            GradingPeriodStatus::activeId(),
+            GradingPeriodStatus::closedId(),
+            GradingPeriodStatus::openId(),
+        ]));
+    }
+
+    public function scopeSeniorHighAvailable($query)
+    {
+        return $query->whereIn('senior_high_grading_period_status_ID', array_filter([
+            GradingPeriodStatus::activeId(),
+            GradingPeriodStatus::closedId(),
+            GradingPeriodStatus::openId(),
+        ]));
+    }
+
+    /** @deprecated Use juniorHighActive(). */
+    public function scopeActive($query)
+    {
+        return $query->juniorHighActive();
+    }
+
+    private function hasJuniorHighStatus(string $slug): bool
+    {
+        return $this->hasStatus('juniorHighStatus', 'junior_high_grading_period_status_ID', $slug);
+    }
+
+    private function hasSeniorHighStatus(string $slug): bool
+    {
+        return $this->hasStatus('seniorHighStatus', 'senior_high_grading_period_status_ID', $slug);
+    }
+
+    private function hasStatus(string $relation, string $column, string $slug): bool
+    {
+        if ($this->relationLoaded($relation) && $this->getRelation($relation)) {
+            return $this->getRelation($relation)->slug === $slug;
+        }
+
+        return (int) $this->{$column} === GradingPeriodStatus::idFor($slug);
+    }
+
     public static function activePeriods(): array
     {
         return self::configuredPeriods();
@@ -50,17 +155,17 @@ class GradingTerm extends Model
         }
 
         $terms = self::query()
-            ->active()
             ->orderBy('sort_order')
             ->orderBy('term_ID')
             ->limit(GradingTermSetting::current()->max_terms)
-            ->get(['key', 'label']);
+            ->get(['key', 'label', 'junior_high_grading_period_status_ID']);
 
         if ($terms->isEmpty()) {
             return array_slice(self::fallbackPeriods(), 0, GradingTermSetting::current()->max_terms);
         }
 
         return $terms
+            ->reject(fn (self $term): bool => $term->isJuniorHighArchived())
             ->map(fn (self $term): array => [
                 'key' => $term->key,
                 'label' => $term->label,
@@ -73,10 +178,7 @@ class GradingTerm extends Model
      */
     public static function gradingOpenPeriods(): array
     {
-        $configured = self::configuredPeriods();
-        $openCount = max(1, (int) GradingTermSetting::current()->open_terms_count);
-
-        return array_slice($configured, 0, min($openCount, count($configured)));
+        return self::configuredPeriods();
     }
 
     /**
@@ -84,27 +186,48 @@ class GradingTerm extends Model
      */
     public static function lockedGradingPeriodKeys(): array
     {
-        $openPeriods = self::gradingOpenPeriods();
+        $currentKey = self::currentEditablePeriodKey();
 
-        if (count($openPeriods) <= 1) {
-            return [];
-        }
-
-        return array_column(array_slice($openPeriods, 0, -1), 'key');
+        return array_values(array_filter(
+            array_column(self::gradingOpenPeriods(), 'key'),
+            fn (string $key): bool => $key !== $currentKey,
+        ));
     }
 
     public static function currentEditablePeriodKey(): ?string
     {
-        $openPeriods = self::gradingOpenPeriods();
+        $configuredKeys = array_column(self::configuredPeriods(), 'key');
 
-        return $openPeriods[array_key_last($openPeriods)]['key'] ?? null;
+        return self::query()
+            ->juniorHighAvailable()
+            ->whereIn('key', $configuredKeys)
+            ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::openId())
+            ->orderBy('sort_order')
+            ->orderBy('term_ID')
+            ->value('key');
     }
 
     public static function currentEditablePeriodLabel(): ?string
     {
-        $openPeriods = self::gradingOpenPeriods();
+        return collect(self::configuredPeriods())
+            ->firstWhere('key', self::currentEditablePeriodKey())['label'] ?? null;
+    }
 
-        return $openPeriods[array_key_last($openPeriods)]['label'] ?? null;
+    public static function isJuniorHighPeriodOpen(?string $periodKey): bool
+    {
+        if (! $periodKey || ! Schema::hasTable('grading_terms')) {
+            return false;
+        }
+
+        return self::query()
+            ->where('key', $periodKey)
+            ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::openId())
+            ->exists();
+    }
+
+    public static function isCurrentJuniorHighPeriodOpen(): bool
+    {
+        return self::isJuniorHighPeriodOpen(self::currentEditablePeriodKey());
     }
 
     public static function fallbackPeriods(): array
@@ -191,7 +314,7 @@ class GradingTerm extends Model
     }
 
     /**
-     * @return array<int, array{key: string, label: string, term_ID?: int}>
+     * @return array<int, array{key: string, label: string, term_ID?: int, is_active?: bool, is_open?: bool}>
      */
     public static function seniorHighTerms(): array
     {
@@ -202,7 +325,7 @@ class GradingTerm extends Model
                 ->orderBy('sort_order')
                 ->orderBy('term_ID')
                 ->limit($limit)
-                ->get(['term_ID', 'key', 'label']);
+                ->get(['term_ID', 'key', 'label', 'senior_high_grading_period_status_ID']);
 
             if ($terms->isNotEmpty()) {
                 return $terms
@@ -210,6 +333,8 @@ class GradingTerm extends Model
                         'key' => $term->key,
                         'label' => $term->label,
                         'term_ID' => (int) $term->term_ID,
+                        'is_active' => ! $term->isSeniorHighArchived(),
+                        'is_open' => $term->isSeniorHighOpen(),
                     ])
                     ->all();
             }
@@ -219,7 +344,7 @@ class GradingTerm extends Model
     }
 
     /**
-     * @return array<int, array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool}>
+     * @return array<int, array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool, is_open?: bool}>
      */
     public static function seniorHighPeriods(?string $semester = null, bool $activeOnly = false): array
     {
@@ -232,6 +357,7 @@ class GradingTerm extends Model
         if (Schema::hasTable('grading_semesters')) {
             $semesters = GradingSemester::query()
                 ->with('status')
+                ->whereIn('key', [GradingSemester::FIRST, GradingSemester::SECOND])
                 ->when($normalizedSemester, fn ($query) => $query->where('key', $normalizedSemester))
                 ->when($activeOnly, fn ($query) => $query->active())
                 ->orderBy('sort_order')
@@ -260,6 +386,9 @@ class GradingTerm extends Model
 
         foreach ($semesters as $gradingSemester) {
             foreach ($terms as $index => $term) {
+                if ($activeOnly && ($term['is_active'] ?? true) === false) {
+                    continue;
+                }
                 $periods[] = self::seniorHighPeriodFromParts($gradingSemester, $term, $index + 1);
             }
         }
@@ -268,7 +397,7 @@ class GradingTerm extends Model
     }
 
     /**
-     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool}
+     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool, is_open?: bool}
      */
     public static function seniorHighPeriod(string $semester, int $termNumber): array
     {
@@ -298,8 +427,8 @@ class GradingTerm extends Model
     }
 
     /**
-     * @param  array{key: string, label: string, term_ID?: int}  $term
-     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID: int|null, term_ID?: int, is_active: bool}
+     * @param  array{key: string, label: string, term_ID?: int, is_active?: bool, is_open?: bool}  $term
+     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID: int|null, term_ID?: int, is_active: bool, is_open: bool}
      */
     public static function seniorHighPeriodFromParts(GradingSemester $semester, array $term, int $termNumber): array
     {
@@ -314,7 +443,8 @@ class GradingTerm extends Model
             'label' => $semester->label.' · '.$term['label'],
             'semester_ID' => (int) $semester->semester_ID,
             'term_ID' => isset($term['term_ID']) ? (int) $term['term_ID'] : null,
-            'is_active' => $semester->isActive(),
+            'is_active' => $semester->isActive() && ($term['is_active'] ?? true),
+            'is_open' => $semester->isActive() && ($term['is_open'] ?? false),
         ];
     }
 
@@ -326,7 +456,7 @@ class GradingTerm extends Model
     }
 
     /**
-     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool}|null
+     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool, is_open?: bool}|null
      */
     public static function findSeniorHighPeriodByKey(string $periodKey): ?array
     {
@@ -351,7 +481,7 @@ class GradingTerm extends Model
     }
 
     /**
-     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool}
+     * @return array{key: string, semester: string, term: int, semester_label: string, term_label: string, label: string, semester_ID?: int|null, term_ID?: int, is_active?: bool, is_open?: bool}
      */
     public static function currentSeniorHighPeriod(): array
     {
@@ -407,6 +537,11 @@ class GradingTerm extends Model
         return self::currentSeniorHighPeriod()['label'];
     }
 
+    public static function isCurrentSeniorHighPeriodOpen(): bool
+    {
+        return self::currentSeniorHighPeriod()['is_open'] ?? false;
+    }
+
     public static function seniorHighPeriodPosition(string $semester, int $term): int
     {
         $offset = $semester === GradingSemester::SECOND ? self::SENIOR_HIGH_TERMS_PER_SEMESTER : 0;
@@ -418,9 +553,9 @@ class GradingTerm extends Model
     {
         $limit = max(0, $maxTerms ?? (int) GradingTermSetting::current()->max_terms);
         $activeId = GradingPeriodStatus::activeId();
-        $inactiveId = GradingPeriodStatus::inactiveId();
+        $archivedId = GradingPeriodStatus::archivedId();
 
-        if ($activeId === null || $inactiveId === null) {
+        if ($activeId === null || $archivedId === null) {
             return;
         }
 
@@ -430,12 +565,17 @@ class GradingTerm extends Model
             ->get();
 
         foreach ($terms as $index => $term) {
-            $statusId = $index < $limit ? $activeId : $inactiveId;
+            $statusId = $index < $limit ? $activeId : $archivedId;
 
-            if ((int) $term->grading_period_status_ID !== $statusId) {
-                $term->update(['grading_period_status_ID' => $statusId]);
+            if ($index < $limit && $term->isJuniorHighArchived()) {
+                $term->update(['junior_high_grading_period_status_ID' => $activeId]);
+            }
+
+            if ($index >= $limit && (int) $term->junior_high_grading_period_status_ID !== $statusId) {
+                $term->update(['junior_high_grading_period_status_ID' => $statusId]);
             }
         }
+
     }
 
     /**

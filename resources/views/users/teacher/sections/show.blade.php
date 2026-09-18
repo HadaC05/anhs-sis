@@ -119,7 +119,7 @@ $summaryColspan = 4 + count($periods);
                                 <th class="border border-gray-200 px-3 py-3 text-center">#</th>
                                 <th class="border border-gray-200 px-3 py-3">LRN</th>
                                 <th class="border border-gray-200 px-3 py-3">Student</th>
-                                @foreach ($periods as $period)
+                                @foreach ($inputPeriods as $period)
                                 <th class="border border-gray-200 px-3 py-3 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
                                 @endforeach
                             </tr>
@@ -154,7 +154,7 @@ $summaryColspan = 4 + count($periods);
                                 <td class="border border-gray-200 px-3 py-2.5 text-center">{{ $rowNumber }}</td>
                                 <td class="border border-gray-200 px-3 py-2.5 font-mono text-xs">{{ $student?->lrn ?? 'N/A' }}</td>
                                 <td class="border border-gray-200 px-3 py-2.5">{{ $name }}</td>
-                                @foreach ($periods as $period)
+                                @foreach ($inputPeriods as $period)
                                 @php
                                 $gradeRecord = $gradeSet->get($period['key']);
                                 $isCellLocked = in_array($period['key'], $lockedPeriodKeys, true) || $gradeRecord?->isTeacherLocked() || ! $canEditCurrentTerm;

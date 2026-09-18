@@ -69,7 +69,11 @@ test('section seeder creates five lettered sections for each grade without stran
             "G{$grade}-E",
         ])
             ->and($sections->firstWhere('name', "G{$grade}-A")?->curriculum?->name)
-            ->toBe('Arts, Social Sciences & Humanities');
+            ->toBe(CurriculumSeeder::seniorHighCurriculumName(
+                $grade,
+                'First',
+                CurriculumSeeder::SENIOR_HIGH_TRACKS[0],
+            ));
     }
 });
 

@@ -2,10 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Cluster;
 use App\Models\Subject;
 use Illuminate\Database\Seeder;
-use RuntimeException;
 
 class SubjectSeeder extends Seeder
 {
@@ -30,30 +28,12 @@ class SubjectSeeder extends Seeder
      */
     public function run(): void
     {
-        $clusterMap = Cluster::query()
-            ->whereIn('name', [
-                'Arts, Social Sciences & Humanities',
-                'Business and Entrepreneurship',
-                'Science, Technology, Engineering and Mathematics',
-            ])
-            ->pluck('cluster_ID', 'name');
-
-        foreach ([
-            'Arts, Social Sciences & Humanities',
-            'Business and Entrepreneurship',
-            'Science, Technology, Engineering and Mathematics',
-        ] as $clusterName) {
-            if (! isset($clusterMap[$clusterName])) {
-                throw new RuntimeException("Missing cluster: {$clusterName}. Run ClusterSeeder first.");
-            }
-        }
-
         $subjects = [];
 
         foreach ([7, 8, 9, 10] as $grade) {
             foreach (self::JUNIOR_HIGH_AREAS as $prefix => $title) {
                 $subjects[] = [
-                    'cluster' => null,
+                    'school_level' => 'Junior High School',
                     'code' => $prefix.$grade,
                     'title' => $title.' '.$grade,
                     'type' => 'core',
@@ -62,47 +42,47 @@ class SubjectSeeder extends Seeder
         }
 
         $subjects = array_merge($subjects, [
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'ORALCOM', 'title' => 'Oral Communication', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'KOMFIL', 'title' => 'Komunikasyon at Pananaliksik sa Wika at Kulturang Pilipino', 'type' => 'core'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENMAT', 'title' => 'General Mathematics', 'type' => 'core'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'STATPROB', 'title' => 'Statistics and Probability', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'MIL', 'title' => 'Media and Information Literacy', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'UCSP', 'title' => 'Understanding Culture, Society and Politics', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'RPH', 'title' => 'Readings in Philippine History', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'EAPP', 'title' => 'English for Academic and Professional Purposes', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'PAGSULAT', 'title' => 'Pagsulat sa Filipino sa Piling Larangan', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'HOPE', 'title' => 'Health Optimizing Physical Education', 'type' => 'core'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'PERDEV', 'title' => 'Personal Development', 'type' => 'core'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'ENTREP', 'title' => 'Entrepreneurship', 'type' => 'core'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'IMMTECH', 'title' => 'Empowerment Technologies', 'type' => 'applied'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'PRACTRESEARCH1', 'title' => 'Practical Research 1', 'type' => 'applied'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'PRACTRESEARCH2', 'title' => 'Practical Research 2', 'type' => 'applied'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'INQUIRY', 'title' => 'Inquiries, Investigations and Immersion', 'type' => 'applied'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'FILIPINO', 'title' => 'Filipino sa Piling Larangan', 'type' => 'applied'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'CULMINATING', 'title' => 'Culminating Activity', 'type' => 'applied'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'PRECALC', 'title' => 'Pre-Calculus', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'BASICCALC', 'title' => 'Basic Calculus', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENBIO1', 'title' => 'General Biology 1', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENBIO2', 'title' => 'General Biology 2', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENCHEM1', 'title' => 'General Chemistry 1', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENCHEM2', 'title' => 'General Chemistry 2', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENPHYS1', 'title' => 'General Physics 1', 'type' => 'specialized'],
-            ['cluster' => 'Science, Technology, Engineering and Mathematics', 'code' => 'GENPHYS2', 'title' => 'General Physics 2', 'type' => 'specialized'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'ACCOUNTING', 'title' => 'Fundamentals of Accountancy, Business and Management', 'type' => 'specialized'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'BUSMATH', 'title' => 'Business Mathematics', 'type' => 'specialized'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'ORGMGMT', 'title' => 'Organization and Management', 'type' => 'specialized'],
-            ['cluster' => 'Business and Entrepreneurship', 'code' => 'APPECON', 'title' => 'Applied Economics', 'type' => 'specialized'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'DISS', 'title' => 'Disciplines and Ideas in the Social Sciences', 'type' => 'specialized'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'DIASS', 'title' => 'Disciplines and Ideas in the Applied Social Sciences', 'type' => 'specialized'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'CREATIVEWRITING', 'title' => 'Creative Writing', 'type' => 'specialized'],
-            ['cluster' => 'Arts, Social Sciences & Humanities', 'code' => 'PPG', 'title' => 'Philippine Politics and Governance', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'ORALCOM', 'title' => 'Oral Communication', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'KOMFIL', 'title' => 'Komunikasyon at Pananaliksik sa Wika at Kulturang Pilipino', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'GENMAT', 'title' => 'General Mathematics', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'STATPROB', 'title' => 'Statistics and Probability', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'MIL', 'title' => 'Media and Information Literacy', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'UCSP', 'title' => 'Understanding Culture, Society and Politics', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'RPH', 'title' => 'Readings in Philippine History', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'EAPP', 'title' => 'English for Academic and Professional Purposes', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'PAGSULAT', 'title' => 'Pagsulat sa Filipino sa Piling Larangan', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'HOPE', 'title' => 'Health Optimizing Physical Education', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'PERDEV', 'title' => 'Personal Development', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'ENTREP', 'title' => 'Entrepreneurship', 'type' => 'core'],
+            ['school_level' => 'Senior High School', 'code' => 'IMMTECH', 'title' => 'Empowerment Technologies', 'type' => 'applied'],
+            ['school_level' => 'Senior High School', 'code' => 'PRACTRESEARCH1', 'title' => 'Practical Research 1', 'type' => 'applied'],
+            ['school_level' => 'Senior High School', 'code' => 'PRACTRESEARCH2', 'title' => 'Practical Research 2', 'type' => 'applied'],
+            ['school_level' => 'Senior High School', 'code' => 'INQUIRY', 'title' => 'Inquiries, Investigations and Immersion', 'type' => 'applied'],
+            ['school_level' => 'Senior High School', 'code' => 'FILIPINO', 'title' => 'Filipino sa Piling Larangan', 'type' => 'applied'],
+            ['school_level' => 'Senior High School', 'code' => 'CULMINATING', 'title' => 'Culminating Activity', 'type' => 'applied'],
+            ['school_level' => 'Senior High School', 'code' => 'PRECALC', 'title' => 'Pre-Calculus', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'BASICCALC', 'title' => 'Basic Calculus', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'GENBIO1', 'title' => 'General Biology 1', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'GENBIO2', 'title' => 'General Biology 2', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'GENCHEM1', 'title' => 'General Chemistry 1', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'GENCHEM2', 'title' => 'General Chemistry 2', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'GENPHYS1', 'title' => 'General Physics 1', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'GENPHYS2', 'title' => 'General Physics 2', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'ACCOUNTING', 'title' => 'Fundamentals of Accountancy, Business and Management', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'BUSMATH', 'title' => 'Business Mathematics', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'ORGMGMT', 'title' => 'Organization and Management', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'APPECON', 'title' => 'Applied Economics', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'DISS', 'title' => 'Disciplines and Ideas in the Social Sciences', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'DIASS', 'title' => 'Disciplines and Ideas in the Applied Social Sciences', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'CREATIVEWRITING', 'title' => 'Creative Writing', 'type' => 'specialized'],
+            ['school_level' => 'Senior High School', 'code' => 'PPG', 'title' => 'Philippine Politics and Governance', 'type' => 'specialized'],
         ]);
 
         foreach ($subjects as $subject) {
             Subject::query()->updateOrCreate(
                 ['code' => $subject['code']],
                 [
-                    'cluster_ID' => $subject['cluster'] ? $clusterMap[$subject['cluster']] : null,
+                    'school_level' => $subject['school_level'],
                     'title' => $subject['title'],
                     'type' => $subject['type'],
                 ],

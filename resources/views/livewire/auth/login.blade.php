@@ -7,6 +7,17 @@
     <title>Login | Agusan National High School Enrollment</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .captcha-answer-correct {
+            border-color: #16a34a !important;
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18) !important;
+        }
+
+        .captcha-answer-incorrect {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18) !important;
+        }
+    </style>
 </head>
 
 <body class="min-h-screen bg-gray-100"
@@ -133,6 +144,7 @@
                                         pattern="\d{1,3}"
                                         maxlength="3"
                                         autocomplete="off"
+                                        data-expected-answer="{{ $captcha_first + $captcha_second }}"
                                         required>
                                     <button type="button"
                                         onclick="window.location.reload()"
@@ -248,8 +260,16 @@
             }
         }
 
-        document.getElementById('captcha_answer')?.addEventListener('input', function () {
+        const captchaAnswer = document.getElementById('captcha_answer');
+        captchaAnswer?.addEventListener('input', function () {
             this.value = this.value.replace(/\D/g, '').slice(0, 3);
+
+            const hasAnswer = this.value !== '';
+            const isCorrect = hasAnswer && Number(this.value) === Number(this.dataset.expectedAnswer);
+
+            this.classList.toggle('captcha-answer-correct', isCorrect);
+            this.classList.toggle('captcha-answer-incorrect', hasAnswer && !isCorrect);
+            this.setAttribute('aria-invalid', String(hasAnswer && !isCorrect));
         });
 
         document.getElementById('status_lrn')?.addEventListener('input', function () {
