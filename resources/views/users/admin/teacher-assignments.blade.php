@@ -208,7 +208,44 @@
                         <div class="flex min-w-0 items-center gap-3"><svg class="h-4 w-4 shrink-0 text-[#296374] transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"></path></svg><div><p class="font-semibold text-gray-900">{{ $subject?->code ?? '—' }}</p><p class="mt-0.5 text-xs text-gray-500">{{ $subject?->title ?? '—' }}</p></div></div>
                         <span class="rounded-full bg-[#296374]/10 px-2.5 py-1 text-xs font-bold text-[#296374]">{{ $subjectAssignments->count() }} {{ Str::plural('section', $subjectAssignments->count()) }}</span>
                     </summary>
+                    <div class="border-t border-gray-100 bg-gray-50 px-5 py-3">
+                        @if ($subjectAssignments->isEmpty())
+                            <p class="py-3 text-sm text-gray-500">No assignments yet.</p>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[560px] text-left text-sm">
+                                    <thead class="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                        <tr>
+                                            <th class="pb-2">Section</th>
+                                            <th class="pb-2">Grade Level</th>
+                                            <th class="pb-2">Teacher</th>
+                                            <th class="pb-2 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        @foreach ($subjectAssignments as $assignment)
+                                            @php $section = $assignment->section; $teacher = $assignment->staff; @endphp
+                                            <tr>
+                                                <td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td>
+                                                <td class="py-3 text-gray-600">{{ $section?->grade_level ? str_replace('grade_', 'Grade ', $section->grade_level) : '—' }}</td>
+                                                <td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td>
+                                                <td class="py-3 text-right">
+                                                    <button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#296374] transition hover:bg-white" title="Edit" aria-label="Edit assignment">
+                                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 3.487a2.1 2.1 0 0 1 2.97 2.97L8.25 18.04 4 19.1l1.06-4.25L16.862 3.487Z"></path>
+                                                        </svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                    {{-- Legacy compact table retained below for source-history continuity.
                     <div class="border-t border-gray-100 bg-gray-50 px-5 py-3">@if ($subjectAssignments->isEmpty())<p class="py-3 text-sm text-gray-500">No assignments yet.</p>@else<div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-[10px] font-bold uppercase tracking-wider text-gray-400"><tr><th class="pb-2">Section</th><th class="pb-2">Grade Level</th><th class="pb-2">Teacher</th><th class="pb-2">Semester</th><th class="pb-2 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@foreach ($subjectAssignments as $assignment) @php $section = $assignment->section; $teacher = $assignment->staff; @endphp<tr><td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td><td class="py-3 text-gray-600">{{ optional($section?->gradeLevel)->grade_label ?? '—' }}</td><td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td><td class="py-3 text-gray-600">{{ optional($assignment->curriculumSubject)->semester ? ucfirst($assignment->curriculumSubject->semester) : '—' }}</td><td class="py-3 text-right"><button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="rounded-lg px-2 py-1 text-xs font-semibold text-[#296374] hover:bg-white">Edit</button><form action="{{ route('admin.teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">@csrf @method('DELETE')<button type="submit" class="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Remove</button></form></td></tr>@endforeach</tbody></table></div>@endif</div>
+                    --}}
                 </details>
             @empty
                 <div class="px-6 py-16 text-center text-gray-500">No assignments found.</div>

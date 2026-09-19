@@ -18,6 +18,7 @@ class StoreTeacherSectionGradesRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'submit' => ['nullable', 'boolean'],
             'grades' => ['nullable', 'array'],
             'grades.*.*.grade' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'grades.*.*.remarks' => ['nullable', 'string', 'max:255'],

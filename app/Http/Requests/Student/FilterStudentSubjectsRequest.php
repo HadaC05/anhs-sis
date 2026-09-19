@@ -16,9 +16,8 @@ class FilterStudentSubjectsRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'SY_ID' => $this->filled('SY_ID') ? $this->input('SY_ID') : null,
+            'grade_ID' => $this->filled('grade_ID') ? $this->input('grade_ID') : null,
             'semester_ID' => $this->filled('semester_ID') ? $this->input('semester_ID') : null,
-            'term_ID' => $this->filled('term_ID') ? $this->input('term_ID') : null,
         ]);
     }
 
@@ -28,9 +27,8 @@ class FilterStudentSubjectsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'SY_ID' => ['nullable', 'integer', Rule::exists('academic_years', 'SY_ID')],
+            'grade_ID' => ['nullable', 'integer', Rule::exists('grade_level', 'grade_ID')],
             'semester_ID' => ['nullable', 'integer', Rule::exists('grading_semesters', 'semester_ID')],
-            'term_ID' => ['nullable', 'integer', Rule::exists('grading_terms', 'term_ID')],
         ];
     }
 
@@ -40,9 +38,8 @@ class FilterStudentSubjectsRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'SY_ID.exists' => 'The selected school year is invalid.',
+            'grade_ID.exists' => 'The selected grade level is invalid.',
             'semester_ID.exists' => 'The selected semester is invalid.',
-            'term_ID.exists' => 'The selected term is invalid.',
         ];
     }
 }

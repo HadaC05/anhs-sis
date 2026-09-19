@@ -101,7 +101,7 @@ class TeacherAssignmentController extends Controller
             ->withQueryString();
 
         $curriculumSubjects = CurriculumSubject::query()
-            ->with(['subject', 'gradeLevel', 'gradingSemester'])
+            ->with(['subject', 'gradeLevel', 'gradingSemester', 'curriculumGradeLevel'])
             ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
             ->orderBy('curriculum_grade_levels.grade_ID')
             ->orderBy('curriculum_grade_levels.semester_ID')
@@ -254,6 +254,7 @@ class TeacherAssignmentController extends Controller
 
         $subjects = CurriculumSubject::query()
             ->whereIn('curr_subj_ID', $validated['curr_subj_ids'])
+            ->with('curriculumGradeLevel')
             ->get()
             ->keyBy('curr_subj_ID');
 

@@ -112,6 +112,7 @@ $summaryColspan = 4 + count($periods);
 
             <form id="gradeForm" action="{{ route('teacher.sections.grades.store', $assignment) }}" method="POST">
                 @csrf
+                <input type="hidden" name="submit" id="submitGradesInput" value="0">
                 <div class="overflow-x-auto">
                     <table class="min-w-full border-collapse text-sm text-gray-800">
                         <thead>
@@ -195,7 +196,7 @@ $summaryColspan = 4 + count($periods);
                     Save Grades
                 </button>
                 <button type="button" id="submitGradesButton" class="inline-flex items-center justify-center rounded-md bg-amber-500 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:bg-amber-600">
-                    Submit for Review
+                    Submit
                 </button>
             </div>
             @endif
@@ -311,16 +312,13 @@ $summaryColspan = 4 + count($periods);
     </div>
 </div>
 
-<form id="submitGradesForm" action="{{ route('teacher.sections.grades.submit', $assignment) }}" method="POST" class="hidden">
-    @csrf
-</form>
 @endpush
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         (function() {
             const gradeForm = document.getElementById('gradeForm');
-            const submitGradesForm = document.getElementById('submitGradesForm');
+            const submitGradesInput = document.getElementById('submitGradesInput');
             const saveGradesButton = document.getElementById('saveGradesButton');
             const submitGradesButton = document.getElementById('submitGradesButton');
             const confirmModal = document.getElementById('gradeConfirmModal');
@@ -502,8 +500,12 @@ $summaryColspan = 4 + count($periods);
                         confirmLabel: 'Save grades',
                         confirmColor: '#296374',
                         headerClass: 'bg-[#296374]',
-                        warning: 'Your progress will be saved, but these grades are not submitted for review yet. You can continue editing afterward.',
+                        warning: 'Your progress will be saved, but these grades are not submitted yet. You can continue editing afterward.',
                         onConfirm: () => {
+                            if (submitGradesInput) {
+                                submitGradesInput.value = '0';
+                            }
+
                             if (typeof gradeForm.requestSubmit === 'function') {
                                 gradeForm.requestSubmit();
                                 return;
@@ -515,17 +517,32 @@ $summaryColspan = 4 + count($periods);
                 });
             }
 
-            if (submitGradesButton && submitGradesForm) {
+            if (submitGradesButton && gradeForm) {
                 submitGradesButton.addEventListener('click', () => {
+                    if (!gradeInputsAreValid()) {
+                        return;
+                    }
+
                     openConfirmModal({
-                        eyebrow: 'Registrar review',
-                        title: 'Submit for review',
-                        message: 'Submit the grades for <strong class="text-gray-900">' + sectionName + '</strong> — <strong class="text-[#296374]">' + subjectLabel + '</strong> to the registrar?',
-                        confirmLabel: 'Submit for review',
+                        eyebrow: 'Grade sheet',
+                        title: 'Submit grades',
+                        confirmLabel: 'Submit',
+                        message: 'Save and submit the current grades for <strong class="text-gray-900">' + sectionName + '</strong> — <strong class="text-[#296374]">' + subjectLabel + '</strong>?',
                         confirmColor: '#f59e0b',
                         headerClass: 'bg-amber-500',
-                        warning: 'Once submitted, these grades will no longer be editable.',
-                        onConfirm: () => submitGradesForm.submit(),
+                        warning: 'The current grades will be saved and then submitted. Once submitted, they can no longer be edited.',
+                        onConfirm: () => {
+                            if (submitGradesInput) {
+                                submitGradesInput.value = '1';
+                            }
+
+                            if (typeof gradeForm.requestSubmit === 'function') {
+                                gradeForm.requestSubmit();
+                                return;
+                            }
+
+                            gradeForm.submit();
+                        },
                     });
                 });
             }

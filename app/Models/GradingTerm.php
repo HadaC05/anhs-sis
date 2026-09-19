@@ -56,12 +56,12 @@ class GradingTerm extends Model
 
     public function isJuniorHighActive(): bool
     {
-        return $this->hasJuniorHighStatus(GradingPeriodStatus::ACTIVE);
+        return ! $this->isJuniorHighArchived();
     }
 
     public function isSeniorHighActive(): bool
     {
-        return $this->hasSeniorHighStatus(GradingPeriodStatus::ACTIVE);
+        return ! $this->isSeniorHighArchived();
     }
 
     public function isJuniorHighOpen(): bool
@@ -84,20 +84,25 @@ class GradingTerm extends Model
         return $this->hasSeniorHighStatus(GradingPeriodStatus::ARCHIVED);
     }
 
-    /** @deprecated Use isJuniorHighActive(). */
+    /**
+     * @deprecated Use isJuniorHighArchived() or isJuniorHighAvailable() as appropriate.
+     *
+     * Historically this represented a term included in the current school year.
+     * Open and closed terms are included too; only archived terms are excluded.
+     */
     public function isActive(): bool
     {
-        return $this->isJuniorHighActive();
+        return ! $this->isJuniorHighArchived();
     }
 
     public function scopeJuniorHighActive($query)
     {
-        return $query->where('junior_high_grading_period_status_ID', GradingPeriodStatus::activeId());
+        return $query->juniorHighAvailable();
     }
 
     public function scopeSeniorHighActive($query)
     {
-        return $query->where('senior_high_grading_period_status_ID', GradingPeriodStatus::activeId());
+        return $query->seniorHighAvailable();
     }
 
     public function scopeJuniorHighAvailable($query)
@@ -118,10 +123,15 @@ class GradingTerm extends Model
         ]));
     }
 
-    /** @deprecated Use juniorHighActive(). */
+    /**
+     * @deprecated Use juniorHighAvailable().
+     *
+     * Retain the legacy scope's included-in-school-year meaning: statuses active,
+     * open, and closed are available, while archived is not.
+     */
     public function scopeActive($query)
     {
-        return $query->juniorHighActive();
+        return $query->juniorHighAvailable();
     }
 
     private function hasJuniorHighStatus(string $slug): bool

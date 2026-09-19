@@ -114,4 +114,30 @@ class CurriculumSubject extends Model
     {
         return $this->attributes['curriculum_grade_level_ID'] ?? null;
     }
+
+    /**
+     * Compatibility value for code that reads the subject's grade directly.
+     * Grade context is stored by the curriculum-grade-level offering.
+     */
+    public function getGradeIdAttribute(): ?int
+    {
+        $offering = $this->relationLoaded('curriculumGradeLevel')
+            ? $this->getRelation('curriculumGradeLevel')
+            : $this->curriculumGradeLevel()->first();
+
+        return $offering?->grade_ID;
+    }
+
+    /**
+     * Compatibility value for code that reads the subject's cluster directly.
+     * Cluster context is stored by the curriculum-grade-level offering.
+     */
+    public function getClusterIdAttribute(): ?int
+    {
+        $offering = $this->relationLoaded('curriculumGradeLevel')
+            ? $this->getRelation('curriculumGradeLevel')
+            : $this->curriculumGradeLevel()->first();
+
+        return $offering?->cluster_ID;
+    }
 }

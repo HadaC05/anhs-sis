@@ -188,7 +188,7 @@ class GradingTermConfigurationController extends Controller
     {
         $settings = GradingTermSetting::current();
         $previousOpenTermsCount = (int) $settings->open_terms_count;
-        $configuredTermCount = GradingTerm::query()->active()->count();
+        $configuredTermCount = GradingTerm::query()->juniorHighAvailable()->count();
         $configuredTermCount = max(1, $configuredTermCount);
 
         $validated = $request->validate([

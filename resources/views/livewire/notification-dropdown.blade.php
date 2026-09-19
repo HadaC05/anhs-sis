@@ -63,22 +63,30 @@
                     $isUnread = $notification->read_at === null;
                     $title = $notification->typeName();
                 @endphp
-                <a
-                    href="{{ $url }}"
-                    wire:click="markAsRead('{{ $notification->id }}')"
+                <div
                     wire:key="notification-{{ $notification->id }}"
-                    class="block border-b border-gray-100 px-4 py-3 last:border-b-0 transition hover:bg-slate-50 {{ $isUnread ? 'bg-[#296374]/5' : 'bg-white' }}"
+                    class="border-b border-gray-100 px-4 py-3 last:border-b-0 transition hover:bg-slate-50 {{ $isUnread ? 'bg-[#296374]/5' : 'bg-white' }}"
                     data-test="notification-item"
                 >
                     <div class="flex items-start gap-3">
                         <span class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full {{ $isUnread ? 'bg-amber-400' : 'bg-transparent' }}"></span>
-                        <div class="min-w-0 flex-1">
+                        <a href="{{ $url }}" wire:click="markAsRead('{{ $notification->id }}')" class="min-w-0 flex-1">
                             <p class="text-sm font-semibold text-gray-900">{{ $title }}</p>
                             <p class="mt-0.5 text-xs leading-relaxed text-gray-600">{{ $data['message'] ?? '' }}</p>
                             <p class="mt-1 text-[11px] text-gray-400">{{ $notification->created_at?->diffForHumans() }}</p>
-                        </div>
+                        </a>
+                        @if ($isUnread)
+                            <button
+                                type="button"
+                                wire:click="markAsRead('{{ $notification->id }}')"
+                                class="flex-shrink-0 text-xs font-semibold text-[#296374] hover:underline"
+                                data-test="notification-mark-read"
+                            >
+                                Mark as read
+                            </button>
+                        @endif
                     </div>
-                </a>
+                </div>
             @empty
                 <p class="px-4 py-8 text-center text-sm text-gray-500" data-test="notification-empty">
                     You have no notifications yet.

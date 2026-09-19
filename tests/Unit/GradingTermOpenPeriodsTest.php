@@ -26,6 +26,22 @@ it('keeps only one junior high term open at a time', function () {
         ->and(GradingTerm::isCurrentJuniorHighPeriodOpen())->toBeTrue();
 });
 
+it('includes active, open, and closed junior high terms while excluding archived terms', function () {
+    $terms = GradingTerm::query()->orderBy('sort_order')->get();
+
+    $terms[0]->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::activeId()]);
+    $terms[1]->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    $terms[2]->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::closedId()]);
+    $terms[3]->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::archivedId()]);
+
+    expect(GradingTerm::configuredPeriods())->toHaveCount(3)
+        ->and(GradingTerm::query()->active()->pluck('key')->all())->toBe(['term_1', 'term_2', 'term_3'])
+        ->and(GradingTerm::query()->juniorHighAvailable()->pluck('key')->all())->toBe(['term_1', 'term_2', 'term_3'])
+        ->and($terms[1]->fresh()->isJuniorHighActive())->toBeTrue()
+        ->and($terms[2]->fresh()->isJuniorHighActive())->toBeTrue()
+        ->and($terms[3]->fresh()->isJuniorHighActive())->toBeFalse();
+});
+
 it('archives terms beyond the maximum and restores them when the limit is raised', function () {
     GradingTerm::syncActiveStatus(3);
 

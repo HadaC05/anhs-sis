@@ -67,11 +67,13 @@ function createTeacherAssignmentPageFixtures(string $username): array
     $curriculum = Curriculum::query()->create([
         'name' => 'DepEd SHS - STEM',
         'description' => 'STEM curriculum',
+        'grade_ID' => GradeLevel::query()->where('grade_label', 'Grade 11')->value('grade_ID'),
         'status' => true,
     ]);
 
     $cluster = Cluster::query()->create(['name' => 'STEM']);
     $gradeLevel = GradeLevel::query()->where('grade_label', 'Grade 11')->firstOrFail();
+    $curriculum->update(['cluster_ID' => $cluster->cluster_ID]);
 
     $section = Section::query()->create([
         'name' => 'Newton',
@@ -253,4 +255,27 @@ test('admin can create a subject assignment from the restyled page', function ()
         ->assertSessionHas('status');
 
     expect(TeacherSubjectAssignment::query()->where('section_ID', $unassignedSection->section_ID)->exists())->toBeTrue();
+});
+
+test('admin can bulk assign a teacher to compatible section subjects', function () {
+    ['admin' => $admin, 'teacher' => $teacher, 'unassignedSection' => $section, 'curriculumSubject' => $curriculumSubject] = createTeacherAssignmentPageFixtures('admin.assignments.bulk');
+
+    $this->actingAs($admin)
+        ->from(route('admin.teacher-assignments.index', ['tab' => 'subjects']))
+        ->post(route('admin.teacher-assignments.bulk'), [
+            '_form' => 'bulk',
+            'staff_ID' => $teacher->staff_id,
+            'grade_levels' => ['grade_11'],
+            'section_ids' => [$section->section_ID],
+            'curr_subj_ids' => [$curriculumSubject->curr_subj_ID],
+        ])
+        ->assertRedirect(route('admin.teacher-assignments.index', ['tab' => 'subjects']))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('status', 'Bulk assignment completed (1 assignment(s)).');
+
+    expect(TeacherSubjectAssignment::query()
+        ->where('section_ID', $section->section_ID)
+        ->where('curr_subj_ID', $curriculumSubject->curr_subj_ID)
+        ->where('staff_ID', $teacher->staff_id)
+        ->exists())->toBeTrue();
 });

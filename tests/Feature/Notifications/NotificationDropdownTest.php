@@ -44,8 +44,10 @@ test('the notification dropdown lists unread student notifications and can mark 
         ->assertSee('Enrollment status updated')
         ->assertSee('now Enrolled')
         ->assertSee('data-test="notification-unread-count"', false)
+        ->assertSee('data-test="notification-mark-read"', false)
         ->call('markAllAsRead')
         ->assertDontSee('data-test="notification-unread-count"', false)
+        ->assertDontSee('data-test="notification-mark-read"', false)
         ->assertSee('Enrollment status updated');
 
     expect($student->unreadNotifications()->count())->toBe(0)

@@ -12,7 +12,6 @@ use App\Models\EnrollmentStatus;
 use App\Models\GradeStatus;
 use App\Models\GradingSemester;
 use App\Models\GradingTerm;
-use App\Models\GradingTermSetting;
 use App\Models\Religion;
 use App\Models\Student;
 use App\Models\StudentAddress;
@@ -20,8 +19,8 @@ use App\Models\StudentApplication;
 use App\Models\StudentDocument;
 use App\Models\StudentGuardian;
 use App\Models\StudentProfile;
-use App\Models\StudentSubjectGrade;
 use App\Models\StudentSubject;
+use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\StudentDocumentUploader;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -354,120 +353,63 @@ class StudentDashboardController extends Controller
             ->with([
                 'academicYear',
                 'section.gradeLevel',
-                'section.curriculum',
                 'gradeLevel',
+                'gradingSemester',
                 'cluster',
                 'preferredCourse',
                 'enrollmentStatus',
             ])
             ->where('student_ID', $student->id)
-            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->orderByDesc('created_at')
             ->get();
 
-        $academicYears = AcademicYear::query()
-            ->orderByDesc('start_date')
-            ->orderByDesc('SY_ID')
-            ->get();
-
-        $activeYear = $academicYears->firstWhere('status', true);
-        $selectedYearId = (int) ($filters['SY_ID'] ?? 0);
-        $selectedYear = $academicYears->firstWhere('SY_ID', $selectedYearId);
-
-        if (! $selectedYear) {
-            $enrolledYearIds = $enrollments->pluck('SY_ID');
-            $selectedYear = $academicYears->first(
-                fn (AcademicYear $year): bool => $year->status && $enrolledYearIds->contains($year->SY_ID)
-            )
-                ?? $academicYears->first(fn (AcademicYear $year): bool => $enrolledYearIds->contains($year->SY_ID))
-                ?? $activeYear
-                ?? $academicYears->first();
-        }
-
-        $yearEnrollments = $enrollments
-            ->filter(fn (Enrollment $enrollment): bool => $selectedYear !== null && (int) $enrollment->SY_ID === (int) $selectedYear->SY_ID)
+        // Filters intentionally come from the student's own enrollment history,
+        // so a learner cannot browse offerings that were never assigned to them.
+        $gradeLevels = $enrollments
+            ->map(fn (Enrollment $enrollment) => $enrollment->getRelation('gradeLevel'))
+            ->filter()
+            ->unique('grade_ID')
+            ->sortBy('grade_ID')
             ->values();
-
-        $isSeniorHigh = $yearEnrollments->contains(
-            fn (Enrollment $enrollment): bool => $enrollment->isSeniorHigh()
-        );
-
-        $semesters = collect();
-        $terms = collect();
-        $selectedSemester = null;
-        $selectedTerm = null;
-        $selectedEnrollment = $yearEnrollments->first();
-
-        if ($isSeniorHigh) {
-            $semesters = GradingSemester::query()
-                ->active()
-                ->whereIn('key', [GradingSemester::FIRST, GradingSemester::SECOND])
-                ->orderBy('sort_order')
-                ->orderBy('semester_ID')
-                ->get();
-
-            $selectedSemester = $semesters->firstWhere('semester_ID', (int) ($filters['semester_ID'] ?? 0));
-
-            if (! $selectedSemester) {
-                // The enrollment's semester records where the learner was initially
-                // placed.  The active grading configuration is the source of truth
-                // for which Senior High subjects are currently in session.
-                $activeSemester = GradingTerm::currentSeniorHighPeriod()['semester'];
-                $enrollmentSemester = $selectedEnrollment?->semester;
-
-                $selectedSemester = $semesters->firstWhere('key', $activeSemester)
-                    ?? $semesters->firstWhere('key', $enrollmentSemester)
-                    ?? $semesters->first();
-            }
-
-            if ($selectedSemester) {
-                $selectedEnrollment = $yearEnrollments->first(
-                    fn (Enrollment $enrollment): bool => $enrollment->semester === $selectedSemester->key
-                ) ?? $selectedEnrollment;
-            }
-        }
-
-        if ($selectedEnrollment) {
-            $termIds = $isSeniorHigh
-                ? array_values(array_filter(array_column(GradingTerm::seniorHighTerms(), 'term_ID')))
-                : [];
-
-            $terms = GradingTerm::query()
-                ->orderBy('sort_order')
-                ->orderBy('term_ID')
-                ->when(
-                    $isSeniorHigh && $termIds !== [],
-                    fn ($query) => $query->whereIn('term_ID', $termIds),
-                )
-                ->when(
-                    ! $isSeniorHigh,
-                    fn ($query) => $query->active()->limit(GradingTermSetting::current()->max_terms),
-                )
-                ->get();
-
-            $selectedTerm = $terms->firstWhere('term_ID', (int) ($filters['term_ID'] ?? 0))
-                ?? $terms->first();
-        }
-
-        $assignments = $selectedEnrollment
-            ? $this->subjectAssignmentsForEnrollment(
-                $selectedEnrollment,
-                $isSeniorHigh ? $selectedSemester?->key : null,
+        $selectedGrade = $gradeLevels->firstWhere('grade_ID', (int) ($filters['grade_ID'] ?? 0))
+            ?? $gradeLevels->first();
+        $gradeEnrollments = $enrollments
+            ->filter(fn (Enrollment $enrollment): bool => (int) $enrollment->getRelation('gradeLevel')?->grade_ID === (int) $selectedGrade?->grade_ID)
+            ->values();
+        $isSeniorHigh = in_array($selectedGrade?->grade_label, ['Grade 11', 'Grade 12'], true);
+        $semesters = $isSeniorHigh
+            ? $gradeEnrollments
+                ->map(fn (Enrollment $enrollment) => $enrollment->gradingSemester)
+                ->filter(fn ($semester): bool => $semester !== null && in_array($semester->key, [GradingSemester::FIRST, GradingSemester::SECOND], true))
+                ->unique('semester_ID')
+                ->sortBy('sort_order')
+                ->values()
+            : collect();
+        $selectedSemester = $semesters->firstWhere('semester_ID', (int) ($filters['semester_ID'] ?? 0))
+            ?? $semesters->first();
+        $selectedEnrollment = $isSeniorHigh
+            ? $gradeEnrollments->first(
+                fn (Enrollment $enrollment): bool => (int) $enrollment->gradingSemester?->semester_ID === (int) $selectedSemester?->semester_ID
             )
+            : $gradeEnrollments->first();
+        $studentSubjects = $selectedEnrollment
+            ? StudentSubject::query()
+                ->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester'])
+                ->where('enrollment_ID', $selectedEnrollment->enrollment_ID)
+                ->orderBy('curr_subj_ID')
+                ->get()
             : collect();
 
         return view('users.student.subjects', [
             'student' => $student,
             'application' => $student?->application,
             'selectedEnrollment' => $selectedEnrollment,
-            'assignments' => $assignments,
-            'academicYears' => $academicYears,
-            'selectedYear' => $selectedYear,
+            'studentSubjects' => $studentSubjects,
+            'gradeLevels' => $gradeLevels,
+            'selectedGrade' => $selectedGrade,
             'isSeniorHigh' => $isSeniorHigh,
             'semesters' => $semesters,
-            'terms' => $terms,
             'selectedSemester' => $selectedSemester,
-            'selectedTerm' => $selectedTerm,
         ]);
     }
 

@@ -1060,7 +1060,17 @@ class TeacherSectionController extends Controller
             }
         }
 
-        return back()->with('status', 'Grades saved successfully.');
+        if (! $request->boolean('submit')) {
+            return back()->with('status', 'Grades saved successfully.');
+        }
+
+        $submitted = $this->submitSavedGrades($assignment, $enrollmentIds, array_keys($editablePeriodKeys));
+
+        if (! $submitted) {
+            return back()->withErrors(['grades' => 'No grades available to submit.'])->withInput();
+        }
+
+        return back()->with('status', 'Grades saved and submitted successfully.');
     }
 
     public function importClassList(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse
@@ -1329,10 +1339,25 @@ class TeacherSectionController extends Controller
             return back()->withErrors(['grades' => 'No grading term is currently open for submission.']);
         }
 
-        $updated = StudentSubjectGrade::query()
+        $updated = $this->submitSavedGrades($assignment, $enrollmentIds, $editablePeriodKeys);
+
+        if (! $updated) {
+            return back()->withErrors(['grades' => 'No grades available to submit.'])->withInput();
+        }
+
+        return back()->with('status', 'Grades submitted successfully.');
+    }
+
+    /**
+     * @param  list<int>  $enrollmentIds
+     * @param  list<string>  $periodKeys
+     */
+    private function submitSavedGrades(TeacherSubjectAssignment $assignment, array $enrollmentIds, array $periodKeys): int
+    {
+        return StudentSubjectGrade::query()
             ->where('assignment_ID', $assignment->assignment_ID)
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollmentIds))
-            ->whereIn('term_ID', array_map(StudentSubjectGrade::termIdForPeriodKey(...), $editablePeriodKeys))
+            ->whereIn('term_ID', array_map(StudentSubjectGrade::termIdForPeriodKey(...), $periodKeys))
             ->whereStatus(GradeStatus::teacherEditableSlugs())
             ->where(function ($query): void {
                 $query->whereNotNull('numeric_grade')
@@ -1344,12 +1369,6 @@ class TeacherSectionController extends Controller
                 'reviewed_by' => null,
                 'reviewed_at' => null,
             ]);
-
-        if (! $updated) {
-            return back()->withErrors(['grades' => 'No grades available to submit for review.'])->withInput();
-        }
-
-        return back()->with('status', 'Grades submitted for registrar review.');
     }
 
     public function summaryPrint(Request $request, TeacherSubjectAssignment $assignment): View
