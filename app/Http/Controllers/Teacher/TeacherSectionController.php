@@ -1105,7 +1105,11 @@ class TeacherSectionController extends Controller
             $updatedStudents = 0;
             $createdEnrollments = 0;
             $existingEnrollments = 0;
-            $skipped = [];
+            $failedEnrollments = false;
+            $activeEnrollmentCount = Enrollment::query()
+                ->where('section_ID', $section->section_ID)
+                ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+                ->count();
 
             foreach ($records as $record) {
                 $student = Student::query()->where('lrn', $record['lrn'])->first();
@@ -1163,7 +1167,19 @@ class TeacherSectionController extends Controller
                     ->first();
 
                 if ($conflictingEnrollment) {
-                    $skipped[] = "{$record['lrn']} is already enrolled in another section for this school year.";
+                    $failedEnrollments = true;
+
+                    continue;
+                }
+
+                $existingEnrollment = Enrollment::query()
+                    ->where('student_ID', $student->id)
+                    ->where('section_ID', $section->section_ID)
+                    ->where('SY_ID', $section->SY_ID)
+                    ->first();
+
+                if (! $existingEnrollment && (int) $section->capacity > 0 && $activeEnrollmentCount >= (int) $section->capacity) {
+                    $failedEnrollments = true;
 
                     continue;
                 }
@@ -1182,17 +1198,22 @@ class TeacherSectionController extends Controller
                     ]
                 );
 
-                $enrollment->wasRecentlyCreated ? $createdEnrollments++ : $existingEnrollments++;
+                if ($enrollment->wasRecentlyCreated) {
+                    $createdEnrollments++;
+                    $activeEnrollmentCount++;
+                } else {
+                    $existingEnrollments++;
+                }
             }
 
-            return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'skipped');
+            return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments');
         });
 
         $message = "Class list import complete. Students created: {$result['createdStudents']}. Students updated: {$result['updatedStudents']}. Enrollments added: {$result['createdEnrollments']}. Already enrolled here: {$result['existingEnrollments']}.";
 
         return back()
             ->with('status', $message)
-            ->with('class_list_import_warnings', $result['skipped']);
+            ->when($result['failedEnrollments'], fn ($redirect) => $redirect->with('class_list_import_error', $this->classListImportFailureMessage()));
     }
 
     public function importAdvisoryClassList(Request $request, Section $section): RedirectResponse
@@ -1218,7 +1239,9 @@ class TeacherSectionController extends Controller
         $result = $this->importRecordsIntoSection($records, $section, $request);
         $message = "Student import complete. Students created: {$result['createdStudents']}. Students updated: {$result['updatedStudents']}. Enrollments added: {$result['createdEnrollments']}. Already enrolled here: {$result['existingEnrollments']}.";
 
-        return back()->with('status', $message)->with('class_list_import_warnings', $result['skipped']);
+        return back()
+            ->with('status', $message)
+            ->when($result['failedEnrollments'], fn ($redirect) => $redirect->with('class_list_import_error', $this->classListImportFailureMessage()));
     }
 
     private function importRecordsIntoSection(array $records, Section $section, Request $request): array
@@ -1229,7 +1252,11 @@ class TeacherSectionController extends Controller
             $updatedStudents = 0;
             $createdEnrollments = 0;
             $existingEnrollments = 0;
-            $skipped = [];
+            $failedEnrollments = false;
+            $activeEnrollmentCount = Enrollment::query()
+                ->where('section_ID', $section->section_ID)
+                ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+                ->count();
 
             foreach ($records as $record) {
                 $student = Student::query()->where('lrn', $record['lrn'])->first();
@@ -1283,7 +1310,19 @@ class TeacherSectionController extends Controller
                     ->where('section_ID', '!=', $section->section_ID)
                     ->first();
                 if ($conflictingEnrollment) {
-                    $skipped[] = "{$record['lrn']} is already enrolled in another section for this school year.";
+                    $failedEnrollments = true;
+
+                    continue;
+                }
+
+                $existingEnrollment = Enrollment::query()
+                    ->where('student_ID', $student->id)
+                    ->where('section_ID', $section->section_ID)
+                    ->where('SY_ID', $section->SY_ID)
+                    ->first();
+
+                if (! $existingEnrollment && (int) $section->capacity > 0 && $activeEnrollmentCount >= (int) $section->capacity) {
+                    $failedEnrollments = true;
 
                     continue;
                 }
@@ -1301,11 +1340,21 @@ class TeacherSectionController extends Controller
                         'enrollment_status' => EnrollmentStatus::ENROLLED,
                     ],
                 );
-                $enrollment->wasRecentlyCreated ? $createdEnrollments++ : $existingEnrollments++;
+                if ($enrollment->wasRecentlyCreated) {
+                    $createdEnrollments++;
+                    $activeEnrollmentCount++;
+                } else {
+                    $existingEnrollments++;
+                }
             }
 
-            return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'skipped');
+            return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments');
         });
+    }
+
+    private function classListImportFailureMessage(): string
+    {
+        return 'Failed to enroll or upload one or more students. They may already be enrolled in a different class, the class may be full, or the uploaded file may contain invalid data.';
     }
 
     public function submitGrades(Request $request, TeacherSubjectAssignment $assignment)

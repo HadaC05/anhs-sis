@@ -16,33 +16,26 @@
     </div>
 </div>
 
-@if (session('status'))
-<div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-    {{ session('status') }}
-</div>
-@endif
-
-@if ($errors->has('class_list'))
-<div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-    {{ $errors->first('class_list') }}
-</div>
+@if (session('status') || session('class_list_import_error') || $errors->has('class_list'))
+    <div id="class-list-import-toasts" class="fixed right-5 top-5 z-[120] flex w-full max-w-sm flex-col gap-3" aria-live="polite">
+        @if (session('status'))
+            <div class="flex items-start gap-3 rounded-lg border border-emerald-200 bg-white p-4 text-sm font-medium text-emerald-800 shadow-xl" role="status">
+                <span>{{ session('status') }}</span>
+                <button type="button" class="ml-auto text-emerald-700" data-dismiss-toast aria-label="Close notification">&times;</button>
+            </div>
+        @endif
+        @if (session('class_list_import_error') || $errors->has('class_list'))
+            <div class="flex items-start gap-3 rounded-lg border border-red-200 bg-white p-4 text-sm font-medium text-red-800 shadow-xl" role="alert">
+                <span>{{ session('class_list_import_error') ?? 'Failed to enroll or upload student(s). Please check the class capacity, enrollment status, and uploaded file.' }}</span>
+                <button type="button" class="ml-auto text-red-700" data-dismiss-toast aria-label="Close notification">&times;</button>
+            </div>
+        @endif
+    </div>
 @endif
 
 @php
 $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator ? $sections->getCollection() : $sections;
-$importWarnings = session('class_list_import_warnings', []);
 @endphp
-
-@if (! empty($importWarnings))
-<div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-    <p class="font-semibold">Some learners were skipped:</p>
-    <ul class="mt-2 list-disc pl-5 space-y-1">
-        @foreach ($importWarnings as $warning)
-        <li>{{ $warning }}</li>
-        @endforeach
-    </ul>
-</div>
-@endif
 
 <div class="mb-6">
     <form method="GET" action="{{ route('teacher.sections.index') }}">
@@ -247,4 +240,11 @@ $importWarnings = session('class_list_import_warnings', []);
     <p class="mt-1 text-sm text-gray-500">Sections will appear here once you are assigned to teach subjects for the current school year.</p>
 </div>
 @endif
+
+<script>
+    document.querySelectorAll('[data-dismiss-toast]').forEach(function (button) {
+        button.addEventListener('click', function () { button.parentElement.remove(); });
+    });
+    setTimeout(function () { document.getElementById('class-list-import-toasts')?.remove(); }, 6000);
+</script>
 @endsection

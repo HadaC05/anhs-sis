@@ -5,12 +5,21 @@
 @section('content')
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'class-list'])
 
-@if (session('status'))
-    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('status') }}</div>
-@endif
-
-@if (session('class_list_import_warnings', []) !== [])
-    <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><p class="font-bold">Some learners were not enrolled</p><ul class="mt-1 list-disc space-y-1 pl-5">@foreach (session('class_list_import_warnings', []) as $warning)<li>{{ $warning }}</li>@endforeach</ul></div>
+@if (session('status') || session('class_list_import_error') || $errors->has('class_list'))
+    <div id="class-list-import-toasts" class="fixed right-5 top-5 z-[120] flex w-full max-w-sm flex-col gap-3" aria-live="polite">
+        @if (session('status'))
+            <div class="flex items-start gap-3 rounded-lg border border-emerald-200 bg-white p-4 text-sm font-medium text-emerald-800 shadow-xl" role="status">
+                <span>{{ session('status') }}</span>
+                <button type="button" class="ml-auto text-emerald-700" data-dismiss-toast aria-label="Close notification">&times;</button>
+            </div>
+        @endif
+        @if (session('class_list_import_error') || $errors->has('class_list'))
+            <div class="flex items-start gap-3 rounded-lg border border-red-200 bg-white p-4 text-sm font-medium text-red-800 shadow-xl" role="alert">
+                <span>{{ session('class_list_import_error') ?? 'Failed to enroll or upload student(s). Please check the class capacity, enrollment status, and uploaded file.' }}</span>
+                <button type="button" class="ml-auto text-red-700" data-dismiss-toast aria-label="Close notification">&times;</button>
+            </div>
+        @endif
+    </div>
 @endif
 
 <div class="overflow-hidden rounded-xl border border-[#296374]/35 bg-[#eef5f7] shadow-md shadow-[#296374]/10">
@@ -168,5 +177,10 @@
             });
         }
     })();
+
+    document.querySelectorAll('[data-dismiss-toast]').forEach(function (button) {
+        button.addEventListener('click', function () { button.parentElement.remove(); });
+    });
+    setTimeout(function () { document.getElementById('class-list-import-toasts')?.remove(); }, 6000);
 </script>
 @endsection
