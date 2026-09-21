@@ -36,7 +36,7 @@ class Curriculum extends Model
 
     public function sections(): HasMany
     {
-        return $this->hasMany(Section::class, 'curriculum_ID', 'curriculum_ID');
+        return $this->hasMany(Section::class, 'curriculum_grade_level_ID', 'curriculum_ID');
     }
 
     public function curricula(): BelongsTo

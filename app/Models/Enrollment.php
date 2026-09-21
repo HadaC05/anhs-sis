@@ -63,7 +63,7 @@ class Enrollment extends Model
             if (empty($enrollment->attributes['curriculum_grade_level_ID']) && ! empty($enrollment->attributes['section_ID'])) {
                 $enrollment->attributes['curriculum_grade_level_ID'] = Section::query()
                     ->where('section_ID', $enrollment->attributes['section_ID'])
-                    ->value('curriculum_ID');
+                    ->value('curriculum_grade_level_ID');
             }
 
             if (empty($enrollment->attributes['learner_type_ID'])) {

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Cluster;
 use App\Models\Curricula;
 use App\Models\Curriculum;
 use App\Models\DataStatus;
@@ -50,6 +51,7 @@ class CurriculumSeeder extends Seeder
         $activeStatusId = DataStatus::query()->where('key', 'active')->value('data_status_ID');
         $gradeIds = GradeLevel::query()->pluck('grade_ID', 'grade_label');
         $semesterIds = GradingSemester::query()->pluck('semester_ID', 'key');
+        $clusterIds = Cluster::query()->pluck('cluster_ID', 'name');
         $juniorHigh = Curricula::query()->updateOrCreate(
             ['name' => 'Junior High School'],
             [
@@ -92,6 +94,7 @@ class CurriculumSeeder extends Seeder
                             'curricula_ID' => $curricula->curricula_ID,
                             'grade_ID' => $gradeIds['Grade '.$grade] ?? null,
                             'semester_ID' => $semesterIds[strtolower($semester)] ?? null,
+                            'cluster_ID' => $clusterIds[$track] ?? null,
                         ],
                     );
                 }

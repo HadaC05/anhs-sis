@@ -32,7 +32,7 @@ class TeacherSubjectAssignmentSeeder extends Seeder
         $groups = $sections->groupBy(fn (Section $section): string => implode(':', [
             (string) $section->SY_ID,
             $section->grade_level,
-            (string) $section->curriculum_ID,
+            (string) $section->curriculum_grade_level_ID,
         ]));
 
         foreach ($groups as $gradeSections) {
@@ -87,7 +87,7 @@ class TeacherSubjectAssignmentSeeder extends Seeder
     {
         return CurriculumSubject::query()
             ->with(['subject', 'gradingSemester'])
-            ->where('curriculum_ID', $section->curriculum_ID)
+            ->where('curriculum_ID', $section->curriculum_grade_level_ID)
             ->where('grade_ID', $section->grade_ID)
             ->when($section->cluster_ID, function ($query) use ($section): void {
                 $query->where(function ($inner) use ($section): void {

@@ -27,7 +27,7 @@ class SectionConfigurationController extends Controller
         $clusterId = $request->integer('cluster_ID');
         $gradeLevel = $request->string('grade_level')->toString();
         $syId = $request->integer('SY_ID');
-        $curriculumId = $request->integer('curriculum_ID');
+        $curriculumGradeLevelId = $request->integer('curriculum_grade_level_ID');
         $status = $request->string('status')->toString();
         if ($status === '') {
             $status = 'active';
@@ -36,7 +36,7 @@ class SectionConfigurationController extends Controller
         $gradeId = GradeLevel::idForValue($gradeLevel);
 
         $sections = Section::query()
-            ->with(['cluster', 'gradeLevel', 'adviser', 'academicYear', 'curriculum'])
+            ->with(['cluster', 'gradeLevel', 'adviser', 'academicYear', 'curriculumGradeLevel.gradeLevel', 'curriculumGradeLevel.gradingSemester'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
@@ -52,8 +52,8 @@ class SectionConfigurationController extends Controller
             ->when($syId > 0, function ($query) use ($syId): void {
                 $query->where('SY_ID', $syId);
             })
-            ->when($curriculumId > 0, function ($query) use ($curriculumId): void {
-                $query->where('curriculum_ID', $curriculumId);
+            ->when($curriculumGradeLevelId > 0, function ($query) use ($curriculumGradeLevelId): void {
+                $query->where('curriculum_grade_level_ID', $curriculumGradeLevelId);
             })
             ->when($status === 'active', function ($query): void {
                 $query->where('status', true);
@@ -126,7 +126,7 @@ class SectionConfigurationController extends Controller
      */
     private function sectionAttributes(array $validated): array
     {
-        $offering = Curriculum::query()->findOrFail($validated['curriculum_ID']);
+        $offering = Curriculum::query()->findOrFail($validated['curriculum_grade_level_ID']);
 
         // A section always belongs to one curriculum-grade-level offering.
         // Copy its context rather than trusting duplicated form values.

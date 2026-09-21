@@ -17,6 +17,12 @@ class StoreSectionRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        // Accept the former request key while integrations transition to the
+        // explicit curriculum-grade-level key used by sections and enrollments.
+        if (! $this->filled('curriculum_grade_level_ID') && $this->filled('curriculum_ID')) {
+            $this->merge(['curriculum_grade_level_ID' => $this->input('curriculum_ID')]);
+        }
+
         $capacity = $this->input('capacity');
         if (is_string($capacity) || is_int($capacity)) {
             $digits = preg_replace('/\D+/', '', (string) $capacity) ?? '';
@@ -57,7 +63,7 @@ class StoreSectionRequest extends FormRequest
             'grade_level' => ['required', Rule::in(['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12'])],
             'staff_ID' => ['nullable', 'integer', Rule::exists('staffs', 'staff_id')],
             'SY_ID' => ['required', 'integer', Rule::exists('academic_years', 'SY_ID')],
-            'curriculum_ID' => ['required', 'integer', Rule::exists('curriculum_grade_levels', 'curriculum_ID')],
+            'curriculum_grade_level_ID' => ['required', 'integer', Rule::exists('curriculum_grade_levels', 'curriculum_ID')],
             'room' => ['nullable', 'string', 'max:255'],
             'capacity' => ['required', 'integer', 'digits_between:1,3', 'min:1', 'max:100'],
         ];

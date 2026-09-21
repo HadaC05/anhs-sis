@@ -75,7 +75,47 @@ class DefaultNonStudentUsersSeeder extends Seeder
             }
         }
 
+        foreach (self::seniorHighSectionDefinitions() as $section) {
+            $usernames[$section['name']] = self::seniorHighTeacherUsername($section);
+        }
+
         return $usernames;
+    }
+
+    /**
+     * The default SHS section for every grade, cluster, and semester.
+     *
+     * @return list<array{name: string, grade_level: string, track: string, semester: 'first'|'second'}>
+     */
+    public static function seniorHighSectionDefinitions(): array
+    {
+        $sections = [];
+
+        foreach ([11, 12] as $grade) {
+            foreach (CurriculumSeeder::SENIOR_HIGH_TRACKS as $track) {
+                foreach (['first', 'second'] as $semester) {
+                    $sections[] = [
+                        'name' => self::seniorHighSectionName($grade, $track, $semester),
+                        'grade_level' => 'grade_'.$grade,
+                        'track' => $track,
+                        'semester' => $semester,
+                    ];
+                }
+            }
+        }
+
+        return $sections;
+    }
+
+    /** @param array{name: string, grade_level: string, track: string, semester: string} $section */
+    public static function seniorHighTeacherUsername(array $section): string
+    {
+        return 'teacher_'.strtolower(str_replace('-', '_', $section['name']));
+    }
+
+    public static function seniorHighSectionName(int $grade, string $track, string $semester): string
+    {
+        return sprintf('G%d-%s-%s', $grade, self::clusterCode($track), $semester === 'first' ? '1ST' : '2ND');
     }
 
     private function seedSectionTeachers(Role $role): void
@@ -90,6 +130,14 @@ class DefaultNonStudentUsersSeeder extends Seeder
                     $this->dummyProfileForSectionTeacher($grade, $letter),
                 );
             }
+        }
+
+        foreach (self::seniorHighSectionDefinitions() as $index => $section) {
+            $this->seedStaff(
+                $role->id,
+                self::seniorHighTeacherUsername($section),
+                $this->dummyProfileForSeniorHighSection($section, $index),
+            );
         }
     }
 
@@ -237,6 +285,33 @@ class DefaultNonStudentUsersSeeder extends Seeder
         ];
     }
 
+    /**
+     * @param  array{name: string, grade_level: string, track: string, semester: string}  $section
+     * @return array<string, mixed>
+     */
+    private function dummyProfileForSeniorHighSection(array $section, int $index): array
+    {
+        $grade = (int) str_replace('grade_', '', $section['grade_level']);
+        $identity = $this->sectionTeacherIdentity($grade, self::SECTION_LETTERS[$index % count(self::SECTION_LETTERS)]);
+        $employeeSuffix = str_replace('-', '-', strtoupper($section['name']));
+
+        return [
+            'first_name' => $identity['first_name'],
+            'middle_name' => $identity['middle_name'],
+            'last_name' => $identity['last_name'],
+            'suffix' => null,
+            'gender' => $identity['gender'],
+            'birthdate' => $identity['birthdate'],
+            'appointment_status' => 'permanent',
+            'fund_source' => 'government',
+            'degree_earned' => 'Bachelor of Secondary Education',
+            'major_specialization' => $section['track'].' ('.ucfirst($section['semester']).' Semester)',
+            'teaching_minutes' => 1080,
+            'employee_no' => 'EMP-TEACHER-'.$employeeSuffix,
+            'plantilla_item_no' => 'PLN-TEACHER-'.$employeeSuffix,
+        ];
+    }
+
     private function specializationForLetter(int $grade, string $letter): string
     {
         return match ($letter) {
@@ -308,5 +383,15 @@ class DefaultNonStudentUsersSeeder extends Seeder
             'gender' => $identity[3],
             'birthdate' => $identity[4],
         ];
+    }
+
+    private static function clusterCode(string $cluster): string
+    {
+        return match ($cluster) {
+            'Arts, Social Sciences & Humanities' => 'ASSH',
+            'Business and Entrepreneurship' => 'BUS',
+            'Science, Technology, Engineering and Mathematics' => 'STEM',
+            default => strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $cluster) ?: 'SEC', 0, 4)),
+        };
     }
 }

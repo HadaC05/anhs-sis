@@ -71,9 +71,9 @@ class VacantSectionAssigner
             return null;
         }
 
-        $curriculumId = self::curriculumIdFor($gradeLevel, $clusterId);
+        $curriculumGradeLevelId = $enrollment->curriculum_grade_level_ID;
 
-        if ($curriculumId === null) {
+        if (! $curriculumGradeLevelId) {
             return null;
         }
 
@@ -85,7 +85,7 @@ class VacantSectionAssigner
                     'grade_ID' => $enrollment->grade_ID,
                     'staff_ID' => null,
                     'SY_ID' => $enrollment->SY_ID,
-                    'curriculum_ID' => $curriculumId,
+                    'curriculum_grade_level_ID' => $curriculumGradeLevelId,
                     'room' => null,
                     'capacity' => self::DEFAULT_CAPACITY,
                     'status' => true,
@@ -128,7 +128,7 @@ class VacantSectionAssigner
         return Section::query()
             ->active()
             ->where('SY_ID', $enrollment->SY_ID)
-            ->where('grade_ID', $enrollment->grade_ID)
+            ->where('curriculum_grade_level_ID', $enrollment->curriculum_grade_level_ID)
             ->when($enrollment->cluster_ID, function ($query) use ($enrollment): void {
                 $query->where('cluster_ID', $enrollment->cluster_ID);
             }, function ($query): void {

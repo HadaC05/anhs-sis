@@ -391,7 +391,7 @@
                     <select id="section_ID" name="section_ID" required class="{{ $fieldClass }} {{ $errors->has('section_ID') && old('_form') === 'assignment' ? 'border-red-300' : 'border-gray-200' }}">
                         <option value="">Select section</option>
                         @foreach ($sections as $section)
-                            <option value="{{ $section->section_ID }}" data-curriculum="{{ $section->curriculum_ID }}" data-grade="{{ $section->grade_level }}" data-cluster="{{ $section->cluster_ID ?? '' }}" @selected((string) old('section_ID') === (string) $section->section_ID)>
+                            <option value="{{ $section->section_ID }}" data-curriculum="{{ $section->curriculum_grade_level_ID }}" data-grade="{{ $section->grade_level }}" data-cluster="{{ $section->cluster_ID ?? '' }}" @selected((string) old('section_ID') === (string) $section->section_ID)>
                                 {{ $section->name }} | {{ optional($section->gradeLevel)->grade_label ?? '—' }} | {{ $section->academicYear?->school_year ?? '—' }}
                             </option>
                         @endforeach
@@ -513,12 +513,12 @@
                         @foreach ($sections as $section)
                             <label class="bulk-section-option hidden items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700"
                                 data-grade="{{ $section->grade_level }}"
-                                data-curriculum="{{ $section->curriculum_ID }}"
+                                data-curriculum="{{ $section->curriculum_grade_level_ID }}"
                                 data-cluster="{{ $section->cluster_ID ?? '' }}">
                                 <input type="checkbox" name="section_ids[]" value="{{ $section->section_ID }}"
                                     class="bulk-section-checkbox mt-0.5 h-4 w-4 accent-[#296374]"
                                     data-grade="{{ $section->grade_level }}"
-                                    data-curriculum="{{ $section->curriculum_ID }}"
+                                    data-curriculum="{{ $section->curriculum_grade_level_ID }}"
                                     data-cluster="{{ $section->cluster_ID ?? '' }}"
                                     @checked(in_array((string) $section->section_ID, array_map('strval', old('section_ids', [])), true))>
                                 <span>

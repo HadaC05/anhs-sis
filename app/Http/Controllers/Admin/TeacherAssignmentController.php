@@ -455,7 +455,7 @@ class TeacherAssignmentController extends Controller
 
     private function curriculumSubjectMatchesSection(Section $section, CurriculumSubject $curriculumSubject): bool
     {
-        if ($curriculumSubject->curriculum_ID !== $section->curriculum_ID ||
+        if ($curriculumSubject->curriculum_ID !== $section->curriculum_grade_level_ID ||
             $curriculumSubject->grade_ID !== $section->grade_ID) {
             return false;
         }

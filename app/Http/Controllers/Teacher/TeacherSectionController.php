@@ -20,8 +20,8 @@ use App\Models\StudentAddress;
 use App\Models\StudentGuardian;
 use App\Models\StudentObservedValue;
 use App\Models\StudentProfile;
-use App\Models\StudentSubjectGrade;
 use App\Models\StudentSubject;
+use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\ClassListSpreadsheet;
@@ -1081,7 +1081,7 @@ class TeacherSectionController extends Controller
             'class_list' => ['required', 'file', 'max:15360', 'mimes:csv,txt,xlsx,pdf'],
         ]);
 
-        $assignment->load(['section.gradeLevel', 'section.academicYear', 'curriculumSubject']);
+        $assignment->load(['section.gradeLevel', 'section.academicYear']);
         $section = $assignment->section;
 
         if (! $section) {
@@ -1099,7 +1099,7 @@ class TeacherSectionController extends Controller
             return back()->withErrors(['class_list' => 'No valid learner rows were found. Make sure the file has LRN and learner name columns.']);
         }
 
-        $result = DB::transaction(function () use ($records, $section, $assignment, $request): array {
+        $result = DB::transaction(function () use ($records, $section, $request): array {
             $enrollmentYear = (int) ($section->academicYear?->start_date?->year ?? now()->year);
             $createdStudents = 0;
             $updatedStudents = 0;
@@ -1156,14 +1156,9 @@ class TeacherSectionController extends Controller
 
                 $this->importStudentSf1Details($student, $record);
 
-                $semester = in_array($section->grade_level, ['grade_11', 'grade_12'], true)
-                    ? ($assignment->curriculumSubject?->semester ?? 'first')
-                    : null;
-
                 $conflictingEnrollment = Enrollment::query()
                     ->where('student_ID', $student->id)
                     ->where('SY_ID', $section->SY_ID)
-                    ->when($semester, fn ($query) => $query->where('semester', $semester), fn ($query) => $query->whereNull('semester'))
                     ->where('section_ID', '!=', $section->section_ID)
                     ->first();
 
@@ -1178,12 +1173,10 @@ class TeacherSectionController extends Controller
                         'student_ID' => $student->id,
                         'section_ID' => $section->section_ID,
                         'SY_ID' => $section->SY_ID,
-                        'semester' => $semester,
                     ],
                     [
-                        'cluster_ID' => $section->cluster_ID,
+                        'curriculum_grade_level_ID' => $section->curriculum_grade_level_ID,
                         'course_ID' => null,
-                        'grade_ID' => $section->grade_ID,
                         'learner_type' => 'regular',
                         'enrollment_status' => EnrollmentStatus::ENROLLED,
                     ]
@@ -1300,12 +1293,10 @@ class TeacherSectionController extends Controller
                         'student_ID' => $student->id,
                         'section_ID' => $section->section_ID,
                         'SY_ID' => $section->SY_ID,
-                        'semester' => null,
                     ],
                     [
-                        'cluster_ID' => $section->cluster_ID,
+                        'curriculum_grade_level_ID' => $section->curriculum_grade_level_ID,
                         'course_ID' => null,
-                        'grade_ID' => $section->grade_ID,
                         'learner_type' => 'regular',
                         'enrollment_status' => EnrollmentStatus::ENROLLED,
                     ],

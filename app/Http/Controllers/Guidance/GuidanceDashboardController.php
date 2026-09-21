@@ -680,7 +680,7 @@ class GuidanceDashboardController extends Controller
             return back()->withErrors(['grade_level' => 'Unable to determine the curriculum for this section. Contact an administrator.'])->withInput();
         }
 
-        $validated['curriculum_ID'] = $curriculumId;
+        $validated['curriculum_grade_level_ID'] = $curriculumId;
         $offering = Curriculum::query()->findOrFail($curriculumId);
         $validated['grade_ID'] = $offering->grade_ID;
         $validated['cluster_ID'] = $offering->cluster_ID;
@@ -778,7 +778,7 @@ class GuidanceDashboardController extends Controller
             'capacity' => (int) $validated['capacity'],
             'staff_ID' => $validated['staff_ID'] ?? null,
             'cluster_ID' => $validated['cluster_ID'] ?? null,
-            'curriculum_ID' => $curriculumId,
+            'curriculum_grade_level_ID' => $curriculumId,
         ]);
 
         return back()->with('status', 'Section details updated successfully.');

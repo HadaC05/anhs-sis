@@ -31,6 +31,8 @@ class Section extends Model
         'grade_level',
         'staff_ID',
         'SY_ID',
+        'curriculum_grade_level_ID',
+        // Compatibility for legacy importers; persisted as curriculum_grade_level_ID.
         'curriculum_ID',
         'room',
         'capacity',
@@ -69,6 +71,16 @@ class Section extends Model
             ? $this->getRelation('gradeLevel')
             : $this->gradeLevel()->first();
 
+        if (! $gradeLevel) {
+            $offering = $this->relationLoaded('curriculumGradeLevel')
+                ? $this->getRelation('curriculumGradeLevel')
+                : $this->curriculumGradeLevel()->with('gradeLevel')->first();
+
+            $gradeLevel = $offering?->relationLoaded('gradeLevel')
+                ? $offering->getRelation('gradeLevel')
+                : $offering?->gradeLevel;
+        }
+
         return GradeLevel::labelToValue($gradeLevel?->grade_label);
     }
 
@@ -87,9 +99,29 @@ class Section extends Model
         return $this->belongsTo(AcademicYear::class, 'SY_ID', 'SY_ID');
     }
 
+    public function curriculumGradeLevel(): BelongsTo
+    {
+        return $this->belongsTo(Curriculum::class, 'curriculum_grade_level_ID', 'curriculum_ID');
+    }
+
+    /** @deprecated Use curriculum_grade_level_ID. */
+    public function getCurriculumIdAttribute(): ?int
+    {
+        return isset($this->attributes['curriculum_grade_level_ID'])
+            ? (int) $this->attributes['curriculum_grade_level_ID']
+            : null;
+    }
+
+    /** @deprecated Use curriculum_grade_level_ID. */
+    public function setCurriculumIdAttribute(?int $value): void
+    {
+        $this->attributes['curriculum_grade_level_ID'] = $value;
+    }
+
+    /** @deprecated Use curriculumGradeLevel(). */
     public function curriculum(): BelongsTo
     {
-        return $this->belongsTo(Curriculum::class, 'curriculum_ID', 'curriculum_ID');
+        return $this->curriculumGradeLevel();
     }
 
     public function enrollments(): HasMany
