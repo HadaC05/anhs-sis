@@ -114,8 +114,10 @@ class TeacherDashboardController extends Controller
             ->when($enrollmentGradeId, fn ($query) => $query->where('curriculum_grade_levels.grade_ID', $enrollmentGradeId))
             ->select('grade_level.grade_ID')
             ->selectRaw('grade_level.grade_label as label')
-            ->selectRaw('SUM(CASE WHEN enrollments.enrollment_status_ID = ? THEN 1 ELSE 0 END) as enrolled', [$enrolledStatusId])
-            ->selectRaw('SUM(CASE WHEN enrollments.enrollment_status_ID = ? THEN 1 ELSE 0 END) as temporary', [$temporaryStatusId])
+            // PostgreSQL lowercases unquoted identifiers in raw SQL, while
+            // this legacy column was created with a mixed-case name.
+            ->selectRaw('SUM(CASE WHEN enrollments."enrollment_status_ID" = ? THEN 1 ELSE 0 END) as enrolled', [$enrolledStatusId])
+            ->selectRaw('SUM(CASE WHEN enrollments."enrollment_status_ID" = ? THEN 1 ELSE 0 END) as temporary', [$temporaryStatusId])
             ->groupBy('grade_level.grade_ID', 'grade_level.grade_label')
             ->orderBy('grade_level.grade_ID')
             ->get()
