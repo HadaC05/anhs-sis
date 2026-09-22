@@ -36,12 +36,8 @@ return new class extends Migration
             DB::statement('ALTER TABLE student_subject_grades MODIFY posted_by INT UNSIGNED NOT NULL');
         }
 
-        $fkExists = DB::table('information_schema.KEY_COLUMN_USAGE')
-            ->where('TABLE_SCHEMA', DB::getDatabaseName())
-            ->where('TABLE_NAME', 'student_subject_grades')
-            ->where('COLUMN_NAME', 'posted_by')
-            ->whereNotNull('REFERENCED_TABLE_NAME')
-            ->exists();
+        $fkExists = collect(Schema::getForeignKeys('student_subject_grades'))
+            ->contains(fn (array $foreignKey): bool => in_array('posted_by', $foreignKey['columns'], true));
 
         if (! $fkExists) {
             Schema::table('student_subject_grades', function (Blueprint $table) {

@@ -46,25 +46,11 @@ return new class extends Migration
 
     private function dropForeignIfPresent(string $column): void
     {
-        if (DB::getDriverName() === 'sqlite') {
-            try {
-                Schema::table('student_subject_grades', fn (Blueprint $table) => $table->dropForeign([$column]));
-            } catch (\Throwable) {
-                // SQLite rebuilds the table and may already omit this key.
-            }
-
-            return;
-        }
-
-        $foreignKey = DB::table('information_schema.KEY_COLUMN_USAGE')
-            ->where('TABLE_SCHEMA', DB::getDatabaseName())
-            ->where('TABLE_NAME', 'student_subject_grades')
-            ->where('COLUMN_NAME', $column)
-            ->whereNotNull('REFERENCED_TABLE_NAME')
-            ->value('CONSTRAINT_NAME');
+        $foreignKey = collect(Schema::getForeignKeys('student_subject_grades'))
+            ->first(fn (array $foreignKey): bool => in_array($column, $foreignKey['columns'], true));
 
         if ($foreignKey) {
-            Schema::table('student_subject_grades', fn (Blueprint $table) => $table->dropForeign($foreignKey));
+            Schema::table('student_subject_grades', fn (Blueprint $table) => $table->dropForeign($foreignKey['name']));
         }
     }
 };
