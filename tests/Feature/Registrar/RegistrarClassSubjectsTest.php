@@ -6,11 +6,14 @@ use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
+use App\Models\GradeStatus;
+use App\Models\GradingTerm;
 use App\Models\GradingTermSetting;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
@@ -128,10 +131,32 @@ test('registrar can view teachers with their advisory and subject assignments', 
     $response->assertSee(trim($unassignedTeacher->last_name.', '.$unassignedTeacher->first_name));
     $response->assertSee('No advisory class assigned.');
     $response->assertSee('No subjects assigned.');
+    $response->assertSee('Advisory class status');
+    $response->assertSee('Subject grade status');
+    $response->assertSee('Ungraded');
+    $response->assertSee('View status');
+    $response->assertSee('View terms');
+    $response->assertDontSee('View class');
+    $response->assertDontSee('Class roster');
 });
 
-test('registrar can view the students assigned to a class', function () {
-    ['registrar' => $registrar, 'section' => $section, 'academicYear' => $academicYear, 'gradeLevel' => $gradeLevel] = createRegistrarClassSubjectFixtures();
+test('registrar can view subject and grade status for an advisory class', function () {
+    ['registrar' => $registrar, 'teacher' => $teacher, 'section' => $section, 'subject' => $subject] = createRegistrarClassSubjectFixtures();
+
+    $response = $this->actingAs($registrar)->get(route('registrar.classes.status', $section));
+
+    $response->assertOk();
+    $response->assertSee('Class subject status');
+    $response->assertSee($section->name);
+    $response->assertSee($subject->code);
+    $response->assertSee(trim($teacher->last_name.', '.$teacher->first_name));
+    $response->assertSee('Ungraded');
+    $response->assertSee('View terms');
+    $response->assertDontSee('Class roster');
+});
+
+test('registrar teacher assignments show submitted grade status for assigned subjects', function () {
+    ['registrar' => $registrar, 'teacher' => $teacher, 'section' => $section, 'assignment' => $assignment, 'academicYear' => $academicYear, 'gradeLevel' => $gradeLevel, 'subject' => $subject] = createRegistrarClassSubjectFixtures();
 
     $student = Student::query()->create([
         'lrn' => '123456789012',
@@ -140,7 +165,7 @@ test('registrar can view the students assigned to a class', function () {
         'status' => 'active',
     ]);
 
-    Enrollment::query()->create([
+    $enrollment = Enrollment::query()->create([
         'student_ID' => $student->id,
         'section_ID' => $section->section_ID,
         'SY_ID' => $academicYear->SY_ID,
@@ -149,12 +174,31 @@ test('registrar can view the students assigned to a class', function () {
         'enrollment_status' => 'enrolled',
     ]);
 
-    $response = $this->actingAs($registrar)->get(route('registrar.classes.students', $section));
+    $studentSubject = StudentSubject::query()->firstOrCreate([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
 
-    $response->assertOk();
-    $response->assertSee('Class roster');
-    $response->assertSee('Student, Class');
-    $response->assertSee('123456789012');
+    StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $studentSubject->student_subject_ID,
+        'assignment_ID' => $assignment->assignment_ID,
+        'term_ID' => GradingTerm::query()->where('key', 'term_1')->value('term_ID'),
+        'numeric_grade' => 90,
+        'grade_status_ID' => GradeStatus::idFor(GradeStatus::SUBMITTED),
+        'posted_by' => $teacher->staff_id,
+    ]);
+
+    $assignments = $this->actingAs($registrar)->get(route('registrar.teacher-assignments'));
+    $assignments->assertOk()
+        ->assertSee($subject->code)
+        ->assertSee('Submitted')
+        ->assertDontSee('Class roster');
+
+    $status = $this->actingAs($registrar)->get(route('registrar.classes.status', $section));
+    $status->assertOk()
+        ->assertSee('Submitted')
+        ->assertSee('1 record')
+        ->assertDontSee('Student, Class');
 });
 
 test('registrar can unlock a grading term for a class subject', function () {
@@ -178,10 +222,15 @@ test('registrar can unlock a grading term for a class subject', function () {
         'enrollment_status' => 'enrolled',
     ]);
 
-    StudentSubjectGrade::query()->create([
+    $studentSubject = StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
+        'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
+
+    StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $studentSubject->student_subject_ID,
         'assignment_ID' => $assignment->assignment_ID,
-        'grading_period' => 'shs_sem1_term_1',
+        'term_ID' => GradingTerm::query()->where('key', 'term_1')->value('term_ID'),
         'numeric_grade' => 88,
         'status' => 'approved',
         'posted_by' => $teacher->staff_id,

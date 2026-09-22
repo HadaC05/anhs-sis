@@ -26,6 +26,7 @@ class StudentDocument extends Model
         'doc_type',
         'document_type_ID',
         'file_path',
+        'original_filename',
         'status',
         'document_status_ID',
         'date_uploaded',
@@ -208,6 +209,11 @@ class StudentDocument extends Model
     public function isVerified(): bool
     {
         return $this->status === DocumentStatus::VERIFIED;
+    }
+
+    public function displayFilename(): ?string
+    {
+        return $this->original_filename ?: ($this->file_path ? basename($this->file_path) : null);
     }
 
     public function isReturned(): bool

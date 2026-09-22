@@ -3,8 +3,24 @@
 @section('title', 'Dashboard')
 
 @section('content')
+@push('modals')
 @if ($profileCompletionRequired ?? false)
-    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 px-4" role="dialog" aria-modal="true" aria-labelledby="profile-completion-title">
+    <style>
+        @media (min-width: 768px) {
+            body.sidebar-collapsed .profile-completion-backdrop {
+                left: 5.5rem;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .app-sidebar {
+                z-index: 201;
+                pointer-events: none;
+            }
+        }
+    </style>
+    <div class="profile-completion-backdrop fixed inset-y-0 right-0 top-20 left-0 z-[200] bg-slate-900/60 md:left-72" aria-hidden="true"></div>
+    <div class="fixed inset-0 z-[202] flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="profile-completion-title">
         <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /></svg>
@@ -15,6 +31,7 @@
         </div>
     </div>
 @endif
+@endpush
 
 @php
     $studentName = optional($application)->last_name
@@ -34,19 +51,6 @@
     $schoolYear = $currentEnrollment?->academicYear?->school_year ?? $activeYear?->school_year ?? '—';
     $needsEnrollment = $currentEnrollment === null;
     $initials = $student?->initials() ?? strtoupper(\Illuminate\Support\Str::substr($firstName, 0, 1));
-    $placementStatus = $currentEnrollment?->placement_status ?: \App\Models\PlacementStatus::PENDING;
-    $placementStatusLabel = $currentEnrollment?->placement_status_label ?: ($needsEnrollment ? 'Not enrolled' : 'Pending');
-    $showPlacementTest = $placementStatus !== \App\Models\PlacementStatus::AGE_APPROPRIATE;
-    $placementDescription = match (true) {
-        $needsEnrollment => 'Placement test status will appear after you enroll.',
-        $placementStatus === \App\Models\PlacementStatus::AGE_APPROPRIATE => 'Your age is appropriate for the selected grade level. No placement test is required.',
-        $placementStatus === \App\Models\PlacementStatus::RECOMMENDED => 'The Guidance Office recommended a placement test. Please visit the Guidance Office to confirm your schedule.',
-        $placementStatus === \App\Models\PlacementStatus::PASSED => 'You passed the placement test.',
-        $placementStatus === \App\Models\PlacementStatus::FAILED => 'Your placement test was not passed. Please contact the Guidance Office for next steps.',
-        $placementStatus === \App\Models\PlacementStatus::RESOLVED => 'Your placement test has been resolved.',
-        default => 'No placement test is currently required for your enrollment.',
-    };
-
     $infoRows = [
         ['label' => 'Enrollment Status', 'value' => $enrollmentStatus],
         ['label' => 'Grade Level', 'value' => $gradeLabel],
@@ -95,14 +99,7 @@
     ];
 @endphp
 
-<div
-    class="space-y-6"
-    x-data="{ placementInstructionsOpen: false }"
-    @keydown.escape.window="placementInstructionsOpen = false"
->
-    <style>
-        [x-cloak] { display: none !important; }
-    </style>
+<div class="space-y-6">
     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <div class="space-y-6 lg:col-span-7 xl:col-span-8">
             <section>
@@ -114,7 +111,7 @@
                     <h2 class="text-lg font-bold tracking-tight text-slate-900">Quick Access</h2>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
                     @foreach ($quickLinks as $link)
                         <a href="{{ $link['href'] }}" class="group flex h-full min-w-0 flex-col rounded-2xl p-4 shadow-lg transition hover:-translate-y-0.5 sm:p-5 {{ $link['card'] }}">
                             <div class="flex h-11 w-11 items-center justify-center rounded-xl {{ $link['iconWrap'] }}">
@@ -166,25 +163,6 @@
                     </dl>
                 </div>
 
-                @if ($showPlacementTest)
-                    <div class="px-6 py-5">
-                        <div class="flex flex-wrap items-baseline justify-between gap-2">
-                            <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Placement test</h3>
-                            <p class="text-sm font-medium text-slate-900">{{ $placementStatusLabel }}</p>
-                        </div>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ $placementDescription }}</p>
-                        @if ($placementStatus === \App\Models\PlacementStatus::RECOMMENDED)
-                            <button
-                                type="button"
-                                @click="placementInstructionsOpen = true"
-                                class="mt-4 inline-flex items-center justify-center rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#214e5c] focus:outline-none focus:ring-2 focus:ring-[#296374] focus:ring-offset-2"
-                                data-test="placement-test-instructions-button"
-                            >
-                                View next steps
-                            </button>
-                        @endif
-                    </div>
-                @endif
             </section>
         </aside>
     </div>
@@ -205,48 +183,5 @@
         </section>
     @endif
 
-    @if ($placementStatus === \App\Models\PlacementStatus::RECOMMENDED)
-        <template x-teleport="body">
-            <div
-                x-cloak
-                x-show="placementInstructionsOpen"
-                x-transition.opacity
-                class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="placement-test-instructions-title"
-                data-test="placement-test-instructions-modal"
-            >
-                <div class="absolute inset-0 bg-slate-900/55" @click="placementInstructionsOpen = false"></div>
-                <div class="relative max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl" @click.stop>
-                    <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[#296374]">Placement test</p>
-                            <h2 id="placement-test-instructions-title" class="mt-1 text-xl font-bold tracking-tight text-slate-900">What to do next</h2>
-                        </div>
-                        <button type="button" @click="placementInstructionsOpen = false" class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close placement test instructions">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"></path></svg>
-                        </button>
-                    </div>
-                    <div class="space-y-5 px-6 py-5 text-sm leading-6 text-slate-600">
-                        <p>Your placement test helps the school confirm the grade level that best matches your current skills. Start with the Guidance Office so they can guide you through the process.</p>
-                        <ol class="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-[#296374]">
-                            <li><span class="font-semibold text-slate-800">Visit or contact the Guidance Office.</span> Confirm your test date, time, venue, and any requirements before going to the testing area.</li>
-                            <li><span class="font-semibold text-slate-800">Bring your LRN and a valid school or government-issued ID.</span> Ask the counselor in advance if you need to submit any other enrollment documents.</li>
-                            <li><span class="font-semibold text-slate-800">Arrive at least 15 minutes early.</span> Bring basic writing materials if the Guidance Office asks you to, and follow the testing instructions provided on the day.</li>
-                            <li><span class="font-semibold text-slate-800">Ask for support early.</span> Tell the Guidance Office before your schedule if you need an accommodation or have a concern about attending.</li>
-                            <li><span class="font-semibold text-slate-800">Wait for the result to be recorded.</span> The Guidance Office will update your placement-test status and advise you on the next enrollment step.</li>
-                        </ol>
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-                            <span class="font-semibold">Important:</span> Your test schedule is confirmed by the Guidance Office. Please do not assume a schedule until you have spoken with them.
-                        </div>
-                    </div>
-                    <div class="flex justify-end border-t border-slate-200 px-6 py-4">
-                        <button type="button" @click="placementInstructionsOpen = false" class="rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#214e5c]">Got it</button>
-                    </div>
-                </div>
-            </div>
-        </template>
-    @endif
 </div>
 @endsection

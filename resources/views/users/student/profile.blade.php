@@ -28,6 +28,7 @@
     $readonlyClass = 'w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-[#296374] shadow-sm';
     $labelClass = 'mb-1.5 block text-sm text-gray-500';
     $requiredMark = '<span class="text-red-600" aria-hidden="true">*</span>';
+    $optionalMark = '<span class="text-xs text-gray-400">(Optional)</span>';
 @endphp
 
 <div class="space-y-5">
@@ -38,11 +39,11 @@
     @endif
 
     @if (session('status'))
-        <div id="studentProfileSuccessToast" role="status" aria-live="polite" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl">
+        <div id="studentProfileSuccessToast" role="status" aria-live="polite" class="fixed right-4 top-24 z-[120] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl sm:right-5">
             <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
-            <span>{{ session('status') }}</span>
+            <span>Student profile changes saved successfully.</span>
             <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-emerald-700/70 transition hover:bg-emerald-50 hover:text-emerald-800" data-dismiss-profile-toast aria-label="Close notification">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -96,11 +97,11 @@
                                 <input type="text" value="{{ $application?->first_name }}" class="{{ $readonlyClass }}" readonly>
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}">Middle Name</label>
+                                <label class="{{ $labelClass }}">Middle Name {!! $optionalMark !!}</label>
                                 <input type="text" value="{{ $application?->middle_name }}" class="{{ $readonlyClass }}" readonly>
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}">Suffix</label>
+                                <label class="{{ $labelClass }}">Suffix {!! $optionalMark !!}</label>
                                 <input type="text" value="{{ $application?->suffix ?: 'None' }}" class="{{ $readonlyClass }}" readonly>
                             </div>
                             <div>
@@ -117,7 +118,7 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Sex {!! $requiredMark !!}</label>
-                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5" data-required-group="gender">
                                     <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                                         <input type="radio" name="gender" value="Male" class="accent-[#296374]" @checked($selectedGender === 'Male') required> Male
                                     </label>
@@ -131,7 +132,7 @@
                                 <input id="contact_no" type="tel" name="contact_no" value="{{ old('contact_no', $application?->contact_no) }}" maxlength="13" inputmode="numeric" pattern="\+63\d{10}" placeholder="+639XXXXXXXXX" class="{{ $fieldClass }}" required>
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}" for="email">Email</label>
+                                <label class="{{ $labelClass }}" for="email">Email {!! $optionalMark !!}</label>
                                 <input id="email" type="email" name="email" value="{{ old('email', $application?->email) }}" class="{{ $fieldClass }}">
                             </div>
                             <div>
@@ -155,7 +156,7 @@
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div>
                                 <label class="{{ $labelClass }}">4Ps Beneficiary {!! $requiredMark !!}</label>
-                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5" data-required-group="four_ps_beneficiary">
                                     <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                                         <input type="radio" name="four_ps_beneficiary" value="No" class="accent-[#296374]" @checked($fourPsValue === 'No') required> No
                                     </label>
@@ -170,7 +171,7 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Indigenous People (IP) {!! $requiredMark !!}</label>
-                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5" data-required-group="ip_community">
                                     <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                                         <input type="radio" name="ip_community" value="No" class="accent-[#296374]" @checked($ipValue === 'No') required> No
                                     </label>
@@ -184,7 +185,7 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Person with Disability (PWD) {!! $requiredMark !!}</label>
-                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                <div class="flex gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5" data-required-group="pwd">
                                     <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                                         <input type="radio" name="pwd" value="No" class="accent-[#296374]" @checked($pwdValue === 'No') required> No
                                     </label>
@@ -223,11 +224,11 @@
                                 <input type="text" name="curr_zip_code" value="{{ old('curr_zip_code', $currentAddress?->zip_code) }}" placeholder="Auto-generated" readonly required class="{{ $fieldClass }}">
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}">House No.</label>
+                                <label class="{{ $labelClass }}">House No. {!! $optionalMark !!}</label>
                                 <input type="text" name="curr_house_no" value="{{ old('curr_house_no', $currentAddress?->house_no) }}" class="{{ $fieldClass }}">
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}">Street/Sitio</label>
+                                <label class="{{ $labelClass }}">Street/Sitio {!! $optionalMark !!}</label>
                                 <input type="text" name="curr_street_name" value="{{ old('curr_street_name', $currentAddress?->street_name) }}" class="{{ $fieldClass }}">
                             </div>
                         </div>
@@ -262,11 +263,11 @@
                                 <input type="text" name="perm_zip_code" value="{{ old('perm_zip_code', $permanentAddress?->zip_code) }}" placeholder="Auto-generated" readonly required class="{{ $fieldClass }}" data-perm-field>
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}">House No.</label>
+                                <label class="{{ $labelClass }}">House No. {!! $optionalMark !!}</label>
                                 <input type="text" name="perm_house_no" value="{{ old('perm_house_no', $permanentAddress?->house_no) }}" class="{{ $fieldClass }}" data-perm-field>
                             </div>
                             <div>
-                                <label class="{{ $labelClass }}">Street/Sitio</label>
+                                <label class="{{ $labelClass }}">Street/Sitio {!! $optionalMark !!}</label>
                                 <input type="text" name="perm_street_name" value="{{ old('perm_street_name', $permanentAddress?->street_name) }}" class="{{ $fieldClass }}" data-perm-field>
                             </div>
                         </div>
@@ -286,14 +287,14 @@
                         <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-5">
                             <input type="text" name="father_lname" placeholder="Last Name" value="{{ old('father_lname', $father?->last_name) }}" class="{{ $fieldClass }}" data-capitalize required autocapitalize="words">
                             <input type="text" name="father_fname" placeholder="Given Name" value="{{ old('father_fname', $father?->first_name) }}" class="{{ $fieldClass }}" data-capitalize required autocapitalize="words">
-                            <input type="text" name="father_mname" placeholder="Middle Name" value="{{ old('father_mname', $father?->middle_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
+                            <input type="text" name="father_mname" placeholder="Middle Name (Optional)" value="{{ old('father_mname', $father?->middle_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
                             <select name="father_suffix" class="{{ $fieldClass }}">
-                                <option value="">None</option>
+                                <option value="">Suffix (Optional)</option>
                                 @foreach ($suffixOptions as $suffixOption)
                                     <option value="{{ $suffixOption }}" @selected(old('father_suffix', $father?->suffix) === $suffixOption)>{{ $suffixOption }}</option>
                                 @endforeach
                             </select>
-                            <input type="tel" name="father_contact_no" placeholder="+639XXXXXXXXX" value="{{ old('father_contact_no', $father?->is_deceased ? '' : $father?->contact_no) }}" maxlength="13" class="{{ $fieldClass }}">
+                            <input type="tel" name="father_contact_no" placeholder="Contact No. (Optional)" value="{{ old('father_contact_no', $father?->is_deceased ? '' : $father?->contact_no) }}" maxlength="13" class="{{ $fieldClass }}">
                         </div>
 
                         <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
@@ -306,34 +307,34 @@
                         <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-5">
                             <input type="text" name="mother_lname" placeholder="Last Name" value="{{ old('mother_lname', $mother?->last_name) }}" class="{{ $fieldClass }}" data-capitalize required autocapitalize="words">
                             <input type="text" name="mother_fname" placeholder="Given Name" value="{{ old('mother_fname', $mother?->first_name) }}" class="{{ $fieldClass }}" data-capitalize required autocapitalize="words">
-                            <input type="text" name="mother_mname" placeholder="Middle Name" value="{{ old('mother_mname', $mother?->middle_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
+                            <input type="text" name="mother_mname" placeholder="Middle Name (Optional)" value="{{ old('mother_mname', $mother?->middle_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
                             <select name="mother_suffix" class="{{ $fieldClass }}">
-                                <option value="">None</option>
+                                <option value="">Suffix (Optional)</option>
                                 @foreach ($suffixOptions as $suffixOption)
                                     <option value="{{ $suffixOption }}" @selected(old('mother_suffix', $mother?->suffix) === $suffixOption)>{{ $suffixOption }}</option>
                                 @endforeach
                             </select>
-                            <input type="tel" name="mother_contact_no" placeholder="+639XXXXXXXXX" value="{{ old('mother_contact_no', $mother?->is_deceased ? '' : $mother?->contact_no) }}" maxlength="13" class="{{ $fieldClass }}">
+                            <input type="tel" name="mother_contact_no" placeholder="Contact No. (Optional)" value="{{ old('mother_contact_no', $mother?->is_deceased ? '' : $mother?->contact_no) }}" maxlength="13" class="{{ $fieldClass }}">
                         </div>
 
                         <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-                            <p class="text-sm font-semibold text-gray-600">Guardian's Full Name</p>
+                            <p class="text-sm font-semibold text-gray-600">Guardian's Full Name {!! $optionalMark !!}</p>
                             <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-600">
                                 <input type="checkbox" name="guardian_is_deceased" value="1" class="h-4 w-4 accent-[#296374]" data-deceased-toggle="guardian_contact_no" @checked(old('guardian_is_deceased', $guardian?->is_deceased))>
                                 Deceased
                             </label>
                         </div>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-5">
-                            <input type="text" name="guardian_lname" placeholder="Last Name" value="{{ old('guardian_lname', $guardian?->last_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
-                            <input type="text" name="guardian_fname" placeholder="Given Name" value="{{ old('guardian_fname', $guardian?->first_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
-                            <input type="text" name="guardian_mname" placeholder="Middle Name" value="{{ old('guardian_mname', $guardian?->middle_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
+                            <input type="text" name="guardian_lname" placeholder="Last Name (Optional)" value="{{ old('guardian_lname', $guardian?->last_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
+                            <input type="text" name="guardian_fname" placeholder="Given Name (Optional)" value="{{ old('guardian_fname', $guardian?->first_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
+                            <input type="text" name="guardian_mname" placeholder="Middle Name (Optional)" value="{{ old('guardian_mname', $guardian?->middle_name) }}" class="{{ $fieldClass }}" data-capitalize autocapitalize="words">
                             <select name="guardian_suffix" class="{{ $fieldClass }}">
-                                <option value="">None</option>
+                                <option value="">Suffix (Optional)</option>
                                 @foreach ($suffixOptions as $suffixOption)
                                     <option value="{{ $suffixOption }}" @selected(old('guardian_suffix', $guardian?->suffix) === $suffixOption)>{{ $suffixOption }}</option>
                                 @endforeach
                             </select>
-                            <input type="tel" name="guardian_contact_no" placeholder="+639XXXXXXXXX" value="{{ old('guardian_contact_no', $guardian?->is_deceased ? '' : $guardian?->contact_no) }}" maxlength="13" class="{{ $fieldClass }}">
+                            <input type="tel" name="guardian_contact_no" placeholder="Contact No. (Optional)" value="{{ old('guardian_contact_no', $guardian?->is_deceased ? '' : $guardian?->contact_no) }}" maxlength="13" class="{{ $fieldClass }}">
                         </div>
                     </div>
                 </div>
@@ -415,6 +416,37 @@
         if (!form) {
             return;
         }
+
+        const invalidClasses = ['border-red-500', 'bg-red-50', 'ring-2', 'ring-red-100'];
+        const addressErrorSelectors = {
+            curr_province: '#curr_province_select',
+            curr_municipality_city: '#curr_municipality_city_select',
+            curr_barangay: '#curr_barangay_select',
+            perm_province: '#perm_province_select',
+            perm_municipality_city: '#perm_municipality_city_select',
+            perm_barangay: '#perm_barangay_select',
+        };
+        const clearInvalid = (field) => {
+            const group = field?.name ? form.querySelector(`[data-required-group="${field.name}"]`) : null;
+            (group || field)?.classList.remove(...invalidClasses);
+        };
+        const markInvalid = (field) => {
+            const group = field?.name ? form.querySelector(`[data-required-group="${field.name}"]`) : null;
+            (group || field)?.classList.add(...invalidClasses);
+        };
+
+        form.addEventListener('invalid', (event) => markInvalid(event.target), true);
+        form.addEventListener('input', (event) => {
+            if (event.target.validity.valid) clearInvalid(event.target);
+        });
+        form.addEventListener('change', (event) => {
+            if (event.target.validity.valid) clearInvalid(event.target);
+        });
+
+        @json($errors->keys()).forEach((fieldName) => {
+            const selector = addressErrorSelectors[fieldName] || `[name="${fieldName}"]`;
+            markInvalid(form.querySelector(selector));
+        });
 
         const sameAddress = document.getElementById('same_address');
         const addressDataBaseUrl = @json(asset('data/addresspinas'));

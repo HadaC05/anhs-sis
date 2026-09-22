@@ -55,23 +55,24 @@
 
 <body class="min-h-screen flex flex-col bg-gray-100">
     <header class="fixed top-0 left-0 right-0 w-full backdrop-blur-sm shadow-sm border-b border-white/20 z-50" style="background-color: #296374;">
-        <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center pl-6">
+        <div class="container mx-auto flex min-h-20 items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+            <div class="flex min-w-0 items-center">
                 <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-12 w-auto">
+                <img src="{{ asset('images/school-logo-dark.png') }}" alt="Agusan National High School" class="h-10 w-auto sm:h-12">
             </div>
 
-            <nav class="flex items-center flex-wrap justify-center gap-4 sm:gap-6 pr-6">
+            <nav class="flex shrink-0 items-center gap-2 sm:gap-4" aria-label="Account controls">
                 <livewire:notification-dropdown />
                 @include('users.student.partials.profile-menu')
             </nav>
         </div>
     </header>
 
-    <div class="min-h-screen flex relative pt-20" style="background-image: url('{{ asset('images/student-dash-image.png') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;">
-        <aside class="app-sidebar fixed left-0 top-20 bottom-0 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
+    <div class="relative flex min-h-screen pt-20" style="background-image: url('{{ asset('images/student-dash-image.png') }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+        <div id="sidebar-backdrop" class="fixed inset-0 z-30 bg-slate-950/45" aria-hidden="true"></div>
+        <aside class="app-sidebar fixed left-0 top-20 bottom-0 bg-white shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
             <div class="p-6 border-b border-gray-200/50 bg-gradient-to-r from-[#296374]/5 to-transparent">
                 <div class="flex items-center gap-3 mb-1">
                     <div class="sidebar-user-icon h-10 w-10 rounded-lg flex items-center justify-center shadow-md" style="background-color: #296374;">
@@ -131,12 +132,13 @@
         </aside>
 
         <main class="app-main flex-1 relative z-10">
-            <div class="max-w-7xl mx-auto py-12 px-4 md:px-8">
+            <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 md:px-8 md:py-12">
                 @yield('content')
             </div>
         </main>
     </div>
 
+    @stack('modals')
     <x-idle-session-timeout />
     @livewireScripts
 </body>

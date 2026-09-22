@@ -7,7 +7,10 @@
     <div class="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg" style="background: linear-gradient(135deg, #296374 0%, #1e4d5c 100%);">
         <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m18 0v-2a4 4 0 00-3-3.87m-2-12.13a4 4 0 010 7.75M10 11a4 4 0 100-8 4 4 0 000 8z" /></svg>
     </div>
-    <div><h1 class="text-2xl font-bold tracking-tight text-gray-800 md:text-3xl">Teacher Assignments</h1><p class="mt-1 text-sm text-gray-500">View every teacher's advisory class and assigned subjects.</p></div>
+    <div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-800 md:text-3xl">Teacher Assignments</h1>
+        <p class="mt-1 text-sm text-gray-500">Track advisory classes, assigned subjects, and whether grades have been encoded or submitted.</p>
+    </div>
 </div>
 
 <form method="GET" action="{{ route('registrar.teacher-assignments') }}" class="mb-6">
@@ -27,7 +30,9 @@
 
 <div class="space-y-4">
 @forelse ($teachers as $teacher)
-    @php($teacherName = trim($teacher->last_name . ', ' . $teacher->first_name . ' ' . $teacher->middle_name))
+    @php
+        $teacherName = trim($teacher->last_name.', '.$teacher->first_name.' '.$teacher->middle_name);
+    @endphp
     <details class="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <summary class="flex cursor-pointer list-none flex-col justify-between gap-3 bg-slate-50 px-5 py-4 transition hover:bg-[#296374]/5 sm:flex-row sm:items-center [&::-webkit-details-marker]:hidden">
             <div><h2 class="font-bold text-gray-800">{{ $teacherName ?: $teacher->username }}</h2><p class="text-xs text-gray-500">{{ $teacher->employee_no ? 'Employee no. '.$teacher->employee_no : 'No employee number' }}</p></div>
@@ -35,12 +40,26 @@
         </summary>
         <div class="grid gap-5 border-t border-gray-100 p-5 lg:grid-cols-2">
             <section>
-                <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Advisory</h3>
+                <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Advisory class status</h3>
                 <div class="space-y-2">
                     @forelse ($teacher->sections as $section)
-                        <div class="flex items-center justify-between gap-3 rounded-lg border border-orange-100 bg-orange-50/50 px-3 py-2 text-sm text-gray-700">
-                            <p class="min-w-0 truncate"><span class="font-semibold">{{ $section->name }}</span><span class="text-gray-500"> &middot; {{ $section->gradeLevel?->grade_label ?? 'No grade level' }} &middot; {{ $section->academicYear?->school_year ?? 'No school year' }}</span></p>
-                            <a href="{{ route('registrar.classes.students', $section) }}" class="shrink-0 rounded-md border border-[#296374]/25 bg-white px-2.5 py-1 text-xs font-bold text-[#296374] transition hover:bg-[#296374] hover:text-white">View class</a>
+                        @php
+                            $advisoryAssignments = $section->teacherSubjectAssignments;
+                            $advisoryLabels = $advisoryAssignments->map->gradeProgressLabel()->unique()->values();
+                            $advisoryStatus = $advisoryAssignments->isEmpty()
+                                ? 'No subjects'
+                                : ($advisoryLabels->count() === 1 ? $advisoryLabels->first() : 'In progress');
+                            $gradedCount = $advisoryAssignments->filter(fn ($assignment): bool => (int) ($assignment->grades_count ?? 0) > 0)->count();
+                        @endphp
+                        <div class="rounded-lg border border-orange-100 bg-orange-50/50 px-3 py-2 text-sm text-gray-700">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="min-w-0 truncate"><span class="font-semibold">{{ $section->name }}</span><span class="text-gray-500"> &middot; {{ $section->gradeLevel?->grade_label ?? 'No grade level' }} &middot; {{ $section->academicYear?->school_year ?? 'No school year' }}</span></p>
+                                @include('users.registrar.partials.grade-progress-badge', ['label' => $advisoryStatus])
+                            </div>
+                            <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-xs text-gray-500">{{ $advisoryAssignments->count() }} {{ Str::plural('subject', $advisoryAssignments->count()) }} &middot; {{ $gradedCount }} with grades</p>
+                                <a href="{{ route('registrar.classes.status', $section) }}" class="shrink-0 rounded-md border border-[#296374]/25 bg-white px-2.5 py-1 text-xs font-bold text-[#296374] transition hover:bg-[#296374] hover:text-white">View status</a>
+                            </div>
                         </div>
                     @empty
                         <p class="text-sm text-gray-500">No advisory class assigned.</p>
@@ -48,13 +67,33 @@
                 </div>
             </section>
             <section>
-                <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Subjects</h3>
+                <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Subject grade status</h3>
                 <div class="space-y-2">
                     @forelse ($teacher->teacherSubjectAssignments as $assignment)
-                        @php($subject = $assignment->curriculumSubject?->subject)
-                        <div class="flex items-center justify-between gap-3 rounded-lg border border-[#296374]/10 bg-[#296374]/5 px-3 py-2 text-sm text-gray-700">
-                            <p class="min-w-0 truncate"><span class="font-semibold">{{ $subject ? $subject->code.' - '.$subject->title : 'Subject unavailable' }}</span><span class="text-gray-500"> &middot; {{ $assignment->section?->name ?? 'No section' }} &middot; {{ $assignment->section?->academicYear?->school_year ?? 'No school year' }}</span></p>
-                            @if ($assignment->section)<a href="{{ route('registrar.classes.students', $assignment->section) }}" class="shrink-0 rounded-md border border-[#296374]/25 bg-white px-2.5 py-1 text-xs font-bold text-[#296374] transition hover:bg-[#296374] hover:text-white">View class</a>@endif
+                        @php
+                            $subject = $assignment->curriculumSubject?->subject;
+                            $statusCounts = $assignment->gradeStatusCounts();
+                        @endphp
+                        <div class="rounded-lg border border-[#296374]/10 bg-[#296374]/5 px-3 py-2 text-sm text-gray-700">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="min-w-0 truncate"><span class="font-semibold">{{ $subject ? $subject->code.' - '.$subject->title : 'Subject unavailable' }}</span><span class="text-gray-500"> &middot; {{ $assignment->section?->name ?? 'No section' }} &middot; {{ $assignment->section?->academicYear?->school_year ?? 'No school year' }}</span></p>
+                                @include('users.registrar.partials.grade-progress-badge', ['label' => $assignment->gradeProgressLabel()])
+                            </div>
+                            <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-xs text-gray-500">
+                                    @if ((int) ($assignment->grades_count ?? 0) === 0)
+                                        No grades yet
+                                    @else
+                                        {{ $assignment->grades_count }} {{ Str::plural('record', $assignment->grades_count) }}
+                                        @foreach ($statusCounts as $status => $count)
+                                            &middot; {{ $count }} {{ \App\Models\GradeStatus::nameFor($status) }}
+                                        @endforeach
+                                    @endif
+                                </p>
+                                @if ($assignment->section)
+                                    <a href="{{ route('registrar.class-subjects.show', $assignment) }}" class="shrink-0 rounded-md border border-[#296374]/25 bg-white px-2.5 py-1 text-xs font-bold text-[#296374] transition hover:bg-[#296374] hover:text-white">View terms</a>
+                                @endif
+                            </div>
                         </div>
                     @empty
                         <p class="text-sm text-gray-500">No subjects assigned.</p>

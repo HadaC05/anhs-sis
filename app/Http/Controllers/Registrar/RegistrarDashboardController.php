@@ -446,13 +446,21 @@ class RegistrarDashboardController extends Controller
             ->whereHas('role', fn ($query) => $query->where('role_name', 'teacher'))
             ->with([
                 'sections' => function ($query) use ($schoolYearId): void {
-                    $query->with(['gradeLevel', 'academicYear'])
+                    $query->with([
+                        'gradeLevel',
+                        'academicYear',
+                        'teacherSubjectAssignments' => function ($assignmentQuery): void {
+                            $assignmentQuery->with(['curriculumSubject.subject', 'staff'])
+                                ->withGradeStatusCounts();
+                        },
+                    ])
                         ->when($schoolYearId !== '', fn ($sectionQuery) => $sectionQuery->where('SY_ID', $schoolYearId))
                         ->orderBy('grade_ID')
                         ->orderBy('name');
                 },
                 'teacherSubjectAssignments' => function ($query) use ($schoolYearId): void {
                     $query->with(['section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject'])
+                        ->withGradeStatusCounts()
                         ->when($schoolYearId !== '', fn ($assignmentQuery) => $assignmentQuery->where('SY_ID', $schoolYearId))
                         ->orderBy('section_ID');
                 },
@@ -476,38 +484,20 @@ class RegistrarDashboardController extends Controller
         ]);
     }
 
-    public function classStudents(Request $request, Section $section): View
+    public function classStatus(Section $section): View
     {
-        $search = trim($request->string('search')->toString());
-        $perPage = (int) $request->input('per_page', 20);
+        $section->load([
+            'gradeLevel',
+            'academicYear',
+            'adviser',
+            'teacherSubjectAssignments' => function ($query): void {
+                $query->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester', 'staff'])
+                    ->withGradeStatusCounts()
+                    ->orderBy('assignment_ID');
+            },
+        ]);
 
-        if (! in_array($perPage, [10, 20, 50], true)) {
-            $perPage = 20;
-        }
-
-        $section->load(['gradeLevel', 'academicYear', 'adviser']);
-
-        $students = Enrollment::query()
-            ->with(['student.application', 'enrollmentStatus'])
-            ->where('section_ID', $section->section_ID)
-            ->where('SY_ID', $section->SY_ID)
-            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->whereHas('student', function ($studentQuery) use ($search): void {
-                    $studentQuery->where('lrn', 'like', "%{$search}%")
-                        ->orWhere('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhereHas('application', function ($applicationQuery) use ($search): void {
-                            $applicationQuery->where('first_name', 'like', "%{$search}%")
-                                ->orWhere('last_name', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->orderBy('student_ID')
-            ->paginate($perPage)
-            ->withQueryString();
-
-        return view('users.registrar.class-students', compact('section', 'students', 'search', 'perPage'));
+        return view('users.registrar.class-status', compact('section'));
     }
 
     public function showClassSubject(TeacherSubjectAssignment $assignment): View

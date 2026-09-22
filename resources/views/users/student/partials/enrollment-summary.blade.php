@@ -21,18 +21,18 @@
     }
 @endphp
 
-<div class="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
-    <div class="grid grid-cols-1 gap-x-10 gap-y-4 md:grid-cols-2">
+<div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:px-5">
+    <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
         @foreach ($infoRows as $index => $row)
             @php
                 $isLastRow = $index >= count($infoRows) - (count($infoRows) % 2 === 0 ? 2 : 1);
             @endphp
             <div @class([
                 'flex items-start justify-between gap-4',
-                'border-b border-gray-100 pb-3' => ! $isLastRow,
+                'border-b border-gray-100 pb-2' => ! $isLastRow,
             ])>
-                <span class="text-sm text-gray-500">{{ $row['label'] }}</span>
-                <span class="text-right text-sm font-semibold text-[#296374]">{{ $row['value'] }}</span>
+                <span class="text-xs text-gray-500 sm:text-sm">{{ $row['label'] }}</span>
+                <span class="text-right text-xs font-semibold text-[#296374] sm:text-sm">{{ $row['value'] }}</span>
             </div>
         @endforeach
     </div>

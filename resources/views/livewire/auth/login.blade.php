@@ -17,45 +17,55 @@
             border-color: #dc2626 !important;
             box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18) !important;
         }
+
+        [x-cloak] {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body class="min-h-screen bg-gray-100"
-    x-data="{ showStatusModal: {{ session('application_status_message') || $errors->statusCheck->has('status_lookup') || $errors->statusCheck->has('status_lrn') || $errors->statusCheck->has('status_birthdate') ? 'true' : 'false' }} }">
+    x-data="{ showStatusModal: {{ session('application_status_message') || $errors->statusCheck->has('status_lookup') || $errors->statusCheck->has('status_lrn') || $errors->statusCheck->has('status_birthdate') ? 'true' : 'false' }}, mobileMenuOpen: false }">
 
     <header class="fixed top-0 left-0 right-0 w-full bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-200 z-50">
-        <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center pl-6">
-                <img src="{{ asset('images/school-logo-light.png') }}" alt="School Logo" class="h-12 w-auto">
+        <div class="container mx-auto flex min-h-20 items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+            <div class="flex items-center">
+                <img src="{{ asset('images/school-logo-light.png') }}" alt="Agusan National High School" class="h-10 w-auto sm:h-12">
             </div>
 
-            <nav class="flex items-center flex-wrap justify-center gap-8 sm:gap-12 pr-4">
-                <a href="{{ route('home') }}" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">Home</a>
-                <a href="{{ route('home') }}#about-us" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">About</a>
-                <a href="{{ route('home') }}#faq" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">FAQ</a>
-                <a href="{{ route('home') }}#contact-us" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">Contact Us</a>
-                <a href="{{ route('login') }}" class="rounded-full bg-[#0C2C55] px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#143d73]">Login</a>
+            <button type="button" class="inline-flex items-center justify-center rounded-md p-2 text-[#0C2C55] hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0C2C55] sm:hidden" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="primary-navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <svg x-show="!mobileMenuOpen" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                <svg x-show="mobileMenuOpen" x-cloak class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
+            <nav id="primary-navigation" :class="mobileMenuOpen ? 'flex' : 'hidden'" class="absolute left-0 right-0 top-full flex-col gap-1 border-b border-gray-200 bg-white px-4 py-4 shadow-lg sm:static sm:flex sm:flex-row sm:items-center sm:gap-6 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none lg:gap-10">
+                <a @click="mobileMenuOpen = false" href="{{ route('home') }}" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">Home</a>
+                <a @click="mobileMenuOpen = false" href="{{ route('home') }}#about-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">About</a>
+                <a @click="mobileMenuOpen = false" href="{{ route('home') }}#faq" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">FAQ</a>
+                <a @click="mobileMenuOpen = false" href="{{ route('home') }}#contact-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">Contact Us</a>
+                <a @click="mobileMenuOpen = false" href="{{ route('login') }}" class="mt-2 inline-flex justify-center rounded-full bg-[#0C2C55] px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#143d73] sm:mt-0">Login</a>
             </nav>
         </div>
     </header>
 
-    <main class="relative min-h-screen pt-24" style="background-image: url('{{ asset('images/background-blue.jpg') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;">
+    <main class="relative min-h-screen pt-20" style="background-image: url('{{ asset('images/background-blue.jpg') }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
         <div class="absolute inset-0 bg-gradient-to-r from-[#0C2C55]/90 via-[#0C2C55]/70 to-[#0C2C55]/35"></div>
 
-        <div class="relative container mx-auto flex min-h-[calc(100vh-6rem)] items-center justify-center px-4 py-10">
-            <div class="grid w-full max-w-6xl gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+        <div class="relative container mx-auto flex min-h-[calc(100dvh-5rem)] items-center justify-center px-4 py-10 sm:px-6">
+            <div class="grid w-full max-w-6xl gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-10">
                 <div class="text-white">
-                    <p class="mb-4 text-sm font-semibold uppercase tracking-[0.35em] text-white/80">Student Portal</p>
-                    <h1 class="mb-6 text-4xl font-bold leading-tight sm:text-5xl">
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-white/80 sm:text-sm sm:tracking-[0.35em]">Student Portal</p>
+                    <h1 class="mb-6 text-3xl font-bold leading-tight sm:text-5xl">
                         Sign in to access your student portal
                     </h1>
-                    <p class="max-w-xl text-lg leading-relaxed text-white/85">
+                    <p class="max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
                         Continue to your dashboard, track your enrollment journey, and manage your school records securely.
                     </p>
                 </div>
 
                 <div class="w-full max-w-md justify-self-center">
-                    <div class="bg-white shadow-xl rounded-lg px-8 pt-8 pb-10">
+                    <div class="rounded-lg bg-white px-5 pb-8 pt-6 shadow-xl sm:px-8 sm:pb-10 sm:pt-8">
                         @if (session('status'))
                         <div class="mb-4 p-3 rounded bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-sm" data-test="login-status">
                             {{ session('status') }}
@@ -125,18 +135,18 @@
                             </div>
 
                             <div class="mb-8">
-                                <div class="flex items-center gap-3">
-                                    <input class="w-16 text-center shadow-sm appearance-none border rounded py-2 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                                    <input class="w-14 text-center shadow-sm appearance-none border rounded py-2 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 sm:w-16"
                                         type="text"
                                         value="{{ $captcha_first }}"
                                         readonly>
                                     <span class="text-gray-600 text-lg font-semibold">+</span>
-                                    <input class="w-16 text-center shadow-sm appearance-none border rounded py-2 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                    <input class="w-14 text-center shadow-sm appearance-none border rounded py-2 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 sm:w-16"
                                         type="text"
                                         value="{{ $captcha_second }}"
                                         readonly>
                                     <span class="text-gray-600 text-lg font-semibold">=</span>
-                                    <input class="w-20 text-center shadow-sm appearance-none border rounded py-2 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                    <input class="w-16 text-center shadow-sm appearance-none border rounded py-2 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 sm:w-20"
                                         id="captcha_answer"
                                         name="captcha_answer"
                                         type="text"
@@ -177,7 +187,7 @@
 
         <button type="button"
             @click="showStatusModal = true"
-            class="fixed bottom-6 left-6 z-50 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-3 rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
+            class="fixed bottom-4 left-4 right-4 z-50 rounded-full bg-blue-700 px-5 py-3 font-semibold text-white shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 hover:bg-blue-800 sm:bottom-6 sm:left-6 sm:right-auto">
             Check Enrollment Status
         </button>
     </main>
@@ -187,7 +197,7 @@
         class="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
         @click.self="showStatusModal = false"
         x-cloak>
-        <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
+        <div class="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg bg-white p-5 shadow-xl sm:p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-[#0C2C55]">Enrollment Status</h3>
                 <button type="button" @click="showStatusModal = false" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>

@@ -32,6 +32,7 @@ class StudentDocumentUploader
     public static function store(Student $student, string $docType, UploadedFile $file): StudentDocument
     {
         $filePath = self::storeFile($file);
+        $originalFilename = Str::limit($file->getClientOriginalName(), 255, '');
 
         $existing = StudentDocument::query()
             ->where('student_ID', $student->id)
@@ -45,6 +46,7 @@ class StudentDocumentUploader
         if ($current) {
             $current->update([
                 'file_path' => $filePath,
+                'original_filename' => $originalFilename,
                 'status' => 'pending',
                 'date_uploaded' => now(),
                 'date_verified' => null,
@@ -56,6 +58,7 @@ class StudentDocumentUploader
                 'student_ID' => $student->id,
                 'doc_type' => $docType,
                 'file_path' => $filePath,
+                'original_filename' => $originalFilename,
                 'status' => 'pending',
                 'date_uploaded' => now(),
             ]);

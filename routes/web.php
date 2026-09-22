@@ -385,9 +385,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/registrar/teacher-assignments', [RegistrarDashboardController::class, 'teacherAssignments'])
         ->middleware('registrar')
         ->name('registrar.teacher-assignments');
-    Route::get('/registrar/classes/{section}', [RegistrarDashboardController::class, 'classStudents'])
+    Route::get('/registrar/classes/{section}', [RegistrarDashboardController::class, 'classStatus'])
         ->middleware('registrar')
-        ->name('registrar.classes.students');
+        ->name('registrar.classes.status');
     Route::get('/registrar/class-subjects/{assignment}', [RegistrarDashboardController::class, 'showClassSubject'])
         ->middleware('registrar')
         ->name('registrar.class-subjects.show');

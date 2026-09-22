@@ -25,6 +25,7 @@ use App\Models\TeacherSubjectAssignment;
 use App\Support\StudentDocumentUploader;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -203,11 +204,15 @@ class StudentDashboardController extends Controller
         ]);
     }
 
-    public function uploadDocument(StoreStudentDocumentsRequest $request): RedirectResponse
+    public function uploadDocument(StoreStudentDocumentsRequest $request): RedirectResponse|JsonResponse
     {
         $student = $request->user();
 
         if (! $student instanceof Student) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Student profile not found.'], 404);
+            }
+
             return back()->withErrors(['error' => 'Student profile not found.']);
         }
 
@@ -221,6 +226,10 @@ class StudentDashboardController extends Controller
             ->pluck('doc_type');
 
         if ($verifiedTypes->isNotEmpty()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'This document has been verified and cannot be replaced. Ask the guidance counselor to unverify it first.'], 422);
+            }
+
             return back()->withErrors(['error' => 'This document has been verified and cannot be replaced. Ask the guidance counselor to unverify it first.']);
         }
 
@@ -228,13 +237,33 @@ class StudentDashboardController extends Controller
             $stored = StudentDocumentUploader::storeMany($student, $uploads);
             $count = count($stored);
 
-            return back()->with(
-                'success',
-                $count === 1
-                    ? 'Document uploaded successfully.'
-                    : $count.' documents uploaded successfully.'
-            );
+            $message = $count === 1
+                ? 'Document uploaded successfully.'
+                : $count.' documents uploaded successfully.';
+
+            if ($request->expectsJson()) {
+                $document = $stored[0];
+
+                return response()->json([
+                    'message' => $message,
+                    'document' => [
+                        'status' => $document->status,
+                        'status_label' => $document->status_label,
+                        'date_uploaded' => $document->date_uploaded?->format('M d, Y h:i A'),
+                        'remarks' => 'Awaiting guidance review.',
+                        'filename' => $document->displayFilename(),
+                        'view_url' => route('student.documents.view', $document),
+                        'delete_url' => route('student.documents.delete', $document),
+                    ],
+                ]);
+            }
+
+            return back()->with('success', $message);
         } catch (\Exception $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Failed to upload document: '.$e->getMessage()], 500);
+            }
+
             return back()->withErrors(['error' => 'Failed to upload document: '.$e->getMessage()]);
         }
     }

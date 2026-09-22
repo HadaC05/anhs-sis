@@ -16,52 +16,62 @@
         section[id] {
             scroll-margin-top: 100px;
         }
+
+        [x-cloak] {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body class="min-h-screen flex flex-col bg-gray-100"
-    x-data="{ showStatusModal: {{ session('application_status_message') || $errors->statusCheck->has('status_lookup') || $errors->statusCheck->has('status_lrn') || $errors->statusCheck->has('status_birthdate') ? 'true' : 'false' }} }">
+    x-data="{ showStatusModal: {{ session('application_status_message') || $errors->statusCheck->has('status_lookup') || $errors->statusCheck->has('status_lrn') || $errors->statusCheck->has('status_birthdate') ? 'true' : 'false' }}, mobileMenuOpen: false }">
 
     <!-- Header with Logo and Navigation - Fixed at top -->
     <header class="fixed top-0 left-0 right-0 w-full bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-200 z-50">
-        <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="container mx-auto flex min-h-20 items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
             <!-- Logo on the left -->
-            <div class="flex items-center pl-6">
-                <img src="{{ asset('images/school-logo-light.png') }}" alt="School Logo" class="h-12 w-auto">
+            <div class="flex items-center">
+                <img src="{{ asset('images/school-logo-light.png') }}" alt="Agusan National High School" class="h-10 w-auto sm:h-12">
             </div>
 
-            <!-- Navigation links on the right -->
-            <nav class="flex items-center flex-wrap justify-center gap-10 sm:gap-16 pr-10">
-                <a href="{{ route('home') }}" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">Home</a>
-                <a href="#about-us" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">About</a>
-                <a href="#faq" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">FAQ</a>
-                <a href="#contact-us" class="text-[#0C2C55] hover:text-[#0C2C55]/80 font-medium transition duration-200 text-sm sm:text-base uppercase tracking-wide">Contact Us</a>
-                <a href="{{ route('login') }}" class="rounded-full bg-[#0C2C55] px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#143d73]">Login</a>
+            <button type="button" class="inline-flex items-center justify-center rounded-md p-2 text-[#0C2C55] hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0C2C55] sm:hidden" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="primary-navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <svg x-show="!mobileMenuOpen" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                <svg x-show="mobileMenuOpen" x-cloak class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
+            <!-- Navigation links: compact menu on small screens, inline from sm upward -->
+            <nav id="primary-navigation" :class="mobileMenuOpen ? 'flex' : 'hidden'" class="absolute left-0 right-0 top-full flex-col gap-1 border-b border-gray-200 bg-white px-4 py-4 shadow-lg sm:static sm:flex sm:flex-row sm:items-center sm:gap-6 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none lg:gap-10">
+                <a @click="mobileMenuOpen = false" href="{{ route('home') }}" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">Home</a>
+                <a @click="mobileMenuOpen = false" href="#about-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">About</a>
+                <a @click="mobileMenuOpen = false" href="#faq" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">FAQ</a>
+                <a @click="mobileMenuOpen = false" href="#contact-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">Contact Us</a>
+                <a @click="mobileMenuOpen = false" href="{{ route('login') }}" class="mt-2 inline-flex justify-center rounded-full bg-[#0C2C55] px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#143d73] sm:mt-0">Login</a>
             </nav>
         </div>
     </header>
 
     <!-- Landing Hero -->
-    <div class="min-h-screen flex flex-col relative pt-20" style="background-image: url('{{ asset('images/high-school-image.jpg') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;">
+    <div class="relative flex min-h-screen flex-col pt-20" style="background-image: url('{{ asset('images/high-school-image.jpg') }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
         <div class="absolute inset-0 bg-gradient-to-r from-[#0C2C55]/90 via-[#0C2C55]/75 to-[#0C2C55]/30"></div>
 
         <div class="flex-1 flex items-center relative z-10">
-            <div class="container mx-auto px-8 md:px-16 lg:px-24 py-16">
+            <div class="container mx-auto px-5 py-16 sm:px-8 md:px-16 lg:px-24">
                 <div class="max-w-3xl text-white">
-                    <p class="mb-4 text-sm font-semibold uppercase tracking-[0.35em] text-white/80">Welcome</p>
-                    <h1 class="mb-6 text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl">
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-white/80 sm:text-sm sm:tracking-[0.35em]">Welcome</p>
+                    <h1 class="mb-6 text-3xl font-bold leading-tight sm:text-5xl lg:text-6xl">
                         Welcome to the Agusan National High School Student Information System
                     </h1>
                     {{-- <p class="mb-8 text-lg leading-relaxed text-white/85 sm:text-xl">
                         Start your application, review enrollment information, and check your approval status from one place.
                     </p> --}}
-                    <div class="mt-8 flex flex-wrap items-center gap-4">
-                        <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-bold uppercase tracking-wide text-[#0C2C55] shadow-lg transition hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-white/40">
+                    <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+                        <a href="{{ route('register') }}" class="inline-flex w-full items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-bold uppercase tracking-wide text-[#0C2C55] shadow-lg transition hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-white/40 sm:w-auto">
                             Enroll Now
                         </a>
                         <button type="button"
                             @click="showStatusModal = true"
-                            class="inline-flex items-center justify-center rounded-full border border-white/70 px-7 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-white/30">
+                            class="inline-flex w-full items-center justify-center rounded-full border border-white/70 px-7 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-white/30 sm:w-auto">
                             Check Status
                         </button>
                     </div>
@@ -75,7 +85,7 @@
         class="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
         @click.self="showStatusModal = false"
         x-cloak>
-        <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
+        <div class="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg bg-white p-5 shadow-xl sm:p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-[#0C2C55]">Application Status</h3>
                 <button type="button" @click="showStatusModal = false" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
@@ -132,10 +142,10 @@
     </div>
 
     <!-- About Us Section -->
-    <section id="about-us" class="py-16 px-4 bg-white/95 backdrop-blur-sm">
+    <section id="about-us" class="bg-white/95 px-4 py-12 backdrop-blur-sm sm:py-16">
         <div class="container mx-auto max-w-6xl">
-            <h2 class="text-4xl font-bold text-[#0C2C55] mb-8 text-center">About Us</h2>
-            <div class="grid md:grid-cols-2 gap-8">
+            <h2 class="mb-8 text-center text-3xl font-bold text-[#0C2C55] sm:text-4xl">About Us</h2>
+            <div class="grid gap-8 md:grid-cols-2">
                 <div>
                     <h3 class="text-2xl font-semibold text-[#0C2C55] mb-4">Our Mission</h3>
                     <p class="text-gray-700 leading-relaxed mb-6">
@@ -165,16 +175,16 @@
     </section>
 
     <!-- FAQ Section -->
-    <section id="faq" class="py-16 px-4 bg-gray-50/95 backdrop-blur-sm" x-data="{ open: 0 }">
+    <section id="faq" class="bg-gray-50/95 px-4 py-12 backdrop-blur-sm sm:py-16" x-data="{ open: 0 }">
         <div class="container mx-auto max-w-4xl">
-            <h2 class="text-4xl font-bold text-[#0C2C55] mb-12 text-center">Frequently Asked Questions</h2>
+            <h2 class="mb-8 text-center text-3xl font-bold text-[#0C2C55] sm:mb-12 sm:text-4xl">Frequently Asked Questions</h2>
 
             <div class="space-y-4">
                 <!-- FAQ Item 1 -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <button class="faq-question w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition duration-200" @click="open = open === 1 ? 0 : 1">
+                    <button class="faq-question flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition duration-200 hover:bg-gray-50 sm:px-6" @click="open = open === 1 ? 0 : 1">
                         <span class="font-semibold text-[#0C2C55]">How do I register as a new student?</span>
-                        <svg class="faq-icon w-5 h-5 text-[#0C2C55] transform transition-transform duration-300" :class="{ 'rotate-180': open === 1 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="faq-icon h-5 w-5 shrink-0 transform text-[#0C2C55] transition-transform duration-300" :class="{ 'rotate-180': open === 1 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
@@ -275,10 +285,10 @@
     </section>
 
     <!-- Contact Us Section -->
-    <section id="contact-us" class="py-16 px-4 bg-[#0C2C55] text-white">
+    <section id="contact-us" class="bg-[#0C2C55] px-4 py-12 text-white sm:py-16">
         <div class="container mx-auto max-w-6xl">
-            <h2 class="text-4xl font-bold mb-12 text-center">Contact Us</h2>
-            <div class="grid md:grid-cols-3 gap-8">
+            <h2 class="mb-8 text-center text-3xl font-bold sm:mb-12 sm:text-4xl">Contact Us</h2>
+            <div class="grid gap-8 md:grid-cols-3">
                 <div class="text-center">
                     <div class="bg-white/10 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">

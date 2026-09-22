@@ -1,7 +1,9 @@
 <style>
     .app-sidebar, .app-main {
-        transition: width .2s ease, margin-left .2s ease;
+        transition: width .2s ease, margin-left .2s ease, transform .2s ease;
     }
+
+    #sidebar-backdrop { display: none; }
 
     .app-sidebar {
         width: 18rem;
@@ -72,18 +74,24 @@
         display: none;
     }
 
-    @media (max-width: 640px) {
-        .app-sidebar { width: 5.5rem; }
-        .app-main { margin-left: 5.5rem; }
-        .sidebar-user-details, .app-sidebar nav > div > p { display: none; }
-        .app-sidebar > div:first-child, .app-sidebar > div:nth-child(2) { padding-left: .75rem; padding-right: .75rem; }
-        .sidebar-link { justify-content: center; gap: 0; padding-left: .75rem; padding-right: .75rem; }
-        .sidebar-link span, .app-sidebar .absolute { display: none; }
-        body.sidebar-collapsed .app-sidebar { width: 18rem; }
-        body.sidebar-collapsed .app-main { margin-left: 18rem; }
-        body.sidebar-collapsed .sidebar-user-details, body.sidebar-collapsed .app-sidebar nav > div > p { display: block; }
+    @media (max-width: 767px) {
+        .app-sidebar {
+            width: min(18rem, calc(100vw - 3.5rem));
+            transform: translateX(-100%);
+        }
+
+        .app-main { margin-left: 0; }
+
+        body.sidebar-mobile-open .app-sidebar { transform: translateX(0); }
+        body.sidebar-mobile-open { overflow: hidden; }
+        body.sidebar-mobile-open #sidebar-backdrop { display: block; }
+
+        body.sidebar-collapsed .app-sidebar { width: min(18rem, calc(100vw - 3.5rem)); }
+        body.sidebar-collapsed .app-main { margin-left: 0; }
+        body.sidebar-collapsed .sidebar-user-details { display: block; }
         body.sidebar-collapsed .sidebar-link { justify-content: flex-start; gap: .75rem; padding-left: 1rem; padding-right: 1rem; }
         body.sidebar-collapsed .sidebar-link span { display: inline; }
+        body.sidebar-collapsed .app-sidebar .absolute { display: block; }
     }
 </style>
 
@@ -100,19 +108,44 @@
             }
         });
 
+        const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
         const savedState = localStorage.getItem('sidebar-collapsed');
-        if (savedState === 'true') document.body.classList.add('sidebar-collapsed');
+        if (savedState === 'true' && !isMobile()) document.body.classList.add('sidebar-collapsed');
 
         const updateToggle = () => {
-            const collapsed = document.body.classList.contains('sidebar-collapsed');
-            toggle.setAttribute('aria-expanded', String(!collapsed));
-            toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-            toggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+            const mobile = isMobile();
+            const open = mobile
+                ? document.body.classList.contains('sidebar-mobile-open')
+                : !document.body.classList.contains('sidebar-collapsed');
+
+            toggle.setAttribute('aria-expanded', String(open));
+            toggle.setAttribute('aria-label', mobile ? (open ? 'Close navigation menu' : 'Open navigation menu') : (open ? 'Collapse sidebar' : 'Expand sidebar'));
+            toggle.title = toggle.getAttribute('aria-label');
         };
 
         toggle.addEventListener('click', () => {
-            document.body.classList.toggle('sidebar-collapsed');
-            localStorage.setItem('sidebar-collapsed', document.body.classList.contains('sidebar-collapsed'));
+            if (isMobile()) {
+                document.body.classList.toggle('sidebar-mobile-open');
+            } else {
+                document.body.classList.toggle('sidebar-collapsed');
+                localStorage.setItem('sidebar-collapsed', document.body.classList.contains('sidebar-collapsed'));
+            }
+            updateToggle();
+        });
+
+        document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
+            document.body.classList.remove('sidebar-mobile-open');
+            updateToggle();
+        });
+
+        document.querySelectorAll('.app-sidebar .sidebar-link').forEach((link) => {
+            link.addEventListener('click', () => {
+                if (isMobile()) document.body.classList.remove('sidebar-mobile-open');
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            if (!isMobile()) document.body.classList.remove('sidebar-mobile-open');
             updateToggle();
         });
 

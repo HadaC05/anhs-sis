@@ -30,7 +30,7 @@
     ])
 
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div class="border-b border-gray-200 px-6 py-5">
+        <div class="border-b border-gray-200 px-4 py-5 sm:px-6">
             <h1 class="text-2xl font-bold tracking-tight text-gray-800">Grade</h1>
 
             <form method="GET" action="{{ route('student.grades') }}" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -57,7 +57,7 @@
                 <button
                     type="button"
                     id="toggleGradeReport"
-                    class="inline-flex items-center justify-center rounded-md border border-[#296374] bg-white px-4 py-2.5 text-sm font-semibold text-[#296374] transition hover:bg-[#296374]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex w-full items-center justify-center rounded-md border border-[#296374] bg-white px-4 py-2.5 text-sm font-semibold text-[#296374] transition hover:bg-[#296374]/5 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     @disabled(! $enrollment)
                 >
                     Grade Report
@@ -85,7 +85,62 @@
                     ? strtoupper(substr($enrollment->semester, 0, 1)).'S'
                     : ($enrollment->gradeLevel?->grade_label ?? strtoupper(str_replace('grade_', 'G', (string) $enrollment->grade_level)));
             @endphp
-            <div class="overflow-x-auto">
+            <div class="space-y-3 p-4 md:hidden">
+                @php $mobileFinalRatings = []; @endphp
+                @foreach ($enrollment->subjectAssignments as $assignment)
+                    @php
+                        $grades = $assignment->grades->keyBy('grading_period');
+                        $subject = $assignment->curriculumSubject?->subject;
+                        $periodValues = collect($periodKeys)
+                            ->mapWithKeys(fn ($periodKey) => [$periodKey => $grades->get($periodKey)?->numeric_grade]);
+                        $availableGrades = $periodValues->filter(fn ($grade) => $grade !== null && $grade !== '');
+                        $finalRating = $availableGrades->isNotEmpty() ? round($availableGrades->avg()) : null;
+                        $mobileFinalRatings[] = $finalRating;
+                        $mobileRowId = 'mobile-grade-detail-'.$assignment->assignment_ID;
+                    @endphp
+                    <article class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-[#296374]">{{ $subject?->code ?? 'â€”' }}</p>
+                                <h2 class="mt-1 text-base font-bold leading-snug text-gray-800">{{ $subject?->title ?? 'N/A' }}</h2>
+                                <p class="mt-1 text-xs text-gray-500">{{ $semesterName }} · {{ $subject?->type ? ucwords(str_replace('_', ' ', $subject->type)) : 'â€”' }}</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Final Grade</p>
+                                <p class="mt-1 text-2xl font-bold text-gray-900">{{ $formatGrade($finalRating) }}</p>
+                                <p class="text-xs font-bold {{ $finalRating !== null && (float) $finalRating < 75 ? 'text-red-600' : 'text-emerald-700' }}">{{ $gradeRemarks($finalRating) }}</p>
+                            </div>
+                        </div>
+                        <button type="button" class="grade-expand mt-4 inline-flex w-full items-center justify-center rounded-md border border-[#296374] px-3 py-2 text-sm font-semibold text-[#296374] transition hover:bg-[#296374] hover:text-white" data-target="{{ $mobileRowId }}" data-expanded-label="Hide term grades" data-collapsed-label="View term grades" aria-expanded="false">
+                            View term grades
+                        </button>
+                        <div id="{{ $mobileRowId }}" class="hidden">
+                        @if ($availableGrades->isNotEmpty())
+                            <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 text-sm">
+                                @foreach ($availableGrades as $periodKey => $periodValue)
+                                    <div class="rounded bg-slate-50 px-3 py-2">
+                                        <dt class="text-xs text-gray-500">{{ $gradingPeriods[$periodKey] ?? $periodKey }}</dt>
+                                        <dd class="mt-1 font-bold text-gray-800">{{ $formatGrade($periodValue) }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        @else
+                            <p class="mt-3 border-t border-gray-100 pt-3 text-center text-sm text-gray-500">There are no grades yet.</p>
+                        @endif
+                        </div>
+                    </article>
+                @endforeach
+                @php
+                    $mobileAverageGrades = collect($mobileFinalRatings)->filter(fn ($grade) => $grade !== null);
+                    $mobileGeneralAverage = $mobileAverageGrades->isNotEmpty() ? round($mobileAverageGrades->avg()) : null;
+                @endphp
+                <div class="flex items-center justify-between rounded-lg bg-[#eef5f8] px-4 py-3">
+                    <span class="text-sm font-bold uppercase tracking-wide text-gray-700">General Average</span>
+                    <span class="text-lg font-bold {{ $mobileGeneralAverage !== null && (float) $mobileGeneralAverage < 75 ? 'text-red-600' : 'text-emerald-700' }}">{{ $formatGrade($mobileGeneralAverage) }} · {{ $gradeRemarks($mobileGeneralAverage) }}</span>
+                </div>
+            </div>
+
+            <div class="hidden overflow-x-auto md:block">
                 <table class="min-w-full border-collapse text-sm text-gray-800">
                     <thead>
                         <tr class="bg-[#dbeaf1] text-left text-xs font-bold uppercase tracking-wide text-gray-700">
@@ -132,33 +187,19 @@
                                     {{ $gradeRemarks($finalRating) }}
                                 </td>
                             </tr>
-                            <tr id="{{ $rowId }}" class="hidden bg-[#f8fbfd]">
+                            <tr id="{{ $rowId }}" class="hidden bg-[#e4f0f4]">
                                 <td colspan="7" class="border border-gray-200 px-4 py-3">
                                     @if ($availableGrades->isEmpty())
-                                        <p class="text-sm text-gray-500">There are no grades yet.</p>
+                                        <p class="text-center text-sm text-gray-500">There are no grades yet.</p>
                                     @else
-                                        <div class="overflow-x-auto">
-                                            <table class="min-w-[420px] text-xs">
-                                                <thead>
-                                                    <tr class="text-left text-gray-500">
-                                                        @foreach ($periodKeys as $periodKey)
-                                                            <th class="px-2 py-1 font-semibold">{{ $gradingPeriods[$periodKey] ?? $periodKey }}</th>
-                                                        @endforeach
-                                                        <th class="px-2 py-1 font-semibold">Final Rating</th>
-                                                        <th class="px-2 py-1 font-semibold">Remarks</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr class="text-gray-800">
-                                                        @foreach ($periodKeys as $periodKey)
-                                                            <td class="px-2 py-1 font-semibold">{{ $formatGrade($periodValues[$periodKey] ?? null) }}</td>
-                                                        @endforeach
-                                                        <td class="px-2 py-1 font-bold">{{ $formatGrade($finalRating) }}</td>
-                                                        <td class="px-2 py-1 font-semibold">{{ $gradeRemarks($finalRating) }}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <dl class="mx-auto max-w-lg divide-y divide-gray-200 overflow-hidden rounded-md border border-gray-200 bg-white text-sm">
+                                            @foreach ($availableGrades as $periodKey => $periodValue)
+                                                <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+                                                    <dt class="font-medium text-gray-600">{{ $gradingPeriods[$periodKey] ?? $periodKey }}</dt>
+                                                    <dd class="font-bold text-gray-800">{{ $formatGrade($periodValue) }}</dd>
+                                                </div>
+                                            @endforeach
+                                        </dl>
                                     @endif
                                 </td>
                             </tr>
@@ -241,6 +282,9 @@
                 const isHidden = target.classList.contains('hidden');
                 target.classList.toggle('hidden', !isHidden);
                 button.textContent = isHidden ? '−' : '+';
+                if (button.dataset.expandedLabel) {
+                    button.textContent = isHidden ? button.dataset.expandedLabel : button.dataset.collapsedLabel;
+                }
                 button.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
             });
         });
