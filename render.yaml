@@ -12,7 +12,8 @@ services:
         value: stderr
       - key: DB_CONNECTION
         value: pgsql
-      - key: DATABASE_URL
+      # config/database.php reads DB_URL (not DATABASE_URL).
+      - key: DB_URL
         fromDatabase:
           name: anhs-sis-db
           property: connectionString
