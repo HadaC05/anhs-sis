@@ -292,7 +292,7 @@
                 Enrollment Submitted Successfully
             </h2>
             <p class="mt-3 text-sm leading-6 text-gray-600 md:text-base">
-                {{ session('status', 'Your enrollment has been submitted successfully.') }}
+                {{ session('status', 'Use Check Enrollment Status for updates on your application.') }}
             </p>
 
             <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">

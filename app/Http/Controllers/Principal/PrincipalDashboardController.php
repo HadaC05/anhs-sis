@@ -33,11 +33,38 @@ class PrincipalDashboardController extends Controller
         ));
     }
 
-    public function gradeReleases(): View
+    public function gradeReleases(Request $request): View
     {
+        $validated = $request->validate([
+            'subject_id' => ['nullable', 'integer', 'exists:subjects,subject_ID'],
+            'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
+            'grade_level' => ['nullable', 'integer', 'exists:grade_level,grade_ID'],
+            'term_id' => ['nullable', 'integer', 'exists:grading_terms,term_ID'],
+            'semester' => ['nullable', 'in:first,second'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $gradeLevels = GradeLevel::query()->orderBy('grade_ID')->get();
+        $selectedGradeLevel = isset($validated['grade_level']) ? (int) $validated['grade_level'] : null;
+        $selectedGrade = $selectedGradeLevel ? $gradeLevels->firstWhere('grade_ID', $selectedGradeLevel) : null;
+        $showSemesterFilter = in_array($selectedGrade?->grade_label, ['Grade 11', 'Grade 12'], true);
+        $filters = [
+            'subject_id' => isset($validated['subject_id']) ? (int) $validated['subject_id'] : null,
+            'academic_year_id' => isset($validated['academic_year_id']) ? (int) $validated['academic_year_id'] : null,
+            'grade_level' => $selectedGradeLevel,
+            'term_id' => isset($validated['term_id']) ? (int) $validated['term_id'] : null,
+            'semester' => $showSemesterFilter ? ($validated['semester'] ?? null) : null,
+            'search' => trim($validated['search'] ?? ''),
+        ];
+
         return view('users.principal.grade-releases', [
-            'approvedAssignments' => $this->gradeReleaseAssignments('approved'),
-            'releasedAssignments' => $this->gradeReleaseAssignments('released'),
+            'assignments' => $this->gradeReleaseAssignments($filters),
+            'subjects' => Subject::query()->where('status', 'active')->orderBy('code')->orderBy('title')->get(),
+            'academicYears' => AcademicYear::query()->orderByDesc('start_date')->orderByDesc('SY_ID')->get(),
+            'gradeLevels' => $gradeLevels,
+            'terms' => GradingTerm::query()->orderBy('sort_order')->orderBy('term_ID')->get(),
+            'filters' => $filters,
+            'showSemesterFilter' => $showSemesterFilter,
         ]);
     }
 
@@ -465,19 +492,40 @@ class PrincipalDashboardController extends Controller
             ->values();
     }
 
-    private function gradeReleaseAssignments(string $status)
+    /**
+     * @param  array{subject_id: ?int, academic_year_id: ?int, grade_level: ?int, term_id: ?int, semester: ?string, search: string}  $filters
+     */
+    private function gradeReleaseAssignments(array $filters): Collection
     {
         return TeacherSubjectAssignment::query()
             ->with([
-                'section',
+                'section.gradeLevel',
+                'section.academicYear',
                 'curriculumSubject.subject',
+                'curriculumSubject.curriculumGradeLevel.gradingSemester',
                 'staff',
-                'grades' => function ($query) use ($status): void {
-                    $query->whereStatus($status);
+                'grades' => function ($query) use ($filters): void {
+                    $query->whereStatus([GradeStatus::APPROVED, GradeStatus::RELEASED])
+                        ->when($filters['term_id'], fn ($gradeQuery) => $gradeQuery->where('term_ID', $filters['term_id']))
+                        ->with(['gradeStatus', 'term']);
                 },
             ])
-            ->whereHas('grades', function ($query) use ($status): void {
-                $query->whereStatus($status);
+            ->whereHas('grades', function ($query) use ($filters): void {
+                $query->whereStatus([GradeStatus::APPROVED, GradeStatus::RELEASED])
+                    ->when($filters['term_id'], fn ($gradeQuery) => $gradeQuery->where('term_ID', $filters['term_id']));
+            })
+            ->when($filters['subject_id'], fn ($query) => $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $filters['subject_id'])))
+            ->when($filters['academic_year_id'], fn ($query) => $query->where('SY_ID', $filters['academic_year_id']))
+            ->when($filters['grade_level'], fn ($query) => $query->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('grade_ID', $filters['grade_level'])))
+            ->when($filters['semester'], fn ($query) => $query->whereHas('curriculumSubject.curriculumGradeLevel.gradingSemester', fn ($semesterQuery) => $semesterQuery->where('key', $filters['semester'])))
+            ->when($filters['search'] !== '', function ($query) use ($filters): void {
+                $search = $filters['search'];
+
+                $query->where(function ($searchQuery) use ($search): void {
+                    $searchQuery->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('curriculumSubject.subject', fn ($subjectQuery) => $subjectQuery->where('code', 'like', "%{$search}%")->orWhere('title', 'like', "%{$search}%"))
+                        ->orWhereHas('staff', fn ($staffQuery) => $staffQuery->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
+                });
             })
             ->orderBy('section_ID')
             ->get();

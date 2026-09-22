@@ -119,7 +119,7 @@ class Enrollment extends Model
         $query->orderBy(
             Curriculum::query()
                 ->select('grade_ID')
-                ->whereColumn('curriculum.curriculum_ID', 'enrollments.curriculum_grade_level_ID'),
+                ->whereColumn('curriculum_grade_levels.curriculum_ID', 'enrollments.curriculum_grade_level_ID'),
             $direction,
         );
     }

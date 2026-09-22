@@ -13,7 +13,7 @@
 
         <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-3 tracking-tight">Enrollment Submitted Successfully</h1>
         <p class="text-gray-600 text-sm md:text-base leading-6">
-            {{ session('status', 'Your enrollment has been submitted successfully.') }}
+            {{ session('status', 'Use Check Enrollment Status for updates on your application.') }}
         </p>
 
         <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3">

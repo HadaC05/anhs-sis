@@ -45,7 +45,7 @@ class ApplicationController extends Controller
 
         return redirect()->route('register')
             ->with('registration_submitted', true)
-            ->with('status', 'Your enrollment has been submitted successfully.');
+            ->with('status', 'Use Check Enrollment Status for updates on your application.');
     }
 
     public function checkStatus(CheckApplicationStatusRequest $request): RedirectResponse

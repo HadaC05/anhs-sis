@@ -76,7 +76,7 @@ class GuidanceEnrollmentController extends Controller
         $enrollment = StudentEnrollmentRegistrar::update($enrollment, $request->validated());
 
         return $this->redirectToShow($enrollment, $request, [
-            'status' => 'Enrollment details were updated.',
+            'toast_success' => 'Enrollment details were updated.',
         ]);
     }
 

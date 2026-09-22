@@ -67,6 +67,9 @@ class EnrollmentDashboardData
 
         $enrolledStatusId = EnrollmentStatus::idFor(EnrollmentStatus::ENROLLED);
         $temporaryStatusId = EnrollmentStatus::idFor(EnrollmentStatus::TEMPORARILY_ENROLLED);
+        $enrollmentStatusColumn = DB::connection()
+            ->getQueryGrammar()
+            ->wrap('enrollments.enrollment_status_ID');
 
         $enrollmentByGrade = DB::table('enrollments')
             ->join('curriculum_grade_levels', 'enrollments.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
@@ -76,10 +79,8 @@ class EnrollmentDashboardData
             ->when($enrollmentGradeId, fn ($query) => $query->where('curriculum_grade_levels.grade_ID', $enrollmentGradeId))
             ->select('grade_level.grade_ID')
             ->selectRaw('grade_level.grade_label as label')
-            // This legacy column is mixed-case and must be quoted in raw SQL
-            // when the application runs on PostgreSQL.
-            ->selectRaw('SUM(CASE WHEN enrollments."enrollment_status_ID" = ? THEN 1 ELSE 0 END) as enrolled', [$enrolledStatusId])
-            ->selectRaw('SUM(CASE WHEN enrollments."enrollment_status_ID" = ? THEN 1 ELSE 0 END) as temporary', [$temporaryStatusId])
+            ->selectRaw("SUM(CASE WHEN {$enrollmentStatusColumn} = ? THEN 1 ELSE 0 END) as enrolled", [$enrolledStatusId])
+            ->selectRaw("SUM(CASE WHEN {$enrollmentStatusColumn} = ? THEN 1 ELSE 0 END) as temporary", [$temporaryStatusId])
             ->groupBy('grade_level.grade_ID', 'grade_level.grade_label')
             ->orderBy('grade_level.grade_ID')
             ->get()
