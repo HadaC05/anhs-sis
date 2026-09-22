@@ -1,20 +1,23 @@
-# Build browser assets separately so the production image does not need Node.js.
-FROM node:22-alpine AS assets
-
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY resources ./resources
-COPY public ./public
-COPY vite.config.js ./
-RUN npm run build
-
 # Install only the PHP packages required in production.
 FROM composer:2 AS dependencies
 
 WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+# Build browser assets separately so the production image does not need Node.js.
+# Flux's stylesheet is imported from Composer's vendor directory, so copy that
+# directory into this stage before Vite compiles app.css.
+FROM node:22-alpine AS assets
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY --from=dependencies /app/vendor ./vendor
+COPY resources ./resources
+COPY public ./public
+COPY vite.config.js ./
+RUN npm run build
 
 FROM php:8.3-fpm-alpine
 
