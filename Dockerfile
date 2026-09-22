@@ -3,7 +3,10 @@ FROM composer:2 AS dependencies
 
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
+# Laravel's Composer hook calls `php artisan package:discover`, but this stage
+# intentionally has only composer files. Run discovery after the application
+# has been copied into the final image below.
+RUN composer install --no-dev --no-scripts --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
 # Build browser assets separately so the production image does not need Node.js.
 # Flux's stylesheet is imported from Composer's vendor directory, so copy that
@@ -51,7 +54,8 @@ COPY --from=assets /app/public/build ./public/build
 COPY docker/nginx/default.conf.template /etc/nginx/http.d/default.conf.template
 COPY docker/start-container /usr/local/bin/start-container
 
-RUN chmod +x /usr/local/bin/start-container \
+RUN php artisan package:discover --ansi \
+    && chmod +x /usr/local/bin/start-container \
     && chown -R www-data:www-data storage bootstrap/cache
 
 ENV PORT=10000
