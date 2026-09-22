@@ -114,7 +114,8 @@ return new class extends Migration
                 ->select('name', DB::raw('MIN("course_ID") as keep_id'), DB::raw('COUNT(*) as total'))
                 ->whereIn('cluster_ID', $oldIds)
                 ->groupBy('name')
-                ->having('total', '>', 1)
+                // PostgreSQL does not permit SELECT aliases in HAVING.
+                ->havingRaw('COUNT(*) > 1')
                 ->get();
 
             foreach ($duplicates as $row) {
