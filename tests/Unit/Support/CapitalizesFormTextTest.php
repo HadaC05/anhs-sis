@@ -39,3 +39,15 @@ it('leaves empty, missing, and non-string values unchanged', function () {
         ->and($result['last_name'])->toBe('  ')
         ->and($result['grade_level'])->toBe(7);
 });
+
+it('preserves words with consecutive uppercase letters', function () {
+    $result = CapitalizesFormText::apply([
+        'first_name' => 'maria ANNE',
+        'last_name' => 'mcdonald MCDONALD',
+        'last_school_attended' => 'agusan NHS',
+    ]);
+
+    expect($result['first_name'])->toBe('Maria ANNE')
+        ->and($result['last_name'])->toBe('Mcdonald MCDONALD')
+        ->and($result['last_school_attended'])->toBe('Agusan NHS');
+});

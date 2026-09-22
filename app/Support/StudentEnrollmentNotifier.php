@@ -31,10 +31,15 @@ class StudentEnrollmentNotifier
             return;
         }
 
-        try {
-            Mail::to($email)->send(new StudentEnrollmentStatusMail($student, $enrollment, $status));
-        } catch (Throwable $exception) {
-            report($exception);
-        }
+        // SMTP can take longer than Render's HTTP gateway timeout. Queue this
+        // work after the redirect has been sent so registration confirmation is
+        // never lost even when an email provider is slow or unavailable.
+        app()->terminating(function () use ($email, $student, $enrollment, $status): void {
+            try {
+                Mail::to($email)->send(new StudentEnrollmentStatusMail($student, $enrollment, $status));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
     }
 }

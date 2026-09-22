@@ -91,7 +91,7 @@
                     @unless ($uploadedDoc?->isVerified())
                         <div class="mt-4">
                             <label class="mb-1.5 block text-xs font-semibold text-gray-600" for="document-{{ $docType }}">Choose file</label>
-                            <input id="document-{{ $docType }}" form="student-documents-form" type="file" name="documents[{{ $docType }}]" accept=".pdf,.jpg,.jpeg,.png" class="student-document-file {{ $fieldClass }}">
+                            <input id="document-{{ $docType }}" form="student-documents-form" type="file" name="documents[{{ $docType }}]" accept=".pdf,.jpg,.jpeg,.png" data-document-input-layout="mobile" class="student-document-file {{ $fieldClass }}">
                         </div>
                     @endunless
                     <div class="mt-4 flex flex-wrap gap-2" data-document-actions data-document-layout="mobile">
@@ -175,6 +175,7 @@
                                         type="file"
                                         name="documents[{{ $docType }}]"
                                         accept=".pdf,.jpg,.jpeg,.png"
+                                        data-document-input-layout="desktop"
                                         class="student-document-file {{ $fieldClass }}"
                                     >
                                 @else
@@ -298,6 +299,25 @@
 
         if (! form) {
             return;
+        }
+
+        // Each document is shown in both the mobile cards and desktop table. Only
+        // submit the inputs from the visible layout so duplicate field names do not
+        // cause an empty hidden input to replace a selected mobile file.
+        const syncActiveDocumentInputs = () => {
+            const activeLayout = window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop';
+
+            document.querySelectorAll('[data-document-input-layout]').forEach((input) => {
+                input.disabled = input.dataset.documentInputLayout !== activeLayout;
+            });
+        };
+
+        const documentLayoutMedia = window.matchMedia('(max-width: 767px)');
+        syncActiveDocumentInputs();
+        if (documentLayoutMedia.addEventListener) {
+            documentLayoutMedia.addEventListener('change', syncActiveDocumentInputs);
+        } else {
+            documentLayoutMedia.addListener(syncActiveDocumentInputs);
         }
 
         const showError = (message) => {

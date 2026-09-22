@@ -187,7 +187,7 @@
 
         <button type="button"
             @click="showStatusModal = true"
-            class="fixed bottom-4 left-4 right-4 z-50 rounded-full bg-blue-700 px-5 py-3 font-semibold text-white shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 hover:bg-blue-800 sm:bottom-6 sm:left-6 sm:right-auto">
+            class="fixed bottom-4 left-4 right-4 z-50 rounded-full bg-[#D4AF37] px-5 py-3 font-semibold text-[#0C2C55] shadow-lg focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50 hover:bg-[#B8912E] sm:bottom-6 sm:left-6 sm:right-auto">
             Check Enrollment Status
         </button>
     </main>

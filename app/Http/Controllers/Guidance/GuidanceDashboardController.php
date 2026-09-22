@@ -14,6 +14,7 @@ use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\DocumentReturnReason;
 use App\Models\DocumentStatus;
+use App\Models\DocumentType;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
@@ -483,6 +484,11 @@ class GuidanceDashboardController extends Controller
 
     public function verifyDocument(StudentDocument $document, Request $request): RedirectResponse
     {
+        if ($document->doc_type === DocumentType::ID_PHOTO) {
+            return $this->redirectToEnrollmentDocuments($document, $request, [])
+                ->withErrors(['error' => 'The 2x2 photo is a profile photo and does not require document verification.']);
+        }
+
         $user = $request->user();
 
         try {
@@ -524,6 +530,7 @@ class GuidanceDashboardController extends Controller
             ->whereIn('doc_ID', $validated['document_ids'])
             ->where('student_ID', $enrollment->student_ID)
             ->where('status', 'pending')
+            ->where('doc_type', '!=', DocumentType::ID_PHOTO)
             ->get();
 
         if ($documents->isEmpty()) {
@@ -562,6 +569,11 @@ class GuidanceDashboardController extends Controller
 
     public function unverifyDocument(StudentDocument $document, Request $request): RedirectResponse
     {
+        if ($document->doc_type === DocumentType::ID_PHOTO) {
+            return $this->redirectToEnrollmentDocuments($document, $request, [])
+                ->withErrors(['error' => 'The 2x2 photo is a profile photo and does not require document verification.']);
+        }
+
         if (! $document->isVerified()) {
             return $this->redirectToEnrollmentDocuments($document, $request, [])
                 ->withErrors(['error' => 'Only verified documents can be unverified.']);
@@ -588,6 +600,11 @@ class GuidanceDashboardController extends Controller
 
     public function rejectDocument(RejectStudentDocumentRequest $request, StudentDocument $document): RedirectResponse
     {
+        if ($document->doc_type === DocumentType::ID_PHOTO) {
+            return $this->redirectToEnrollmentDocuments($document, $request, [])
+                ->withErrors(['error' => 'The 2x2 photo is a profile photo and does not require document verification.']);
+        }
+
         $user = $request->user();
         $validated = $request->validated();
 
@@ -948,6 +965,7 @@ class GuidanceDashboardController extends Controller
         $documents = StudentDocument::query()
             ->with('returnReason')
             ->where('student_ID', $enrollment->student_ID)
+            ->where('doc_type', '!=', DocumentType::ID_PHOTO)
             ->orderBy('created_at', 'desc')
             ->get();
 

@@ -53,11 +53,6 @@
                 {{ $pendingCount }} pending review
             </a>
         @endif
-        @if ($showEnrollmentNotifications && $placementTestMarkedCount > 0)
-            <a href="{{ route('guidance.reports.age-for-grade') }}" class="inline-flex items-center gap-2 rounded-xl border border-[#296374]/20 bg-[#296374]/5 px-4 py-3 text-sm font-semibold text-[#296374] shadow-sm transition hover:bg-[#296374]/10">
-                {{ $placementTestMarkedCount }} marked for placement test
-            </a>
-        @endif
     </div>
 </div>
 

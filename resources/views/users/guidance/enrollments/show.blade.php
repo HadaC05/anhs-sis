@@ -223,7 +223,6 @@ $documentLabels = [
     'birth_certificate' => 'Birth Certificate',
     'form_137' => 'Form 137 / SF9',
     'good_moral' => 'Good Moral Certificate',
-    'id_photo' => '2x2 Photo',
     'other' => 'Other Supporting Document',
 ];
 $labelClass = 'mb-1.5 block text-sm text-gray-500';
@@ -605,7 +604,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
         </div>
         <div class="flex flex-wrap items-center gap-2">
             @if($pendingDocuments->isNotEmpty())
-            <form id="bulk-verify-form" action="{{ route('guidance.documents.bulk-verify') }}" method="POST" class="inline">
+            <form id="bulk-verify-form" action="{{ route('guidance.documents.bulk-verify') }}" method="POST" class="document-action-form inline" data-confirm-title="Verify selected documents?" data-confirm-message="The selected documents will be marked as verified.">
                 @csrf
                 <input type="hidden" name="enrollment_ID" value="{{ $enrollment->enrollment_ID }}">
                 @if ($fromSectionId)
@@ -623,24 +622,29 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
     </div>
 
     @if(isset($documents) && $documents->isNotEmpty())
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="overflow-x-auto rounded-xl border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                <tr>
+                    <th class="w-12 px-4 py-3"><span class="sr-only">Select</span></th>
+                    <th class="px-4 py-3">Document</th>
+                    <th class="px-4 py-3">Uploaded</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Remarks</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 bg-white">
         @foreach($documents as $doc)
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="flex items-start justify-between gap-3 mb-3">
-                <div class="flex items-start gap-2 min-w-0">
-                    @if(($doc->status ?? '') === 'pending')
-                    <input type="checkbox" form="bulk-verify-form" name="document_ids[]" value="{{ $doc->doc_ID }}" class="document-verify-checkbox mt-1 h-4 w-4 rounded border-gray-300 text-[#296374] focus:ring-[#296374]">
-                    @endif
-                    <div>
-                        <p class="text-xs font-bold text-[#296374] uppercase tracking-wider">
-                            {{ $documentLabels[$doc->doc_type] ?? ucwords(str_replace('_', ' ', $doc->doc_type ?? 'document')) }}
-                        </p>
-                        <p class="text-xs text-gray-500 mt-1">Uploaded {{ $doc->date_uploaded?->format('M d, Y h:i A') ?? '-' }}</p>
-                        @if($doc->date_verified)
-                        <p class="text-xs text-gray-500">Reviewed {{ $doc->date_verified->format('M d, Y h:i A') }}</p>
-                        @endif
-                    </div>
-                </div>
+        <tr class="align-top hover:bg-slate-50/70">
+            <td class="px-4 py-4">
+                @if(($doc->status ?? '') === 'pending')
+                <input type="checkbox" form="bulk-verify-form" name="document_ids[]" value="{{ $doc->doc_ID }}" class="document-verify-checkbox h-4 w-4 rounded border-gray-300 text-[#296374] focus:ring-[#296374]" aria-label="Select document">
+                @endif
+            </td>
+            <td class="px-4 py-4 font-semibold text-[#296374]">{{ $documentLabels[$doc->doc_type] ?? ucwords(str_replace('_', ' ', $doc->doc_type ?? 'document')) }}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-xs text-gray-600">{{ $doc->date_uploaded?->format('M d, Y h:i A') ?? '-' }}</td>
+            <td class="px-4 py-4">
                 @if(($doc->status ?? '') === 'verified')
                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-green-100 text-green-800">Verified</span>
                 @elseif(($doc->status ?? '') === 'returned')
@@ -648,36 +652,40 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                 @else
                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-800">Pending</span>
                 @endif
-            </div>
-
-            @if(($doc->status ?? '') === 'returned' && $doc->returnReason)
-            <p class="mb-3 rounded-md border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
-                Return reason: {{ $doc->returnReason->name }}
-            </p>
-            @endif
+            </td>
+            <td class="px-4 py-4 text-xs text-gray-600">
+                @if(($doc->status ?? '') === 'returned' && $doc->returnReason)
+                    <span class="text-red-700">{{ $doc->returnReason->name }}</span>
+                @elseif($doc->date_verified)
+                    Reviewed {{ $doc->date_verified->format('M d, Y h:i A') }}
+                @else
+                    Awaiting review
+                @endif
+            </td>
+            <td class="px-4 py-4">
+                <div class="flex flex-wrap justify-end gap-2">
 
             @if($doc->file_path)
             <a href="{{ route('guidance.documents.view', $doc) }}"
                target="_blank"
                rel="noopener noreferrer"
-               class="inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+               class="inline-flex items-center gap-1 rounded-lg border border-[#296374]/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#296374] hover:bg-[#296374]/5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
                 View document
             </a>
             @else
-            <p class="text-sm text-gray-500">No file attached.</p>
+            <span class="text-xs text-gray-500">No file attached.</span>
             @endif
 
             @if(($doc->status ?? '') === 'pending')
-            <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
-                <form action="{{ route('guidance.documents.verify', $doc) }}" method="POST" class="inline">
+                <form action="{{ route('guidance.documents.verify', $doc) }}" method="POST" class="document-action-form inline" data-confirm-title="Verify document?" data-confirm-message="This marks the document as verified.">
                     @csrf
                     @if ($fromSectionId)
                         <input type="hidden" name="from_section" value="{{ $fromSectionId }}">
                     @endif
-                    <button type="submit" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white bg-green-600 hover:bg-green-700 transition-colors">
+                    <button type="submit" class="rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-white bg-green-600 hover:bg-green-700 transition-colors">
                         Verify
                     </button>
                 </form>
@@ -687,22 +695,23 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                     class="document-return-trigger rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white bg-red-600 hover:bg-red-700 transition-colors">
                     Return
                 </button>
-            </div>
             @elseif($doc->isVerified())
-            <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
-                <form action="{{ route('guidance.documents.unverify', $doc) }}" method="POST" class="inline" onsubmit="return confirm('Unverify this document so the student can replace it?')">
+                <form action="{{ route('guidance.documents.unverify', $doc) }}" method="POST" class="document-action-form inline" data-confirm-title="Unverify document?" data-confirm-message="The student will be able to replace this document.">
                     @csrf
                     @if ($fromSectionId)
                         <input type="hidden" name="from_section" value="{{ $fromSectionId }}">
                     @endif
-                    <button type="submit" class="rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white bg-amber-600 hover:bg-amber-700 transition-colors">
+                    <button type="submit" class="rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-white bg-amber-600 hover:bg-amber-700 transition-colors">
                         Unverify
                     </button>
                 </form>
-            </div>
             @endif
-        </div>
+                </div>
+            </td>
+        </tr>
         @endforeach
+            </tbody>
+        </table>
     </div>
     @else
     <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center">
@@ -870,13 +879,33 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
         });
         syncBulkVerifyState();
 
-        if (bulkForm) {
-            bulkForm.addEventListener('submit', function(event) {
-                if (bulkSubmit && bulkSubmit.disabled) {
-                    event.preventDefault();
-                }
+        function showActionConfirmation(form) {
+            var previous = document.getElementById('document-action-toast');
+            if (previous) previous.remove();
+
+            var toast = document.createElement('div');
+            toast.id = 'document-action-toast';
+            toast.className = 'fixed bottom-5 right-5 z-[110] w-[min(24rem,calc(100vw-2.5rem))] rounded-xl border border-slate-200 bg-white p-4 shadow-xl';
+            toast.innerHTML = '<p class="text-sm font-bold text-slate-800"></p><p class="mt-1 text-xs leading-relaxed text-slate-600"></p><div class="mt-4 flex justify-end gap-2"><button type="button" data-toast-cancel class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-700">Cancel</button><button type="button" data-toast-confirm class="rounded-lg bg-[#296374] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">Confirm</button></div>';
+            toast.querySelector('p:first-child').textContent = form.dataset.confirmTitle || 'Confirm action?';
+            toast.querySelector('p:nth-child(2)').textContent = form.dataset.confirmMessage || 'This action will update the document.';
+            toast.querySelector('[data-toast-cancel]').addEventListener('click', function() { toast.remove(); });
+            toast.querySelector('[data-toast-confirm]').addEventListener('click', function() {
+                form.dataset.confirmed = 'true';
+                toast.remove();
+                form.requestSubmit();
             });
+            document.body.appendChild(toast);
         }
+
+        document.querySelectorAll('.document-action-form').forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.dataset.confirmed === 'true') return;
+                event.preventDefault();
+                if (form === bulkForm && bulkSubmit && bulkSubmit.disabled) return;
+                showActionConfirmation(form);
+            });
+        });
 
         var returnModal = document.getElementById('documentReturnModal');
         var returnForm = document.getElementById('documentReturnForm');
@@ -958,7 +987,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
             <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Documents</p>
             <h3 id="documentReturnTitle" class="mt-1 text-lg font-bold tracking-tight text-white">Return document</h3>
         </div>
-        <form id="documentReturnForm" method="POST" action="">
+        <form id="documentReturnForm" method="POST" action="" class="document-action-form" data-confirm-title="Return document?" data-confirm-message="The student will be asked to resubmit this document.">
             @csrf
             @if ($fromSectionId)
                 <input type="hidden" name="from_section" value="{{ $fromSectionId }}">

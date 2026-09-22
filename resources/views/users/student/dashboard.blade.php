@@ -101,7 +101,7 @@
 
 <div class="space-y-6">
     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <div class="space-y-6 lg:col-span-7 xl:col-span-8">
+        <div class="order-2 space-y-6 lg:order-1 lg:col-span-7 xl:col-span-8">
             <section>
                 <h1 class="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
             </section>
@@ -111,7 +111,7 @@
                     <h2 class="text-lg font-bold tracking-tight text-slate-900">Quick Access</h2>
                 </div>
 
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+                <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                     @foreach ($quickLinks as $link)
                         <a href="{{ $link['href'] }}" class="group flex h-full min-w-0 flex-col rounded-2xl p-4 shadow-lg transition hover:-translate-y-0.5 sm:p-5 {{ $link['card'] }}">
                             <div class="flex h-11 w-11 items-center justify-center rounded-xl {{ $link['iconWrap'] }}">
@@ -132,7 +132,7 @@
             </section>
         </div>
 
-        <aside class="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24">
+        <aside class="order-1 lg:order-2 lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24">
             <section class="overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm">
                 <div class="border-b border-slate-300 bg-[#296374] px-6 py-3">
                     <h2 class="text-sm font-semibold uppercase tracking-[0.16em] text-white">Student Record</h2>

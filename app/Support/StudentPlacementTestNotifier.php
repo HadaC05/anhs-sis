@@ -22,11 +22,14 @@ class StudentPlacementTestNotifier
 
         $enrollment->loadMissing(['academicYear', 'gradeLevel', 'student']);
 
-        try {
-            Mail::to($email)->send(new StudentPlacementTestMail($student, $enrollment));
-        } catch (Throwable $exception) {
-            report($exception);
-        }
+        // Do not let a slow SMTP connection delay the enrollment response.
+        app()->terminating(function () use ($email, $student, $enrollment): void {
+            try {
+                Mail::to($email)->send(new StudentPlacementTestMail($student, $enrollment));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
     }
 
     public static function sendIfNewlyRecommended(Enrollment $enrollment, ?string $previousStatus = null): void

@@ -199,6 +199,10 @@
         .enrollment-step {
             min-width: 200px;
         }
+
+        .enrollment-section {
+            scroll-margin-top: 5.5rem;
+        }
     }
 
     .guidance-edit-form {
@@ -1633,7 +1637,7 @@
         }
     }
 
-    function setActiveStep(stepIndex) {
+    function setActiveStep(stepIndex, { scrollToTop = false } = {}) {
         activeStep = Math.max(0, Math.min(stepIndex, formSections.length - 1));
 
         if (isSinglePageEdit) {
@@ -1664,6 +1668,13 @@
         }
         if (submitButton) {
             submitButton.classList.toggle('hidden', activeStep !== formSections.length - 1);
+        }
+
+        if (scrollToTop && window.matchMedia('(max-width: 640px)').matches) {
+            formSections[activeStep]?.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                block: 'start',
+            });
         }
     }
 
@@ -1828,17 +1839,17 @@
         field?.addEventListener('input', copyCurrentToPermanent);
     });
     backButton?.addEventListener('click', () => {
-        setActiveStep(activeStep - 1);
+        setActiveStep(activeStep - 1, { scrollToTop: true });
     });
     nextButton?.addEventListener('click', async () => {
         if (await validateStep(activeStep)) {
-            setActiveStep(activeStep + 1);
+            setActiveStep(activeStep + 1, { scrollToTop: true });
         }
     });
     sectionLinks.forEach((link, index) => {
         link.addEventListener('click', async () => {
             if (index <= activeStep || await validateThrough(index - 1)) {
-                setActiveStep(index);
+                setActiveStep(index, { scrollToTop: true });
             }
         });
     });

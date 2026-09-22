@@ -71,8 +71,8 @@
                         </a>
                         <button type="button"
                             @click="showStatusModal = true"
-                            class="inline-flex w-full items-center justify-center rounded-full border border-white/70 px-7 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-white/30 sm:w-auto">
-                            Check Status
+                            class="inline-flex w-full items-center justify-center rounded-full bg-[#D4AF37] px-7 py-3 text-sm font-bold uppercase tracking-wide text-[#0C2C55] shadow-lg transition hover:bg-[#B8912E] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50 sm:w-auto">
+                            Check Enrollment Status
                         </button>
                     </div>
                 </div>
@@ -183,16 +183,16 @@
                 <!-- FAQ Item 1 -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <button class="faq-question flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition duration-200 hover:bg-gray-50 sm:px-6" @click="open = open === 1 ? 0 : 1">
-                        <span class="font-semibold text-[#0C2C55]">How do I register as a new student?</span>
+                        <span class="font-semibold text-[#0C2C55]">How do I enroll?</span>
                         <svg class="faq-icon h-5 w-5 shrink-0 transform text-[#0C2C55] transition-transform duration-300" :class="{ 'rotate-180': open === 1 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div class="faq-answer px-6 pb-4" x-show="open === 1" x-transition>
                         <p class="text-gray-700 leading-relaxed">
-                            To register as a new student, click on the "Register as a Student" link on the login page.
-                            You will need to provide your personal information, contact details, and academic records.
-                            Once your registration is approved, you can check your status using your LRN and birthdate to view your login instructions.
+                            Click <strong>Enroll Now</strong> and complete the registration form with your LRN, personal and contact details,
+                            address, parent or guardian information, and enrollment details. Submit the form once all required fields are complete.
+                            The system will create your student account and mark your enrollment as temporarily enrolled.
                         </p>
                     </div>
                 </div>
@@ -207,9 +207,9 @@
                     </button>
                     <div class="faq-answer px-6 pb-4" x-show="open === 2" x-transition>
                         <p class="text-gray-700 leading-relaxed">
-                            For enrollment, you will need the following documents: birth certificate, high school diploma or transcript of records,
-                            recent 2x2 ID photos, medical certificate, and valid ID. Additional documents may be required depending on your
-                            chosen program. Please check the documents section in your student portal for a complete list.
+                            After you sign in, open the Documents section of your student portal and upload the requirements shown there.
+                            A Birth Certificate and Form 137/SF9 are required. A Good Moral Certificate and recent 2x2 photo may also be
+                            submitted when applicable. Guidance will review and verify your uploaded documents.
                         </p>
                     </div>
                 </div>
@@ -217,16 +217,16 @@
                 <!-- FAQ Item 3 -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <button class="faq-question w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition duration-200" @click="open = open === 3 ? 0 : 3">
-                        <span class="font-semibold text-[#0C2C55]">How can I reset my password?</span>
+                        <span class="font-semibold text-[#0C2C55]">How do I check my enrollment status?</span>
                         <svg class="faq-icon w-5 h-5 text-[#0C2C55] transform transition-transform duration-300" :class="{ 'rotate-180': open === 3 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div class="faq-answer px-6 pb-4" x-show="open === 3" x-transition>
                         <p class="text-gray-700 leading-relaxed">
-                            If you forgot your password, click on the "Forgot Password" link on the login page. Enter your registered
-                            Username, and you will receive instructions on how to reset your password. If you continue to have issues,
-                            please contact the IT support team or visit the registrar's office.
+                            Select <strong>Check Enrollment Status</strong> on the home page or login page. Enter the same 12-digit LRN and
+                            birthdate you used during registration. The system will show whether your enrollment is pending, temporarily enrolled,
+                            or enrolled, along with sign-in instructions when your account is ready.
                         </p>
                     </div>
                 </div>
@@ -234,16 +234,16 @@
                 <!-- FAQ Item 4 -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <button class="faq-question w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition duration-200" @click="open = open === 4 ? 0 : 4">
-                        <span class="font-semibold text-[#0C2C55]">When is the enrollment period?</span>
+                        <span class="font-semibold text-[#0C2C55]">How do I sign in for the first time?</span>
                         <svg class="faq-icon w-5 h-5 text-[#0C2C55] transform transition-transform duration-300" :class="{ 'rotate-180': open === 4 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div class="faq-answer px-6 pb-4" x-show="open === 4" x-transition>
                         <p class="text-gray-700 leading-relaxed">
-                            The enrollment period typically begins one month before the start of each semester. For the first semester,
-                            enrollment usually starts in May and ends in July. For the second semester, enrollment starts in November
-                            and ends in January. Please check the academic calendar for specific dates.
+                            Check your enrollment status using your LRN and birthdate. When sign-in instructions are available, use your LRN as
+                            your username. Your temporary password follows the format shown by the status checker. Change that password immediately
+                            after your first sign-in.
                         </p>
                     </div>
                 </div>
@@ -251,15 +251,16 @@
                 <!-- FAQ Item 5 -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <button class="faq-question w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition duration-200" @click="open = open === 5 ? 0 : 5">
-                        <span class="font-semibold text-[#0C2C55]">How do I access my student portal?</span>
+                        <span class="font-semibold text-[#0C2C55]">What happens after I upload my documents?</span>
                         <svg class="faq-icon w-5 h-5 text-[#0C2C55] transform transition-transform duration-300" :class="{ 'rotate-180': open === 5 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div class="faq-answer px-6 pb-4" x-show="open === 5" x-transition>
                         <p class="text-gray-700 leading-relaxed">
-                            After your application is approved, verify your status using your LRN and birthdate. Your username will be
-                            your LRN, and your default password will follow the posted password format. Change your password after your first login.
+                            Your enrollment remains temporarily enrolled while the required documents are being reviewed. Once Guidance verifies
+                            that the required documents are complete, the system updates your status to enrolled. You can continue to check the
+                            status checker or your student portal for updates.
                         </p>
                     </div>
                 </div>
@@ -267,16 +268,16 @@
                 <!-- FAQ Item 6 -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <button class="faq-question w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition duration-200" @click="open = open === 6 ? 0 : 6">
-                        <span class="font-semibold text-[#0C2C55]">Who can I contact for technical support?</span>
+                        <span class="font-semibold text-[#0C2C55]">What if I forget my password or need help?</span>
                         <svg class="faq-icon w-5 h-5 text-[#0C2C55] transform transition-transform duration-300" :class="{ 'rotate-180': open === 6 }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div class="faq-answer px-6 pb-4" x-show="open === 6" x-transition>
                         <p class="text-gray-700 leading-relaxed">
-                            For technical support, you can contact the IT Department through email at it-support@school.edu or call
-                            (123) 456-7890 during office hours (Monday to Friday, 8:00 AM to 5:00 PM). You can also visit the IT
-                            office located on the ground floor of the main building for in-person assistance.
+                            On the login page, select <strong>Forgot Password</strong>, enter the email registered to your account, request the
+                            one-time password, and enter the six-digit code to reset your password. For enrollment or document concerns,
+                            contact or visit the Guidance Office.
                         </p>
                     </div>
                 </div>

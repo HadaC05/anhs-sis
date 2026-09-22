@@ -2,8 +2,6 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Str;
-
 class CapitalizesFormText
 {
     /**
@@ -43,9 +41,28 @@ class CapitalizesFormText
                 continue;
             }
 
-            $values[$field] = Str::title($values[$field]);
+            $values[$field] = self::titleCasePreservingUppercaseRuns($values[$field]);
         }
 
         return $values;
+    }
+
+    /**
+     * Title-case ordinary words while retaining deliberate uppercase sequences,
+     * such as initials and acronyms (for example, "ANHS" or "McDONALD").
+     */
+    private static function titleCasePreservingUppercaseRuns(string $value): string
+    {
+        return preg_replace_callback(
+            '/\S+/u',
+            static function (array $matches): string {
+                $word = $matches[0];
+
+                return preg_match('/\p{Lu}{2,}/u', $word)
+                    ? $word
+                    : mb_convert_case($word, MB_CASE_TITLE, 'UTF-8');
+            },
+            $value,
+        ) ?? $value;
     }
 }

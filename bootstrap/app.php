@@ -41,6 +41,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function (Throwable $exception): void {
+            $request = app()->bound('request') ? request() : null;
+            $context = [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+                'method' => $request?->method(),
+                'path' => $request?->path(),
+                'trace' => $exception->getTraceAsString(),
+            ];
+
+            Log::error('Unhandled application exception.', $context);
+            error_log('Unhandled application exception: '.json_encode($context));
+        });
+
         $exceptions->render(function (TransportExceptionInterface $exception, Request $request) {
             if (! $request->routeIs('password.email')) {
                 return null;
