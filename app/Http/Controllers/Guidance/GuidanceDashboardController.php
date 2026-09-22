@@ -149,7 +149,7 @@ class GuidanceDashboardController extends Controller
                 }
             })
             ->when($gradeId, function ($query) use ($gradeId) {
-                $query->where('grade_ID', $gradeId);
+                $query->forGrade($gradeId);
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereHas('student', function ($studentQuery) use ($search) {
@@ -406,7 +406,7 @@ class GuidanceDashboardController extends Controller
                 $query->where('SY_ID', $activeYear->SY_ID);
             })
             ->when($gradeId, function ($query) use ($gradeId) {
-                $query->where('grade_ID', $gradeId);
+                $query->forGrade($gradeId);
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereHas('student', function ($studentQuery) use ($search) {
@@ -416,7 +416,7 @@ class GuidanceDashboardController extends Controller
                         ->orWhere('middle_name', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('grade_ID')
+            ->orderByGrade()
             ->orderBy('section_ID')
             ->orderBy('enrollment_ID')
             ->get();

@@ -54,7 +54,9 @@ class TeacherSectionController extends Controller
         }
 
         if ($staff) {
-            $assignmentScope = function ($query) use ($staff): void {
+            $gradeStatusIds = GradeStatus::idsBySlug();
+
+            $assignmentScope = function ($query) use ($staff, $gradeStatusIds): void {
                 $query->with(['curriculumSubject.subject'])
                     ->where('staff_ID', $staff->staff_id)
                     ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
@@ -62,7 +64,18 @@ class TeacherSectionController extends Controller
                     ->leftJoin('subjects', 'curriculum_subjects.subject_ID', '=', 'subjects.subject_ID')
                     ->orderBy('curriculum_grade_levels.semester_ID')
                     ->orderBy('subjects.title')
-                    ->select('teacher_subject_assignments.*');
+                    ->select('teacher_subject_assignments.*')
+                    ->withCount('grades');
+
+                foreach (GradeStatus::slugs() as $status) {
+                    $statusId = $gradeStatusIds[$status] ?? null;
+
+                    if ($statusId) {
+                        $query->withCount([
+                            "grades as {$status}_grades_count" => fn ($gradeQuery) => $gradeQuery->where('grade_status_ID', $statusId),
+                        ]);
+                    }
+                }
             };
 
             $sections = Section::query()
@@ -117,6 +130,12 @@ class TeacherSectionController extends Controller
             'clusters' => Cluster::query()->orderBy('name')->get(['cluster_ID', 'name']),
             'academicYears' => AcademicYear::query()->orderByDesc('school_year')->get(['SY_ID', 'school_year']),
             'gradeLevels' => GradeLevel::options(),
+            'seniorHighGradeIds' => array_filter([
+                GradeLevel::idForValue('grade_11'),
+                GradeLevel::idForValue('grade_12'),
+            ]),
+            'juniorHighTermLabel' => GradingTerm::currentEditablePeriodLabel() ?? 'Term',
+            'seniorHighTermLabel' => GradingTerm::currentSeniorHighPeriod()['term_label'] ?? 'Term',
             'filters' => [
                 'search' => $search,
                 'grade_level' => $gradeLevel,
@@ -200,7 +219,7 @@ class TeacherSectionController extends Controller
         }
 
         $grades = StudentSubjectGrade::query()
-            ->with('studentSubject')
+            ->with(['studentSubject', 'gradeReturnReason'])
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->get()
@@ -954,6 +973,12 @@ class TeacherSectionController extends Controller
             && ($editablePeriodGrades->isEmpty() || $editablePeriodGrades->contains(fn (StudentSubjectGrade $grade): bool => ! $grade->isTeacherLocked()));
 
         $summaries = $this->buildSummaries($enrollments, $grades, $periods);
+        $gradeReturnReasons = $grades->flatten(1)
+            ->filter(fn (StudentSubjectGrade $grade): bool => $grade->status === GradeStatus::REJECTED)
+            ->pluck('gradeReturnReason')
+            ->filter()
+            ->unique('reason_ID')
+            ->values();
 
         return view('users.teacher.sections.show', [
             'assignment' => $assignment,
@@ -967,6 +992,7 @@ class TeacherSectionController extends Controller
             'editablePeriodKey' => $editablePeriodKey,
             'editablePeriodLabel' => $editablePeriodLabel,
             'canEditCurrentTerm' => $canEditCurrentTerm,
+            'gradeReturnReasons' => $gradeReturnReasons,
         ]);
     }
 
@@ -1054,6 +1080,7 @@ class TeacherSectionController extends Controller
                         'submitted_at' => null,
                         'reviewed_by' => null,
                         'reviewed_at' => null,
+                        'grade_return_reason_ID' => null,
                         'posted_by' => $request->user()->staff_id,
                     ]
                 );
@@ -1211,9 +1238,13 @@ class TeacherSectionController extends Controller
 
         $message = "Class list import complete. Students created: {$result['createdStudents']}. Students updated: {$result['updatedStudents']}. Enrollments added: {$result['createdEnrollments']}. Already enrolled here: {$result['existingEnrollments']}.";
 
-        return back()
-            ->with('status', $message)
-            ->when($result['failedEnrollments'], fn ($redirect) => $redirect->with('class_list_import_error', $this->classListImportFailureMessage()));
+        $redirect = back()->with('status', $message);
+
+        if ($result['failedEnrollments']) {
+            $redirect->with('class_list_import_error', $this->classListImportFailureMessage());
+        }
+
+        return $redirect;
     }
 
     public function importAdvisoryClassList(Request $request, Section $section): RedirectResponse
@@ -1239,9 +1270,13 @@ class TeacherSectionController extends Controller
         $result = $this->importRecordsIntoSection($records, $section, $request);
         $message = "Student import complete. Students created: {$result['createdStudents']}. Students updated: {$result['updatedStudents']}. Enrollments added: {$result['createdEnrollments']}. Already enrolled here: {$result['existingEnrollments']}.";
 
-        return back()
-            ->with('status', $message)
-            ->when($result['failedEnrollments'], fn ($redirect) => $redirect->with('class_list_import_error', $this->classListImportFailureMessage()));
+        $redirect = back()->with('status', $message);
+
+        if ($result['failedEnrollments']) {
+            $redirect->with('class_list_import_error', $this->classListImportFailureMessage());
+        }
+
+        return $redirect;
     }
 
     private function importRecordsIntoSection(array $records, Section $section, Request $request): array
@@ -1408,6 +1443,7 @@ class TeacherSectionController extends Controller
                 'submitted_at' => now(),
                 'reviewed_by' => null,
                 'reviewed_at' => null,
+                'grade_return_reason_ID' => null,
             ]);
     }
 

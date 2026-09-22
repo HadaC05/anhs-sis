@@ -8,6 +8,7 @@ use App\Models\Cluster;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
+use App\Models\GradeReturnReason;
 use App\Models\GradeStatus;
 use App\Models\GradingTerm;
 use App\Models\LearnerType;
@@ -83,7 +84,7 @@ class RegistrarDashboardController extends Controller
                 }
             })
             ->when($gradeId, function ($query) use ($gradeId): void {
-                $query->where('grade_ID', $gradeId);
+                $query->forGrade($gradeId);
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->whereHas('student', function ($studentQuery) use ($search): void {
@@ -98,7 +99,7 @@ class RegistrarDashboardController extends Controller
             ->when($dateFrom !== '' && $dateTo !== '', function ($query) use ($dateFrom, $dateTo): void {
                 $query->whereBetween('created_at', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59']);
             })
-            ->orderBy('grade_ID')
+            ->orderByGrade()
             ->latest('created_at')
             ->paginate($perPage)
             ->withQueryString();
@@ -302,6 +303,7 @@ class RegistrarDashboardController extends Controller
             'periods' => $periods,
             'rows' => $rows,
             'status' => $status,
+            'gradeReturnReasons' => GradeReturnReason::query()->orderBy('name')->get(),
         ]);
     }
 
@@ -327,14 +329,28 @@ class RegistrarDashboardController extends Controller
 
     public function rejectGrades(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse
     {
-        StudentSubjectGrade::query()
+        $validated = $request->validate([
+            'grade_return_reason_ID' => ['required', 'integer', 'exists:grade_return_reasons,reason_ID'],
+        ], [
+            'grade_return_reason_ID.required' => 'Please select a reason for returning these grades.',
+            'grade_return_reason_ID.exists' => 'The selected grade return reason is invalid.',
+        ]);
+
+        $returned = StudentSubjectGrade::query()
             ->where('assignment_ID', $assignment->assignment_ID)
             ->whereStatus(GradeStatus::SUBMITTED)
             ->update([
                 'grade_status_ID' => GradeStatus::idFor(GradeStatus::REJECTED),
                 'reviewed_by' => $request->user()->staff_id,
                 'reviewed_at' => now(),
+                'grade_return_reason_ID' => $validated['grade_return_reason_ID'],
             ]);
+
+        if (! $returned) {
+            return redirect()
+                ->route('registrar.grade-approvals')
+                ->with('error', 'No submitted grades were available to return.');
+        }
 
         return redirect()
             ->route('registrar.grade-approvals')

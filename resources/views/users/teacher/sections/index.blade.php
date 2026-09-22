@@ -181,11 +181,24 @@ $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator 
                 $subject = $assignment->curriculumSubject?->subject;
                 $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
                 $semester = $assignment->curriculumSubject?->semester;
+                $isSeniorHigh = in_array((int) $section->grade_ID, $seniorHighGradeIds, true);
+                $periodLabel = $isSeniorHigh
+                    ? ($semester ? ucfirst($semester) . ' Semester · ' : '') . $seniorHighTermLabel
+                    : $juniorHighTermLabel;
+                $gradeStatus = 'Ungraded';
+                if ($assignment->grades_count > 0) {
+                    $presentStatuses = collect(\App\Models\GradeStatus::slugs())
+                        ->filter(fn (string $status): bool => (int) ($assignment->{"{$status}_grades_count"} ?? 0) > 0);
+                    $gradeStatus = $presentStatuses->count() === 1
+                        ? \App\Models\GradeStatus::nameFor($presentStatuses->first())
+                        : 'In progress';
+                }
                 @endphp
                 <div class="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2">
                     <div class="min-w-0">
                         <p class="truncate text-xs font-semibold text-gray-800">{{ $subjectLabel }}</p>
-                        <p class="text-[10px] text-gray-500">{{ $semester ? ucfirst($semester) . ' semester' : 'Full year' }}</p>
+                        <p class="text-[10px] text-gray-500">{{ $periodLabel }}</p>
+                        <p class="mt-0.5 text-[10px] font-semibold {{ $gradeStatus === 'Ungraded' ? 'text-gray-400' : 'text-[#296374]' }}">Grade status: {{ $gradeStatus }}</p>
                     </div>
                     <a href="{{ route('teacher.sections.show', $assignment) }}" class="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
                         Grades

@@ -38,8 +38,16 @@
     @endif
 
     @if (session('status'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-            {{ session('status') }}
+        <div id="studentProfileSuccessToast" role="status" aria-live="polite" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl">
+            <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span>{{ session('status') }}</span>
+            <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-emerald-700/70 transition hover:bg-emerald-50 hover:text-emerald-800" data-dismiss-profile-toast aria-label="Close notification">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
         </div>
     @endif
 
@@ -395,6 +403,14 @@
 @if ($student)
 <script>
     (function () {
+        const successToast = document.getElementById('studentProfileSuccessToast');
+        const dismissSuccessToast = () => successToast?.remove();
+
+        successToast?.querySelector('[data-dismiss-profile-toast]')?.addEventListener('click', dismissSuccessToast);
+        if (successToast) {
+            window.setTimeout(dismissSuccessToast, 4000);
+        }
+
         const form = document.getElementById('studentProfileForm');
         if (!form) {
             return;

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\PlacementAssessmentAdvisor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -104,6 +105,23 @@ class Enrollment extends Model
     public function curriculumGradeLevel(): BelongsTo
     {
         return $this->belongsTo(Curriculum::class, 'curriculum_grade_level_ID', 'curriculum_ID');
+    }
+
+    /** Limit enrollments by the grade attached to their curriculum offering. */
+    public function scopeForGrade(Builder $query, int $gradeId): void
+    {
+        $query->whereHas('curriculumGradeLevel', fn (Builder $offering) => $offering->where('grade_ID', $gradeId));
+    }
+
+    /** Sort by the grade attached to the curriculum offering, not a removed enrollment column. */
+    public function scopeOrderByGrade(Builder $query, string $direction = 'asc'): void
+    {
+        $query->orderBy(
+            Curriculum::query()
+                ->select('grade_ID')
+                ->whereColumn('curriculum.curriculum_ID', 'enrollments.curriculum_grade_level_ID'),
+            $direction,
+        );
     }
 
     public function cluster(): HasOneThrough

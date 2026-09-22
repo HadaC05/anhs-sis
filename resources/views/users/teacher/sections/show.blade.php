@@ -10,26 +10,45 @@ $subject = $assignment->curriculumSubject?->subject;
 $subjectCode = $subject?->code ?? 'SUBJ';
 $subjectTitle = $subject?->title ?? 'Subject';
 $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
-$semester = $assignment->curriculumSubject?->semester;
 $lockedPeriodKeys = $lockedPeriodKeys ?? [];
 $studentCount = $enrollments->count();
 $inputColspan = 3 + count($periods);
 $summaryColspan = 4 + count($periods);
+$gradeReturnReasons = $gradeReturnReasons ?? collect();
 @endphp
 
 <div class="space-y-5">
     @if (session('status'))
-    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-        {{ session('status') }}
+    <div id="teacherGradeToast" role="status" aria-live="polite" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+        <span>{{ session('status') }}</span>
+        <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-emerald-700/70 hover:bg-emerald-50" data-dismiss-teacher-grade-toast aria-label="Close notification">&times;</button>
     </div>
     @endif
 
     @if ($errors->any())
-    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        @foreach ($errors->all() as $error)
-        <p>{{ $error }}</p>
-        @endforeach
+    <div id="teacherGradeErrorToast" role="alert" aria-live="assertive" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-rose-200 bg-white p-4 text-sm font-semibold text-rose-800 shadow-xl">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        <span>{{ $errors->first() }}</span>
+        <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-rose-700/70 hover:bg-rose-50" data-dismiss-teacher-grade-toast aria-label="Close notification">&times;</button>
     </div>
+    @endif
+
+    @if ($gradeReturnReasons->isNotEmpty())
+    <section class="overflow-hidden rounded-xl border-2 border-amber-400 bg-amber-50 shadow-lg" aria-labelledby="grade-returned-title">
+        <div class="flex items-start gap-4 bg-amber-400 px-5 py-4 text-amber-950">
+            <svg class="mt-0.5 h-6 w-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" /></svg>
+            <div>
+                <h1 id="grade-returned-title" class="text-base font-extrabold uppercase tracking-wide">Submitted grades returned for revision</h1>
+                <p class="mt-1 text-sm font-semibold">Please correct the item below and resubmit the grades.</p>
+            </div>
+        </div>
+        <div class="space-y-2 px-5 py-4 text-sm text-amber-950">
+            @foreach ($gradeReturnReasons as $reason)
+                <p><span class="font-bold">Reason:</span> {{ $reason->name }}@if ($reason->description) — {{ $reason->description }}@endif</p>
+            @endforeach
+        </div>
+    </section>
     @endif
 
     <div class="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
@@ -49,14 +68,6 @@ $summaryColspan = 4 + count($periods);
             <div class="flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
                 <span class="text-sm text-gray-500">Grade Level</span>
                 <span class="text-right text-sm font-semibold text-[#296374]">{{ $gradeLabel }}</span>
-            </div>
-            <div class="flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
-                <span class="text-sm text-gray-500">Cluster</span>
-                <span class="text-right text-sm font-semibold text-[#296374]">{{ $section->cluster?->name ?? 'N/A' }}</span>
-            </div>
-            <div class="flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
-                <span class="text-sm text-gray-500">Semester</span>
-                <span class="text-right text-sm font-semibold text-[#296374]">{{ $semester ? ucfirst($semester).' Semester' : 'Full Year' }}</span>
             </div>
             <div class="flex items-start justify-between gap-4 border-b border-gray-100 pb-3 md:border-b-0 md:pb-0">
                 <span class="text-sm text-gray-500">Room</span>
@@ -288,6 +299,12 @@ $summaryColspan = 4 + count($periods);
         </a>
     </div>
 </div>
+
+<script>
+    document.querySelectorAll('[data-dismiss-teacher-grade-toast]').forEach((button) => button.addEventListener('click', () => button.closest('[role]')?.remove()));
+    window.setTimeout(() => document.getElementById('teacherGradeToast')?.remove(), 4000);
+    window.setTimeout(() => document.getElementById('teacherGradeErrorToast')?.remove(), 6000);
+</script>
 
 @push('modals')
 <div id="gradeConfirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="gradeConfirmTitle">

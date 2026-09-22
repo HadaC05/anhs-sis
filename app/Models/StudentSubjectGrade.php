@@ -33,6 +33,7 @@ class StudentSubjectGrade extends Model
         'submitted_at',
         'reviewed_by',
         'reviewed_at',
+        'grade_return_reason_ID',
         'posted_by',
     ];
 
@@ -84,6 +85,11 @@ class StudentSubjectGrade extends Model
     public function gradeStatus(): BelongsTo
     {
         return $this->belongsTo(GradeStatus::class, 'grade_status_ID', 'grade_status_ID');
+    }
+
+    public function gradeReturnReason(): BelongsTo
+    {
+        return $this->belongsTo(GradeReturnReason::class, 'grade_return_reason_ID', 'reason_ID');
     }
 
     public function postedBy(): BelongsTo

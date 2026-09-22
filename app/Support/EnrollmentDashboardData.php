@@ -31,7 +31,7 @@ class EnrollmentDashboardData
         $genderGradeId = GradeLevel::idForValue($genderGradeLevel);
 
         $genderDistribution = (clone $activeEnrolleeQuery)
-            ->when($genderGradeId, fn ($query) => $query->where('grade_ID', $genderGradeId))
+            ->when($genderGradeId, fn ($query) => $query->forGrade($genderGradeId))
             ->join('students', 'enrollments.student_ID', '=', 'students.id')
             ->selectRaw("CASE WHEN students.sex = 'male' THEN 'Male' WHEN students.sex = 'female' THEN 'Female' ELSE 'Unspecified' END as label")
             ->selectRaw('COUNT(*) as total')
@@ -103,7 +103,7 @@ class EnrollmentDashboardData
             ->with(['student', 'academicYear', 'gradeLevel'])
             ->when($syId, fn ($query) => $query->where('SY_ID', $syId))
             ->whereIn('enrollment_status_ID', EnrollmentStatus::inProgressIds())
-            ->when($ageGradeId, fn ($query) => $query->where('grade_ID', $ageGradeId))
+            ->when($ageGradeId, fn ($query) => $query->forGrade($ageGradeId))
             ->get();
 
         return [

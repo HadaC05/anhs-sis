@@ -87,14 +87,9 @@ class TeacherSubjectAssignmentSeeder extends Seeder
     {
         return CurriculumSubject::query()
             ->with(['subject', 'gradingSemester'])
-            ->where('curriculum_ID', $section->curriculum_grade_level_ID)
-            ->where('grade_ID', $section->grade_ID)
-            ->when($section->cluster_ID, function ($query) use ($section): void {
-                $query->where(function ($inner) use ($section): void {
-                    $inner->whereNull('cluster_ID')
-                        ->orWhere('cluster_ID', $section->cluster_ID);
-                });
-            })
+            // Grade level and cluster are defined by the curriculum-grade-level
+            // offering, not by columns on curriculum_subjects.
+            ->where('curriculum_grade_level_ID', $section->curriculum_grade_level_ID)
             ->get()
             ->sortBy(fn (CurriculumSubject $subject): string => $this->subjectSortKey($subject))
             ->values();

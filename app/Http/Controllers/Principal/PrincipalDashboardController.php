@@ -14,6 +14,7 @@ use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\EnrollmentDashboardData;
 use App\Support\PlacementAssessmentAdvisor;
+use App\Support\StudentGradeNotifier;
 use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -254,7 +255,7 @@ class PrincipalDashboardController extends Controller
                 $query->where('SY_ID', $activeYear->SY_ID);
             })
             ->when($gradeId, function ($query) use ($gradeId) {
-                $query->where('grade_ID', $gradeId);
+                $query->forGrade($gradeId);
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereHas('student', function ($studentQuery) use ($search) {
@@ -264,7 +265,7 @@ class PrincipalDashboardController extends Controller
                         ->orWhere('middle_name', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('grade_ID')
+            ->orderByGrade()
             ->orderBy('section_ID')
             ->orderBy('enrollment_ID')
             ->get();
@@ -397,6 +398,8 @@ class PrincipalDashboardController extends Controller
 
     public function releaseGrades(TeacherSubjectAssignment $assignment)
     {
+        $students = $this->studentsWithApprovedGrades($assignment);
+
         $released = StudentSubjectGrade::query()
             ->where('assignment_ID', $assignment->assignment_ID)
             ->whereStatus(GradeStatus::APPROVED)
@@ -407,6 +410,7 @@ class PrincipalDashboardController extends Controller
         }
 
         TeacherGradeNotifier::released($assignment);
+        StudentGradeNotifier::released($assignment, $students);
 
         return redirect()->route('principal.grade-releases')->with('status', "{$released} grade record(s) released to students.");
     }
@@ -425,18 +429,40 @@ class PrincipalDashboardController extends Controller
             })
             ->get();
 
+        $studentsByAssignment = $assignments->mapWithKeys(fn (TeacherSubjectAssignment $assignment): array => [
+            $assignment->assignment_ID => $this->studentsWithApprovedGrades($assignment),
+        ]);
+
         $released = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
             ->whereStatus(GradeStatus::APPROVED)
             ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::RELEASED)]);
 
         if ($released > 0) {
-            $assignments->each(function (TeacherSubjectAssignment $assignment): void {
+            $assignments->each(function (TeacherSubjectAssignment $assignment) use ($studentsByAssignment): void {
                 TeacherGradeNotifier::released($assignment);
+                StudentGradeNotifier::released($assignment, $studentsByAssignment->get($assignment->assignment_ID, collect()));
             });
         }
 
         return back()->with('status', "{$released} grade record(s) released to students.");
+    }
+
+    /**
+     * Return each student whose approved grade will be released for an assignment.
+     *
+     * @return Collection<int, \App\Models\Student>
+     */
+    private function studentsWithApprovedGrades(TeacherSubjectAssignment $assignment): Collection
+    {
+        return StudentSubjectGrade::query()
+            ->where('assignment_ID', $assignment->assignment_ID)
+            ->whereStatus(GradeStatus::APPROVED)
+            ->with('studentSubject.enrollment.student')
+            ->get()
+            ->map(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment?->student)
+            ->filter()
+            ->values();
     }
 
     private function gradeReleaseAssignments(string $status)
@@ -573,7 +599,7 @@ class PrincipalDashboardController extends Controller
         $students = Enrollment::query()
             ->with(['grades'])
             ->when($academicYearId, fn ($query) => $query->where('SY_ID', $academicYearId))
-            ->when($gradeId, fn ($query) => $query->where('grade_ID', $gradeId))
+            ->when($gradeId, fn ($query) => $query->forGrade($gradeId))
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->get()
             ->map(function (Enrollment $enrollment): ?array {

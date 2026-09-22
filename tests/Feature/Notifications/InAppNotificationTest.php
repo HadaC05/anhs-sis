@@ -21,6 +21,7 @@ use App\Notifications\EnrollmentStatusUpdated;
 use App\Notifications\GradesApproved;
 use App\Notifications\GradesReleased;
 use App\Notifications\PlacementStatusUpdated;
+use App\Notifications\StudentGradesReleased;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -196,6 +197,24 @@ test('teachers are notified when approved grades are released', function () {
     });
 });
 
+test('students are notified when their approved grades are released', function () {
+    Notification::fake();
+
+    ['principal' => $principal, 'student' => $student, 'assignment' => $assignment] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+
+    $this->actingAs($principal)
+        ->post(route('principal.grade-releases.release', $assignment))
+        ->assertRedirect(route('principal.grade-releases'));
+
+    Notification::assertSentTo($student, StudentGradesReleased::class, function (StudentGradesReleased $notification) use ($assignment, $student): bool {
+        $data = $notification->toArray($student);
+
+        return $notification->assignment->is($assignment)
+            && $data['notification_type_ID'] === NotificationType::idFor(NotificationType::GRADES_RELEASED)
+            && $data['url'] === route('student.grades', [], false);
+    });
+});
+
 test('teachers are notified when approved grades are bulk released', function () {
     Notification::fake();
 
@@ -327,7 +346,7 @@ function inAppNotificationRegistrationPayload(array $overrides = []): array
 }
 
 /**
- * @return array{registrar: Staff, principal: Staff, teacher: Staff, assignment: TeacherSubjectAssignment}
+ * @return array{registrar: Staff, principal: Staff, teacher: Staff, student: Student, assignment: TeacherSubjectAssignment}
  */
 function createInAppNotificationGradeAssignment(string $gradeStatus): array
 {
@@ -424,5 +443,5 @@ function createInAppNotificationGradeAssignment(string $gradeStatus): array
         'posted_by' => $teacher->staff_id,
     ]);
 
-    return compact('registrar', 'principal', 'teacher', 'assignment');
+    return compact('registrar', 'principal', 'teacher', 'student', 'assignment');
 }

@@ -6,6 +6,8 @@ use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
+use App\Models\GradeStatus;
+use App\Models\GradingTerm;
 use App\Models\GradingTermSetting;
 use App\Models\Role;
 use App\Models\Section;
@@ -103,6 +105,50 @@ function teacherSectionGradeField(int $enrollmentId): string
 {
     return "grades.{$enrollmentId}.shs_sem1_term_1.grade";
 }
+
+test('teacher subject list identifies subjects with no grade records as ungraded', function () {
+    ['teacher' => $teacher] = createTeacherSectionGradeFixtures();
+
+    $response = $this->actingAs($teacher)->get(route('teacher.sections.index'));
+
+    $response->assertOk()
+        ->assertSee('ENG11 - English 11')
+        ->assertSee('Grade status: Ungraded');
+});
+
+test('teacher subject list displays the configured grade status from its status ID', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
+
+    StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $studentSubject->student_subject_ID,
+        'assignment_ID' => $assignment->assignment_ID,
+        'term_ID' => GradingTerm::query()->where('key', 'term_1')->value('term_ID'),
+        'numeric_grade' => 90,
+        'grade_status_ID' => GradeStatus::idFor(GradeStatus::SUBMITTED),
+        'posted_by' => $teacher->staff_id,
+    ]);
+
+    $response = $this->actingAs($teacher)->get(route('teacher.sections.index'));
+
+    $response->assertOk()
+        ->assertSee('Grade status: Submitted');
+});
+
+test('teacher subject list uses term rather than semester for junior high sections', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $juniorHighGrade = GradeLevel::query()->where('grade_label', 'Grade 7')->firstOrFail();
+    $assignment->section->update(['grade_ID' => $juniorHighGrade->grade_ID]);
+
+    $response = $this->actingAs($teacher)->get(route('teacher.sections.index'));
+
+    $response->assertOk()
+        ->assertSee('Term 1')
+        ->assertDontSee('Full year');
+});
 
 test('teacher grade input only accepts numeric values up to 100', function () {
     ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
