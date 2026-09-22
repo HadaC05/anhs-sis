@@ -44,7 +44,11 @@ return new class extends Migration
         }
 
         Schema::table('curriculum_subjects', function (Blueprint $table): void {
-            $table->enum('semester', ['first', 'second'])->nullable()->change();
+            if (DB::getDriverName() === 'pgsql') {
+                $table->string('semester')->nullable()->change();
+            } else {
+                $table->enum('semester', ['first', 'second'])->nullable()->change();
+            }
             $table->unsignedInteger('grade_ID')->nullable(false)->change();
         });
 
@@ -90,8 +94,13 @@ return new class extends Migration
         });
 
         Schema::table('curriculum_subjects', function (Blueprint $table): void {
-            $table->enum('grade_level', ['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12'])->nullable(false)->change();
-            $table->enum('semester', ['first', 'second'])->nullable(false)->change();
+            if (DB::getDriverName() === 'pgsql') {
+                $table->string('grade_level')->nullable(false)->change();
+                $table->string('semester')->nullable(false)->change();
+            } else {
+                $table->enum('grade_level', ['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12'])->nullable(false)->change();
+                $table->enum('semester', ['first', 'second'])->nullable(false)->change();
+            }
             $table->unique(['curriculum_ID', 'subject_ID', 'grade_level', 'semester'], 'curriculum_subjects_unique_assignment');
             $table->dropColumn('grade_ID');
         });

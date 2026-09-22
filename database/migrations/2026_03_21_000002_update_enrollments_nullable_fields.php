@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,7 +12,14 @@ return new class extends Migration
         Schema::table('enrollments', function (Blueprint $table) {
             $table->unsignedInteger('section_ID')->nullable()->change();
             $table->unsignedInteger('cluster_ID')->nullable()->change();
-            $table->enum('semester', ['first', 'second'])->nullable()->change();
+            // PostgreSQL cannot use its inline CHECK-based enum definition
+            // while altering a column. The existing constraint remains in
+            // place; only the nullability needs to change.
+            if (DB::getDriverName() === 'pgsql') {
+                $table->string('semester')->nullable()->change();
+            } else {
+                $table->enum('semester', ['first', 'second'])->nullable()->change();
+            }
         });
 
         Schema::table('enrollments', function (Blueprint $table) {
@@ -28,7 +36,11 @@ return new class extends Migration
         Schema::table('enrollments', function (Blueprint $table) {
             $table->unsignedInteger('section_ID')->nullable(false)->change();
             $table->unsignedInteger('cluster_ID')->nullable(false)->change();
-            $table->enum('semester', ['first', 'second'])->nullable(false)->change();
+            if (DB::getDriverName() === 'pgsql') {
+                $table->string('semester')->nullable(false)->change();
+            } else {
+                $table->enum('semester', ['first', 'second'])->nullable(false)->change();
+            }
         });
     }
 };

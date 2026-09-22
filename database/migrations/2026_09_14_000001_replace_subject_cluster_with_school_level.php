@@ -28,7 +28,11 @@ return new class extends Migration
         });
 
         Schema::table('subjects', function (Blueprint $table): void {
-            $table->enum('school_level', ['Junior High School', 'Senior High School'])->default('Junior High School')->change();
+            if (DB::getDriverName() === 'pgsql') {
+                $table->string('school_level')->default('Junior High School')->change();
+            } else {
+                $table->enum('school_level', ['Junior High School', 'Senior High School'])->default('Junior High School')->change();
+            }
         });
     }
 
