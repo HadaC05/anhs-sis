@@ -26,6 +26,10 @@ services:
         value: database
       - key: APP_KEY
         generateValue: true
+      # Keep disabled in production. Temporarily set to true only when you
+      # deliberately want to create the application's demo users and data.
+      - key: RUN_DATABASE_SEEDER
+        value: "false"
       # Set this to the public Render URL after the first deployment.
       - key: APP_URL
         sync: false

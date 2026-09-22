@@ -15,6 +15,13 @@ fi
 
 php artisan package:discover --ansi
 php artisan migrate --force
+
+# Disabled by default. Set RUN_DATABASE_SEEDER=true only for a deliberate,
+# one-time test-data setup, then set it back to false and redeploy.
+if [ "${RUN_DATABASE_SEEDER:-false}" = "true" ]; then
+    php artisan db:seed --force
+fi
+
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache

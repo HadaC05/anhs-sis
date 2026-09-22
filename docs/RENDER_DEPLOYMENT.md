@@ -23,6 +23,10 @@ After the Blueprint creates the service, open its **Environment** page. Enter th
 
 Deploy the service. The startup script runs the Laravel migrations, caches the production configuration, and starts Nginx/PHP on Render's assigned port. Check **Logs** until you see the service become live, then visit `/up` and the homepage.
 
+## Create the initial test accounts
+
+Migrations create tables but do not create application users. To load the included test data, temporarily set `RUN_DATABASE_SEEDER` to `true` on the web service's **Environment** page and deploy once. After the deploy is live, change it back to `false` and deploy again. The seeded administrator signs in at `/login` with username `admin` and password `password`. Change that password before using real data.
+
 ## Important: student uploads
 
 By default Render discards files created by the app when it restarts or deploys. This application stores student photos and documents locally, so configure persistent storage before accepting real uploads:
