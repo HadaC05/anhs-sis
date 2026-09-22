@@ -168,7 +168,7 @@
                                     @endif
                                 </td>
                                 <td class="px-5 py-3">
-                                    <p class="font-medium text-gray-800">{{ $enrollment->gradeLevel?->grade_label ?? strtoupper(str_replace('_', ' ', $enrollment->grade_level)) }}</p>
+                                    <p class="font-medium text-gray-800">{{ $enrollment->grade_level ? \App\Models\GradeLevel::valueToLabel($enrollment->grade_level) : '—' }}</p>
                                     <p class="text-xs text-gray-500">{{ $enrollment->section?->name ?? 'Unassigned' }}</p>
                                 </td>
                                 <td class="px-5 py-3 font-semibold text-gray-900">{{ $assessment['age'] }}</td>
