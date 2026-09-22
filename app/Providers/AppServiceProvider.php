@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -30,8 +31,36 @@ class AppServiceProvider extends ServiceProvider
     {
         Auth::provider('merged_users', fn () => new MergedUserProvider);
 
+        $this->configureHttps();
         $this->configureDefaults();
         $this->configureMail();
+    }
+
+    /**
+     * Render terminates TLS before forwarding a request to this container.
+     * Explicitly generate HTTPS URLs so assets, Livewire, and fetch requests
+     * are never rendered as browser-blocked HTTP mixed content.
+     */
+    protected function configureHttps(): void
+    {
+        if (! app()->isProduction()) {
+            return;
+        }
+
+        $appUrl = config('app.url');
+
+        if (is_string($appUrl) && $appUrl !== '') {
+            $secureUrl = preg_replace('#^http://#i', 'https://', rtrim($appUrl, '/'));
+
+            config([
+                'app.url' => $secureUrl,
+                'app.asset_url' => $secureUrl,
+            ]);
+
+            URL::forceRootUrl($secureUrl);
+        }
+
+        URL::forceScheme('https');
     }
 
     /**
