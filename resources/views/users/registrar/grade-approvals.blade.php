@@ -3,139 +3,106 @@
 @section('title', 'Grade Approvals')
 
 @section('content')
-@php
-    $tabs = [
-        'pending' => [
-            'label' => 'Pending',
-            'heading' => 'Pending Submissions',
-            'empty' => 'No submitted grades awaiting approval.',
-            'assignments' => $pendingAssignments ?? collect(),
-            'status' => 'submitted',
-            'date_label' => 'Last Submitted',
-        ],
-        'approved' => [
-            'label' => 'Approved',
-            'heading' => 'Approved Grades',
-            'empty' => 'No approved grades found.',
-            'assignments' => $approvedAssignments ?? collect(),
-            'status' => 'approved',
-            'date_label' => 'Last Approved',
-        ],
-    ];
-@endphp
-
-<div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">Grade Approvals</h1>
-    <p class="text-gray-600 text-sm md:text-base">Review pending submissions and revisit approved grades when teachers request changes.</p>
+<div class="mb-6">
+    <h1 class="text-xl font-bold tracking-tight text-gray-700 md:text-2xl">Grade Approvals</h1>
 </div>
 
 @if (session('status'))
     <div id="gradeApprovalsToast" role="status" aria-live="polite" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl">
-        <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-        <span>{{ session('status') }}</span>
-        <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-emerald-700/70 hover:bg-emerald-50" data-dismiss-grade-toast aria-label="Close notification">&times;</button>
+        <span>{{ session('status') }}</span><button type="button" class="ml-auto" data-dismiss-grade-toast aria-label="Close notification">&times;</button>
     </div>
 @endif
 
 @if (session('error'))
     <div id="gradeApprovalsErrorToast" role="alert" aria-live="assertive" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-rose-200 bg-white p-4 text-sm font-semibold text-rose-800 shadow-xl">
-        <svg class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        <span>{{ session('error') }}</span>
-        <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-rose-700/70 hover:bg-rose-50" data-dismiss-grade-toast aria-label="Close notification">&times;</button>
+        <span>{{ session('error') }}</span><button type="button" class="ml-auto" data-dismiss-grade-toast aria-label="Close notification">&times;</button>
     </div>
 @endif
 
-<div class="mb-6 inline-flex rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-    @foreach($tabs as $key => $tab)
-        <button type="button" class="grade-tab-btn px-5 py-2.5 text-sm font-semibold {{ $loop->first ? 'text-white' : 'text-gray-600 bg-white' }}" style="{{ $loop->first ? 'background-color: #296374;' : '' }}" data-grade-tab="{{ $key }}">
-            {{ $tab['label'] }}
-            <span class="ml-2 rounded-full px-2 py-0.5 text-[11px] {{ $loop->first ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500' }}">{{ $tab['assignments']->count() }}</span>
-        </button>
-    @endforeach
-</div>
-
-@foreach($tabs as $key => $tab)
-    <div id="grade-tab-{{ $key }}" class="grade-tab-panel {{ $loop->first ? '' : 'hidden' }}">
-        <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 overflow-hidden">
-            <div class="px-6 py-4 border-b border-white/20 bg-white/40">
-                <h2 class="text-sm font-bold uppercase tracking-widest text-gray-500">{{ $tab['heading'] }}</h2>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="text-xs font-bold text-[#296374] uppercase tracking-wider border-b border-white/20 bg-white/30">
-                            <th class="px-6 py-4">Section</th>
-                            <th class="px-6 py-4">Subject</th>
-                            <th class="px-6 py-4">Teacher</th>
-                            <th class="px-6 py-4">{{ $key === 'pending' ? 'Submitted Grades' : 'Approved Grades' }}</th>
-                            <th class="px-6 py-4">{{ $tab['date_label'] }}</th>
-                            <th class="px-6 py-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-white/20">
-                        @forelse($tab['assignments'] as $assignment)
-                            @php
-                                $section = $assignment->section;
-                                $subject = $assignment->curriculumSubject?->subject;
-                                $teacher = $assignment->staff;
-                                $grades = $assignment->grades ?? collect();
-                                $latestDate = $key === 'pending' ? $grades->max('submitted_at') : $grades->max('reviewed_at');
-                                $teacherName = $teacher ? ($teacher->last_name . ', ' . $teacher->first_name) : '—';
-                                $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : '—';
-                                $reviewUrl = $key === 'approved'
-                                    ? route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => 'approved'])
-                                    : route('registrar.grade-approvals.show', $assignment);
-                            @endphp
-                            <tr class="hover:bg-white/30 transition-all bg-white/10">
-                                <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700">{{ $subjectLabel }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700">{{ $teacherName }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700">{{ $grades->count() }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-600">{{ $latestDate ? $latestDate->format('M d, Y h:i A') : '—' }}</td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <a href="{{ $reviewUrl }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">
-                                            {{ $key === 'pending' ? 'Review' : 'View' }}
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">{{ $tab['empty'] }}</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+<form method="GET" action="{{ route('registrar.grade-approvals') }}" class="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div class="flex items-end gap-3 overflow-x-auto pb-1">
+        <div class="w-60 shrink-0">
+            <label for="grade-approval-search" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Search</label>
+            <input id="grade-approval-search" type="search" name="search" value="{{ request('search') }}" placeholder="Section, subject, or teacher" class="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+        </div>
+        <div class="min-w-[170px]">
+            <label for="grade-approval-subject" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Subject</label>
+            <select id="grade-approval-subject" name="subject_id" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All subjects</option>
+                @foreach($subjects as $subject)
+                    <option value="{{ $subject->subject_ID }}" @selected((string) request('subject_id') === (string) $subject->subject_ID)>{{ $subject->code }} - {{ $subject->title }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="min-w-[160px]">
+            <label for="grade-approval-level" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Grade level</label>
+            <select id="grade-approval-level" name="grade_level" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All grade levels</option>
+                @foreach($gradeLevels as $level)
+                    <option value="{{ $level->value }}" @selected(request('grade_level') === $level->value)>{{ $level->grade_label }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="min-w-[160px]">
+            <label for="grade-approval-year" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">School year</label>
+            <select id="grade-approval-year" name="academic_year_id" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All school years</option>
+                @foreach($academicYears as $academicYear)
+                    <option value="{{ $academicYear->SY_ID }}" @selected((string) request('academic_year_id') === (string) $academicYear->SY_ID)>{{ $academicYear->school_year }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="min-w-[150px]">
+            <label for="grade-approval-status" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Status</label>
+            <select id="grade-approval-status" name="status" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+                <option value="">All statuses</option>
+                <option value="submitted" @selected(request('status') === 'submitted')>Submitted</option>
+                <option value="approved" @selected(request('status') === 'approved')>Approved</option>
+            </select>
+        </div>
+        <div class="flex shrink-0 gap-2">
+            <button type="submit" class="inline-flex items-center rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">Filter</button>
+            <a href="{{ route('registrar.grade-approvals') }}" class="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-600 hover:bg-gray-50">Clear</a>
         </div>
     </div>
-@endforeach
+</form>
+
+<div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div class="overflow-x-auto">
+        <table class="min-w-[950px] w-full text-left">
+            <thead><tr class="border-b border-[#296374] bg-[#296374] text-xs font-bold uppercase tracking-wider text-white">
+                <th class="px-6 py-4">Section</th><th class="px-6 py-4">Grade Level</th><th class="px-6 py-4">Subject</th><th class="px-6 py-4">Teacher</th><th class="px-6 py-4">Grades</th><th class="px-6 py-4">Status</th><th class="px-6 py-4 text-right">Action</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-200">
+                @forelse($assignments as $assignment)
+                    @php
+                        $section = $assignment->section;
+                        $subject = $assignment->curriculumSubject?->subject;
+                        $teacher = $assignment->staff;
+                        $grades = $assignment->grades ?? collect();
+                        $rowStatus = $grades->contains('status', 'submitted') ? 'submitted' : 'approved';
+                        $teacherName = $teacher ? ($teacher->last_name . ', ' . $teacher->first_name) : '—';
+                        $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : '—';
+                        $reviewUrl = $rowStatus === 'approved' ? route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => 'approved']) : route('registrar.grade-approvals.show', $assignment);
+                    @endphp
+                    <tr class="transition-colors odd:bg-white even:bg-slate-50/70 hover:bg-[#eaf3f5]">
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ $section?->gradeLevel?->grade_label ?? ($section?->grade_level ? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level)) : '—') }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ $subjectLabel }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ $teacherName }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ $grades->count() }}</td>
+                        <td class="px-6 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $rowStatus === 'submitted' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">{{ ucfirst($rowStatus) }}</span></td>
+                        <td class="px-6 py-4 text-right"><a href="{{ $reviewUrl }}" class="inline-flex items-center rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">{{ $rowStatus === 'submitted' ? 'Review' : 'View' }}</a></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="7" class="px-6 py-12 text-center text-gray-500">No grade submissions match your filters.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
 
 <script>
-    (function () {
-        const buttons = Array.from(document.querySelectorAll('.grade-tab-btn'));
-        const panels = Array.from(document.querySelectorAll('.grade-tab-panel'));
-
-        function activate(tab) {
-            buttons.forEach((button) => {
-                const isActive = button.dataset.gradeTab === tab;
-                button.classList.toggle('text-white', isActive);
-                button.classList.toggle('text-gray-600', !isActive);
-                button.classList.toggle('bg-white', !isActive);
-                button.style.backgroundColor = isActive ? '#296374' : 'white';
-            });
-
-            panels.forEach((panel) => {
-                panel.classList.toggle('hidden', panel.id !== `grade-tab-${tab}`);
-            });
-        }
-
-        buttons.forEach((button) => {
-            button.addEventListener('click', () => activate(button.dataset.gradeTab));
-        });
-    })();
-
     document.querySelectorAll('[data-dismiss-grade-toast]').forEach((button) => button.addEventListener('click', () => button.closest('[role]')?.remove()));
     window.setTimeout(() => document.getElementById('gradeApprovalsToast')?.remove(), 4000);
     window.setTimeout(() => document.getElementById('gradeApprovalsErrorToast')?.remove(), 6000);

@@ -211,28 +211,63 @@ class RegistrarDashboardController extends Controller
 
     public function gradeApprovals(Request $request): \Illuminate\View\View
     {
-        $pendingAssignments = $this->gradeApprovalAssignments('submitted');
-        $approvedAssignments = $this->gradeApprovalAssignments('approved');
+        $search = trim($request->string('search')->toString());
+        $status = $request->string('status')->toString();
+        $subjectId = $request->integer('subject_id') ?: null;
+        $gradeLevel = $request->string('grade_level')->toString();
+        $gradeId = GradeLevel::idForValue($gradeLevel);
+        $academicYearId = $request->integer('academic_year_id') ?: null;
 
         return view('users.registrar.grade-approvals', [
-            'pendingAssignments' => $pendingAssignments,
-            'approvedAssignments' => $approvedAssignments,
+            'assignments' => $this->gradeApprovalAssignments($status, $subjectId, $gradeId, $academicYearId, $search),
+            'subjects' => $this->gradeApprovalAssignments()
+                ->map(fn (TeacherSubjectAssignment $assignment) => $assignment->curriculumSubject?->subject)
+                ->filter()
+                ->unique('subject_ID')
+                ->sortBy('title')
+                ->values(),
+            'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
+            'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(['SY_ID', 'school_year']),
         ]);
     }
 
-    private function gradeApprovalAssignments(string $status)
+    private function gradeApprovalAssignments(?string $status = null, ?int $subjectId = null, ?int $gradeId = null, ?int $academicYearId = null, string $search = '')
     {
+        $statuses = [GradeStatus::SUBMITTED, GradeStatus::APPROVED];
+        $status = in_array($status, $statuses, true) ? $status : null;
+
         return TeacherSubjectAssignment::query()
             ->with([
-                'section',
+                'section.gradeLevel',
                 'curriculumSubject.subject',
                 'staff',
-                'grades' => function ($query) use ($status): void {
-                    $query->whereStatus($status);
+                'grades' => function ($query) use ($statuses, $status): void {
+                    $query->whereStatus($status ?: $statuses)->with('gradeStatus');
                 },
             ])
-            ->whereHas('grades', function ($query) use ($status): void {
-                $query->whereStatus($status);
+            ->whereHas('grades', function ($query) use ($statuses, $status): void {
+                $query->whereStatus($status ?: $statuses);
+            })
+            ->when($subjectId, function ($query) use ($subjectId): void {
+                $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $subjectId));
+            })
+            ->when($gradeId, function ($query) use ($gradeId): void {
+                $query->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('grade_ID', $gradeId));
+            })
+            ->when($academicYearId, fn ($query) => $query->where('SY_ID', $academicYearId))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($assignmentQuery) use ($search): void {
+                    $assignmentQuery
+                        ->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('curriculumSubject.subject', function ($subjectQuery) use ($search): void {
+                            $subjectQuery->where('code', 'like', "%{$search}%")
+                                ->orWhere('title', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('staff', function ($staffQuery) use ($search): void {
+                            $staffQuery->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%");
+                        });
+                });
             })
             ->orderBy('section_ID')
             ->get();
@@ -284,6 +319,8 @@ class RegistrarDashboardController extends Controller
                 $periodValues[$period['key']] = $value !== null ? number_format((float) $value, 2) : '-';
             }
 
+            $average = count($values) ? round(array_sum($values) / count($values), 2) : null;
+
             return [
                 'enrollment' => $enrollment,
                 'student' => $student,
@@ -293,8 +330,8 @@ class RegistrarDashboardController extends Controller
                 'lrn' => $student?->lrn ?? 'N/A',
                 'grades' => $periodGrades,
                 'period_values' => $periodValues,
-                'average' => count($values) ? round(array_sum($values) / count($values), 2) : null,
-                'remarks' => $grades->pluck('remarks')->filter()->unique()->implode(', '),
+                'average' => $average,
+                'remarks' => $average === null ? '' : ($average >= 75 ? 'Passed' : 'Failed'),
             ];
         })->sortBy('name')->values();
 

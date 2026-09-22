@@ -13,14 +13,8 @@
     $isApprovedView = ($status ?? 'submitted') === 'approved';
 @endphp
 
-<div class="mb-8">
-    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-            <a href="{{ route('registrar.grade-approvals') }}" class="text-sm font-semibold text-[#296374] hover:underline">Back to grade approvals</a>
-            <h1 class="mt-3 text-2xl md:text-3xl font-bold text-gray-700 mb-2 tracking-tight">{{ $isApprovedView ? 'Approved Grade Record' : 'Review Grade Submission' }}</h1>
-            <p class="text-gray-600 text-sm md:text-base">{{ $section?->name ?? 'N/A' }} | {{ $subjectLabel }}</p>
-        </div>
-    </div>
+<div class="mb-6">
+    <h1 class="text-xl font-bold tracking-tight text-gray-700 md:text-2xl">{{ $isApprovedView ? 'Approved Grade Record' : 'Review Grade Submission' }}</h1>
 </div>
 
 @if (session('status'))
@@ -39,36 +33,26 @@
     </div>
 @endif
 
-<div class="grid gap-4 md:grid-cols-4 mb-6">
-    <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 px-5 py-4">
-        <p class="text-xs font-bold uppercase tracking-widest text-gray-500">Section</p>
-        <p class="mt-2 text-sm font-semibold text-gray-800">{{ $section?->name ?? 'N/A' }}</p>
+<section class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="grid md:grid-cols-2 md:divide-x md:divide-slate-200">
+        <dl class="divide-y divide-slate-100 px-6">
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">School Year</dt><dd class="text-sm font-semibold text-[#296374]">{{ $assignment->academicYear?->school_year ?? 'N/A' }}</dd></div>
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">Section</dt><dd class="text-sm font-semibold text-[#296374]">{{ $section?->name ?? 'N/A' }}</dd></div>
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">Teacher</dt><dd class="text-right text-sm font-semibold text-[#296374]">{{ $teacherName }}</dd></div>
+        </dl>
+        <dl class="divide-y divide-slate-100 px-6">
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">Subject</dt><dd class="text-right text-sm font-semibold text-[#296374]">{{ $subjectLabel }}</dd></div>
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">Grade Level</dt><dd class="text-sm font-semibold text-[#296374]">{{ $section?->gradeLevel?->grade_label ?? ($section?->grade_level ? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level)) : 'N/A') }}</dd></div>
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">{{ $isApprovedView ? 'Approved Records' : 'Submitted Records' }}</dt><dd class="text-sm font-semibold text-[#296374]">{{ $assignment->grades->count() }}</dd></div>
+        </dl>
     </div>
-    <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 px-5 py-4">
-        <p class="text-xs font-bold uppercase tracking-widest text-gray-500">Teacher</p>
-        <p class="mt-2 text-sm font-semibold text-gray-800">{{ $teacherName }}</p>
-    </div>
-    <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 px-5 py-4">
-        <p class="text-xs font-bold uppercase tracking-widest text-gray-500">{{ $isApprovedView ? 'Approved Records' : 'Submitted Records' }}</p>
-        <p class="mt-2 text-sm font-semibold text-gray-800">{{ $assignment->grades->count() }}</p>
-    </div>
-    <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 px-5 py-4">
-        <p class="text-xs font-bold uppercase tracking-widest text-gray-500">{{ $isApprovedView ? 'Last Approved' : 'Last Submitted' }}</p>
-        <p class="mt-2 text-sm font-semibold text-gray-800">
-            @php($latestDate = $isApprovedView ? $assignment->grades->max('reviewed_at') : $latestSubmitted)
-            {{ $latestDate ? $latestDate->format('M d, Y h:i A') : 'N/A' }}
-        </p>
-    </div>
-</div>
+</section>
 
-<div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-white/20 overflow-hidden">
-    <div class="px-6 py-4 border-b border-white/20 bg-white/40">
-        <h2 class="text-sm font-bold uppercase tracking-widest text-gray-500">{{ $isApprovedView ? 'Approved Grade Details' : 'Submitted Grade Details' }}</h2>
-    </div>
+<div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
     <div class="overflow-x-auto">
-        <table class="w-full text-left">
+        <table class="min-w-[900px] w-full text-left">
             <thead>
-                <tr class="text-xs font-bold text-[#296374] uppercase tracking-wider border-b border-white/20 bg-white/30">
+                <tr class="border-b border-[#296374] bg-[#296374] text-xs font-bold uppercase tracking-wider text-white">
                     <th class="px-6 py-4">Student</th>
                     <th class="px-6 py-4">LRN</th>
                     @foreach($periods as $period)
@@ -78,9 +62,9 @@
                     <th class="px-6 py-4">Remarks</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-white/20">
+            <tbody class="divide-y divide-gray-200">
                 @foreach($rows as $row)
-                    <tr class="hover:bg-white/30 transition-all bg-white/10">
+                    <tr class="transition-colors odd:bg-white even:bg-slate-50/70 hover:bg-[#eaf3f5]">
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $row['name'] }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $row['lrn'] }}</td>
                         @foreach($periods as $period)
@@ -91,7 +75,7 @@
                         <td class="px-6 py-4 text-center text-sm font-bold text-gray-800">
                             {{ $row['average'] !== null ? number_format($row['average'], 2) : '-' }}
                         </td>
-                        <td class="px-6 py-4 text-sm text-gray-700">{{ $row['remarks'] !== '' ? $row['remarks'] : '-' }}</td>
+                        <td class="px-6 py-4 text-sm font-semibold {{ $row['remarks'] === 'Passed' ? 'text-emerald-700' : ($row['remarks'] === 'Failed' ? 'text-rose-700' : 'text-gray-500') }}">{{ $row['remarks'] !== '' ? $row['remarks'] : '-' }}</td>
                     </tr>
                 @endforeach
 
@@ -104,7 +88,7 @@
         </table>
     </div>
     @if(! $isApprovedView)
-        <div class="px-6 py-5 border-t border-white/20 bg-white/50 flex flex-col sm:flex-row justify-end gap-2">
+        <div class="flex flex-col justify-end gap-2 border-t border-gray-200 bg-slate-50 px-6 py-5 sm:flex-row">
             <form action="{{ route('registrar.grade-approvals.approve', $assignment) }}" method="POST">
                 @csrf
                 <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">Approve Grades</button>
