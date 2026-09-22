@@ -4,8 +4,8 @@ FROM composer:2 AS dependencies
 WORKDIR /app
 COPY composer.json composer.lock ./
 # Laravel's Composer hook calls `php artisan package:discover`, but this stage
-# intentionally has only composer files. Run discovery after the application
-# has been copied into the final image below.
+# intentionally has only composer files. Package discovery runs at container
+# startup, after Render has supplied the application environment.
 RUN composer install --no-dev --no-scripts --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
 # Build browser assets separately so the production image does not need Node.js.
@@ -54,8 +54,7 @@ COPY --from=assets /app/public/build ./public/build
 COPY docker/nginx/default.conf.template /etc/nginx/http.d/default.conf.template
 COPY docker/start-container /usr/local/bin/start-container
 
-RUN php artisan package:discover --ansi \
-    && chmod +x /usr/local/bin/start-container \
+RUN chmod +x /usr/local/bin/start-container \
     && chown -R www-data:www-data storage bootstrap/cache
 
 ENV PORT=10000
