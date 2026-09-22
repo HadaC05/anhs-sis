@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+cd /var/www/html
+
+# Render's filesystem is ephemeral. When PUBLIC_DISK_ROOT is set to a mounted
+# persistent disk (for example /var/data), keep uploads there instead.
+public_disk_root="${PUBLIC_DISK_ROOT:-/var/www/html/storage/app/public}"
+mkdir -p "$public_disk_root" storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache "$public_disk_root"
+
+if [ ! -e public/storage ]; then
+    ln -s "$public_disk_root" public/storage
+fi
+
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# The official nginx image entrypoint expands ${PORT} in this template.
+envsubst '${PORT}' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf
+
+php-fpm -D
+exec nginx -g 'daemon off;'

@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: anhs-sis
+    runtime: docker
+    healthCheckPath: /up
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: anhs-sis-db
+          property: connectionString
+      # A worker is not included yet, so jobs run within the web request.
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: CACHE_STORE
+        value: database
+      - key: SESSION_DRIVER
+        value: database
+      - key: APP_KEY
+        generateValue: true
+      # Set this to the public Render URL after the first deployment.
+      - key: APP_URL
+        sync: false
+      - key: ASSET_URL
+        sync: false
+      # Optional: attach a paid persistent disk at /var/data and then enable these.
+      # - key: PUBLIC_DISK_ROOT
+      #   value: /var/data
+      # - key: FILESYSTEM_DISK
+      #   value: public
+
+databases:
+  - name: anhs-sis-db
+    databaseName: anhs_sis
+    user: anhs_sis
