@@ -165,7 +165,10 @@ class StudentEnrollmentRegistrar
             $curriculumGradeLevelChanged = $previousCurriculumGradeLevelId !== $curriculumGradeLevelId;
             $section = $enrollment->section;
             $sectionMatches = $section
-                && (int) $section->grade_ID === (int) $enrollment->gradeLevel?->grade_ID
+                // grade_level is an appended string accessor. Compare against
+                // the enrollment's derived numeric grade ID instead of the
+                // accessor/relationship name.
+                && (int) $section->grade_ID === (int) $enrollment->gradeId
                 && ($section->cluster_ID ? (int) $section->cluster_ID : null) === $newClusterId
                 && (int) $section->SY_ID === (int) $enrollment->SY_ID;
 
