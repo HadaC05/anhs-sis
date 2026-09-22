@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 
@@ -17,7 +17,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 

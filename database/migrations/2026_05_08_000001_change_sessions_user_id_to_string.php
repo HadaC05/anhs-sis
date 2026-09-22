@@ -12,7 +12,7 @@ return new class extends Migration
             return;
         }
 
-        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 
@@ -25,7 +25,7 @@ return new class extends Migration
             return;
         }
 
-        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 

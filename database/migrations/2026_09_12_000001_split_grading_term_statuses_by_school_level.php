@@ -68,7 +68,7 @@ return new class extends Migration
         });
 
         DB::table('grading_terms')->update([
-            'grading_period_status_ID' => DB::raw('junior_high_grading_period_status_ID'),
+            'grading_period_status_ID' => DB::raw('"junior_high_grading_period_status_ID"'),
         ]);
 
         $this->dropForeignKey('grading_terms', 'grading_terms_jhs_status_foreign', 'junior_high_grading_period_status_ID');

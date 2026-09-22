@@ -19,7 +19,7 @@ return new class extends Migration
         // are junior high.  The new column makes that distinction explicit.
         DB::table('subjects')
             ->update([
-                'school_level' => DB::raw("CASE WHEN cluster_ID IS NULL THEN 'Junior High School' ELSE 'Senior High School' END"),
+                'school_level' => DB::raw("CASE WHEN \"cluster_ID\" IS NULL THEN 'Junior High School' ELSE 'Senior High School' END"),
             ]);
 
         Schema::table('subjects', function (Blueprint $table): void {

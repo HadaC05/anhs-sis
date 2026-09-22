@@ -281,7 +281,7 @@ return new class extends Migration
         $activeId = $this->statusId(GradingPeriodStatus::ACTIVE);
 
         DB::table('grading_terms')->update([
-            'is_active' => DB::raw('CASE WHEN grading_period_status_ID = '.(int) $activeId.' THEN 1 ELSE 0 END'),
+            'is_active' => DB::raw('CASE WHEN "grading_period_status_ID" = '.(int) $activeId.' THEN 1 ELSE 0 END'),
         ]);
 
         Schema::table('grading_terms', function (Blueprint $table): void {

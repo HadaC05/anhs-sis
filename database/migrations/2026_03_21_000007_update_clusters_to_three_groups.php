@@ -109,7 +109,9 @@ return new class extends Migration
 
         foreach ($targetToOld as $targetId => $oldIds) {
             $duplicates = DB::table('preferred_courses')
-                ->select('name', DB::raw('MIN(course_ID) as keep_id'), DB::raw('COUNT(*) as total'))
+                // Raw identifiers are not quoted by the query builder. Quote
+                // this legacy mixed-case column for PostgreSQL compatibility.
+                ->select('name', DB::raw('MIN("course_ID") as keep_id'), DB::raw('COUNT(*) as total'))
                 ->whereIn('cluster_ID', $oldIds)
                 ->groupBy('name')
                 ->having('total', '>', 1)
