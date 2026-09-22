@@ -24,7 +24,7 @@ return new class extends Migration
                 'data_status_ID' => $activeStatusId,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ], 'curricula_ID');
         } else {
             DB::table('curricula')->where('curricula_ID', $matatagId)->update([
                 'name' => 'MATATAG',

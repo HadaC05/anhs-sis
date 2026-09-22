@@ -79,7 +79,7 @@ return new class extends Migration
                     'data_status_ID' => $statusId,
                     'created_at' => $offering->created_at ?? $now,
                     'updated_at' => $offering->updated_at ?? $now,
-                ]);
+                ], 'curricula_ID');
             }
 
             DB::table('curriculum_grade_levels')

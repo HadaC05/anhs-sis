@@ -31,7 +31,9 @@ return new class extends Migration
                 }
                 $targetIds[$name] = $cluster->cluster_ID;
             } else {
-                $id = DB::table('clusters')->insertGetId(['name' => $name]);
+                // PostgreSQL's RETURNING clause needs the actual primary-key
+                // name; this table uses cluster_ID instead of Laravel's id.
+                $id = DB::table('clusters')->insertGetId(['name' => $name], 'cluster_ID');
                 $targetIds[$name] = $id;
             }
         }

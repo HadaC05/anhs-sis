@@ -34,7 +34,7 @@ return new class extends Migration
                             'status' => true,
                             'created_at' => now(),
                             'updated_at' => now(),
-                        ]);
+                        ], 'curriculum_ID');
                     }
 
                     $newCurriculumIds[$grade][$track] = $existingId;
