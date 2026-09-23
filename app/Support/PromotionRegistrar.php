@@ -74,7 +74,7 @@ class PromotionRegistrar
                 'learner_type' => $enrollment->learner_type ?: LearnerType::REGULAR,
                 'enrollment_status' => EnrollmentStatus::PENDING,
                 'promotion_status' => PromotionStatus::PENDING,
-                'last_grade_level_completed' => $enrollment->section?->gradeLevel?->grade_label,
+                'last_grade_level_completed' => $enrollment->section?->getRelation('gradeLevel')?->grade_label,
                 'last_school_year_completed' => $enrollment->academicYear?->school_year,
             ],
         );

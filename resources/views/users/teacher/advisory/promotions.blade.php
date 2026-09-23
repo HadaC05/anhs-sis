@@ -45,7 +45,7 @@
                         $status = $evaluation['status'];
                         $badge = match ($status) { 'eligible' => 'bg-emerald-100 text-emerald-800', 'retained' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' };
                         $label = match ($status) { 'eligible' => 'Eligible for Promotion', 'retained' => 'Not Eligible', default => 'Pending Requirements' };
-                        $isGradeTwelve = $section->gradeLevel?->grade_label === 'Grade 12';
+                        $isGradeTwelve = $section->getRelation('gradeLevel')?->grade_label === 'Grade 12';
                         $alreadyPromoted = in_array((int) $enrollment->student_ID, $alreadyPromotedStudentIds, true);
                         $canPromote = $status === 'eligible' && ! $isGradeTwelve && ! $alreadyPromoted && $nextAcademicYear;
                     @endphp

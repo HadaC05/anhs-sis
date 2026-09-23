@@ -399,7 +399,9 @@ class TeacherSectionController extends Controller
 
         $nextEnrollment = DB::transaction(fn (): Enrollment => PromotionRegistrar::promote($enrollment));
 
-        return back()->with('status', "Learner promoted. A pending {$nextEnrollment->gradeLevel?->grade_label} enrollment was created for {$nextEnrollment->academicYear?->school_year}.");
+        $nextGradeLabel = $nextEnrollment->gradeLevel()->value('grade_label') ?? 'next-grade';
+
+        return back()->with('status', "Learner promoted. A pending {$nextGradeLabel} enrollment was created for {$nextEnrollment->academicYear?->school_year}.");
     }
 
     public function advisoryPromotions(Request $request, Section $section): View
