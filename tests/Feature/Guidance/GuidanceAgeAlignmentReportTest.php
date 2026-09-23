@@ -3,6 +3,7 @@
 use App\Models\AcademicYear;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
+use App\Models\PlacementStatus;
 use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
@@ -54,6 +55,8 @@ test('age alignment report defaults to above range and uses an icon action', fun
     $response->assertOk();
     $response->assertSee('Age Alignment Report');
     $response->assertSee('Expected age by grade');
+    $response->assertSee('Download recommendations');
+    $response->assertSee(route('guidance.reports.placement-test-recommendations.download'), false);
     $response->assertSee('Grade 7');
     $response->assertSee('12–13');
     $response->assertSee('Grade 12');
@@ -94,6 +97,47 @@ test('age alignment report can show all alignments when requested', function () 
         ->assertOk()
         ->assertSee('value="all" selected', false)
         ->assertSee('Learner, Ontrack');
+});
+
+test('guidance counselor can download placement test recommendations from the age alignment report', function () {
+    [$user, $academicYear, $gradeLevel] = createGuidanceAgeAlignmentFixtures();
+    $recommended = Student::query()->create([
+        'lrn' => '555555555555',
+        'first_name' => 'Placement',
+        'last_name' => 'Candidate',
+        'birthdate' => '2010-01-01',
+        'status' => 'pending',
+    ]);
+    $notRecommended = Student::query()->create([
+        'lrn' => '666666666666',
+        'first_name' => 'Not',
+        'last_name' => 'Included',
+        'birthdate' => '2010-01-01',
+        'status' => 'pending',
+    ]);
+
+    foreach ([[$recommended, PlacementStatus::RECOMMENDED], [$notRecommended, PlacementStatus::PENDING]] as [$student, $placementStatus]) {
+        Enrollment::query()->create([
+            'student_ID' => $student->id,
+            'section_ID' => null,
+            'SY_ID' => $academicYear->SY_ID,
+            'cluster_ID' => null,
+            'grade_ID' => $gradeLevel->grade_ID,
+            'semester' => null,
+            'learner_type' => 'regular',
+            'enrollment_status' => 'pending',
+            'placement_status_ID' => PlacementStatus::idFor($placementStatus),
+        ]);
+    }
+
+    $response = $this->actingAs($user)->get(route('guidance.reports.placement-test-recommendations.download'));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+    expect($response->streamedContent())
+        ->toContain('Placement Test Status')
+        ->toContain('Candidate, Placement')
+        ->not->toContain('Included, Not');
 });
 
 /**

@@ -104,6 +104,11 @@
             <h2 class="text-lg font-bold text-gray-900">Terms</h2>
             <p class="mt-1 text-sm text-gray-500">Open is the one editable term. Active and Closed are included; Archived is excluded from school operations.</p>
         </div>
+        <form action="{{ route('admin.grading-term-config.junior-high.close-all') }}" method="POST" onsubmit="return confirm('Close all configured Junior High terms? Teachers will no longer be able to enter grades for them.');">
+            @csrf
+            @method('PUT')
+            <button type="submit" class="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700">Close all terms</button>
+        </form>
     </div>
 
     <div class="overflow-x-auto">
@@ -200,8 +205,19 @@
                         @php $isCurrentSemester = (int) $settings->semester_ID === (int) $semester->semester_ID; @endphp
                         <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                             <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $semester->label }} @if ($isCurrentSemester)<p class="mt-0.5 text-xs font-semibold text-[#296374]">Active semester</p>@endif</td>
-                            <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">{{ $semester->status?->name ?? 'Available' }}</span></td>
-                            <td class="px-5 py-4 text-right">@if (! $isCurrentSemester)<form action="{{ route('admin.grading-term-config.senior-high.semester.update') }}" method="POST" class="inline" onsubmit="return confirm('Set {{ $semester->label }} as the active Senior High semester?');">@csrf @method('PUT')<input type="hidden" name="semester_ID" value="{{ $semester->semester_ID }}"><button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Set Active</button></form>@endif</td>
+                            <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($semester->status?->slug) }}">{{ $semester->status?->name ?? 'Available' }}</span></td>
+                            <td class="px-5 py-4 text-right">
+                                <div class="inline-flex items-center gap-2">
+                                    @if (! $isCurrentSemester && $semester->status?->slug !== 'closed')<form action="{{ route('admin.grading-term-config.senior-high.semester.update') }}" method="POST" class="inline" onsubmit="return confirm('Set {{ $semester->label }} as the active Senior High semester?');">@csrf @method('PUT')<input type="hidden" name="semester_ID" value="{{ $semester->semester_ID }}"><button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Set Active</button></form>@endif
+                                    @if ($semester->status?->slug !== 'closed')
+                                        <form action="{{ route('admin.grading-term-config.senior-high.semester.close', $semester) }}" method="POST" class="inline" onsubmit="return confirm('Close {{ $semester->label }} and all of its terms? Teachers will no longer be able to enter grades for this semester.');">
+                                            @csrf
+                                            @method('PUT')
+                                            <button type="submit" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-700">Close semester</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -13,6 +13,7 @@ use App\Models\GradingTermSetting;
 use App\Support\GradingTermNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class GradingTermConfigurationController extends Controller
@@ -36,7 +37,6 @@ class GradingTermConfigurationController extends Controller
             'seniorHighPeriods' => GradingTerm::seniorHighPeriods(),
             'seniorHighSemesters' => GradingSemester::query()
                 ->with('status')
-                ->active()
                 ->whereIn('key', [GradingSemester::FIRST, GradingSemester::SECOND])
                 ->orderBy('sort_order')
                 ->orderBy('semester_ID')
@@ -112,6 +112,13 @@ class GradingTermConfigurationController extends Controller
         GradingTerm::syncActiveStatus();
 
         return back()->with('success', "{$term->label} is now ".GradingPeriodStatus::nameFor($validated['status']).'.');
+    }
+
+    public function closeAllJuniorHighTerms(): RedirectResponse
+    {
+        GradingTerm::closeAllJuniorHighTerms();
+
+        return back()->with('success', 'All configured Junior High terms are now closed.');
     }
 
     public function updateSeniorHighStatus(Request $request, GradingTerm $term): RedirectResponse
@@ -256,6 +263,22 @@ class GradingTermConfigurationController extends Controller
         }
 
         return back()->with('success', "Active senior high semester set to {$semester->label}.");
+    }
+
+    public function closeSeniorHighSemester(Request $request, GradingSemester $semester): RedirectResponse
+    {
+        abort_unless(in_array($semester->key, [GradingSemester::FIRST, GradingSemester::SECOND], true), 404);
+
+        DB::transaction(function () use ($semester): void {
+            $semester->update(['grading_period_status_ID' => GradingPeriodStatus::closedId()]);
+
+            GradingTerm::query()
+                ->whereIn('term_ID', array_values(array_filter(array_column(GradingTerm::seniorHighTerms(), 'term_ID'))))
+                ->seniorHighAvailable()
+                ->update(['senior_high_grading_period_status_ID' => GradingPeriodStatus::closedId()]);
+        });
+
+        return back()->with('success', "{$semester->label} is closed, and all of its Senior High terms are closed.");
     }
 
     public function updateSeniorHighTerm(Request $request): RedirectResponse

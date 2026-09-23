@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\GradingSemester;
+use App\Models\GradingPeriodStatus;
 use App\Models\GradingTerm;
 use App\Models\GradingTermSetting;
 use App\Models\Role;
@@ -86,6 +87,18 @@ test('admin can close a junior high term', function () {
 
     expect($term->fresh()->isJuniorHighOpen())->toBeFalse()
         ->and($term->fresh()->juniorHighStatus?->name)->toBe('Closed');
+});
+
+test('admin can close all configured junior high terms at once', function () {
+    $admin = createGradingTermAdmin('admin.grading.close.all.jhs');
+
+    $this->actingAs($admin)
+        ->from(route('admin.grading-term-config.index'))
+        ->put(route('admin.grading-term-config.junior-high.close-all'))
+        ->assertRedirect(route('admin.grading-term-config.index'))
+        ->assertSessionHas('success');
+
+    expect(GradingTerm::areJuniorHighTermsClosed())->toBeTrue();
 });
 
 test('admin can add a term from the settings modal', function () {
@@ -273,6 +286,22 @@ test('admin can set senior high semester and term independently from their looku
     expect(GradingTermSetting::current()->semester?->key)->toBe('second')
         ->and(GradingTermSetting::current()->term_ID)->toBe($secondTerm->term_ID)
         ->and(GradingTerm::currentSeniorHighPeriodKey())->toBe('shs_sem2_term_2');
+});
+
+test('closing a senior high semester also closes its terms', function () {
+    $admin = createGradingTermAdmin('admin.grading.close.shs.semester');
+    $semester = GradingSemester::query()->where('key', 'first')->firstOrFail();
+
+    $this->actingAs($admin)
+        ->from(route('admin.grading-term-config.index', ['tab' => 'senior_high']))
+        ->put(route('admin.grading-term-config.senior-high.semester.close', $semester))
+        ->assertRedirect(route('admin.grading-term-config.index', ['tab' => 'senior_high']))
+        ->assertSessionHas('success');
+
+    expect($semester->fresh()->status?->slug)->toBe('closed')
+        ->and(GradingTerm::query()
+            ->where('senior_high_grading_period_status_ID', GradingPeriodStatus::closedId())
+            ->count())->toBe(3);
 });
 
 test('admin can set the current senior high semester and term', function () {

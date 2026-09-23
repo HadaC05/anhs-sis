@@ -27,6 +27,7 @@ use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\ClassListSpreadsheet;
 use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
+use App\Support\PromotionRegistrar;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
 use App\Support\StudentCredentials;
@@ -35,6 +36,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class TeacherSectionController extends Controller
@@ -350,7 +352,7 @@ class TeacherSectionController extends Controller
         ]);
     }
 
-    public function evaluatePromotions(Request $request, Section $section): RedirectResponse
+    public function bulkPromote(Request $request, Section $section): RedirectResponse
     {
         $this->authorizeAdvisorySection($request, $section);
 
@@ -363,17 +365,41 @@ class TeacherSectionController extends Controller
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->whereIn('enrollment_ID', $validated['enrollment_ids'])
             ->get();
-        $counts = ['eligible' => 0, 'retained' => 0, 'pending' => 0];
+        $promoted = 0;
+        $blocked = [];
 
-        DB::transaction(function () use ($enrollments, &$counts): void {
-            foreach ($enrollments as $enrollment) {
-                $result = PromotionEligibility::evaluate($enrollment);
-                $enrollment->update(['promotion_status' => $result['status']]);
-                $counts[$result['status']]++;
+        foreach ($enrollments as $enrollment) {
+            try {
+                DB::transaction(function () use ($enrollment): void {
+                    PromotionRegistrar::promote($enrollment);
+                });
+                $promoted++;
+            } catch (ValidationException $exception) {
+                $blocked[] = $exception->errors()['promotion'][0] ?? 'This learner could not be promoted.';
             }
-        });
+        }
 
-        return back()->with('status', "Promotion evaluation completed: {$counts['eligible']} eligible, {$counts['retained']} retained, {$counts['pending']} pending final grades.");
+        $message = "Bulk promotion completed for {$promoted} learner(s).";
+        if ($blocked !== []) {
+            $message .= ' '.count($blocked).' learner(s) were skipped: '.$blocked[0];
+        }
+
+        return back()->with('status', $message);
+    }
+
+    public function promote(Request $request, Section $section, Enrollment $enrollment): RedirectResponse
+    {
+        $this->authorizeAdvisorySection($request, $section);
+
+        abort_unless(
+            (int) $enrollment->section_ID === (int) $section->section_ID
+            && in_array((int) $enrollment->enrollment_status_ID, EnrollmentStatus::activeIds(), true),
+            404,
+        );
+
+        $nextEnrollment = DB::transaction(fn (): Enrollment => PromotionRegistrar::promote($enrollment));
+
+        return back()->with('status', "Learner promoted. A pending {$nextEnrollment->gradeLevel?->grade_label} enrollment was created for {$nextEnrollment->academicYear?->school_year}.");
     }
 
     public function advisoryPromotions(Request $request, Section $section): View
@@ -382,14 +408,37 @@ class TeacherSectionController extends Controller
         $section->load(['academicYear', 'cluster', 'gradeLevel']);
 
         $enrollments = Enrollment::query()
-            ->with(['student.application', 'promotionStatus'])
+            ->with(['student.application', 'promotionStatus', 'gradingSemester.status'])
             ->where('section_ID', $section->section_ID)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->get()
             ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
             ->values();
 
-        return view('users.teacher.advisory.promotions', compact('section', 'enrollments'));
+        $evaluations = $enrollments
+            ->mapWithKeys(fn (Enrollment $enrollment): array => [$enrollment->enrollment_ID => PromotionEligibility::evaluate($enrollment)])
+            ->all();
+
+        $nextAcademicYear = AcademicYear::query()
+            ->whereDate('start_date', '>', $section->academicYear?->start_date)
+            ->orderBy('start_date')
+            ->first();
+        $alreadyPromotedStudentIds = $nextAcademicYear
+            ? Enrollment::query()
+                ->where('SY_ID', $nextAcademicYear->SY_ID)
+                ->whereIn('student_ID', $enrollments->pluck('student_ID'))
+                ->pluck('student_ID')
+                ->map(fn (mixed $studentId): int => (int) $studentId)
+                ->all()
+            : [];
+
+        return view('users.teacher.advisory.promotions', compact(
+            'section',
+            'enrollments',
+            'evaluations',
+            'nextAcademicYear',
+            'alreadyPromotedStudentIds',
+        ));
     }
 
     public function advisoryAttendance(Request $request, Section $section): View

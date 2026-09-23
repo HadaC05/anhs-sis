@@ -111,12 +111,18 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::put('/admin/grading-term-configuration/open-term', [GradingTermConfigurationController::class, 'updateOpenTerm'])
         ->middleware('admin')
         ->name('admin.grading-term-config.open-term.update');
+    Route::put('/admin/grading-term-configuration/junior-high/close-all', [GradingTermConfigurationController::class, 'closeAllJuniorHighTerms'])
+        ->middleware('admin')
+        ->name('admin.grading-term-config.junior-high.close-all');
     Route::put('/admin/grading-term-configuration/senior-high', [GradingTermConfigurationController::class, 'updateSeniorHigh'])
         ->middleware('admin')
         ->name('admin.grading-term-config.senior-high.update');
     Route::put('/admin/grading-term-configuration/senior-high/semester', [GradingTermConfigurationController::class, 'updateSeniorHighSemester'])
         ->middleware('admin')
         ->name('admin.grading-term-config.senior-high.semester.update');
+    Route::put('/admin/grading-term-configuration/senior-high/semester/{semester}/close', [GradingTermConfigurationController::class, 'closeSeniorHighSemester'])
+        ->middleware('admin')
+        ->name('admin.grading-term-config.senior-high.semester.close');
     Route::put('/admin/grading-term-configuration/senior-high/term', [GradingTermConfigurationController::class, 'updateSeniorHighTerm'])
         ->middleware('admin')
         ->name('admin.grading-term-config.senior-high.term.update');
@@ -333,9 +339,12 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/teacher/advisory/{section}', [TeacherSectionController::class, 'advisoryShow'])
         ->middleware('teacher')
         ->name('teacher.advisory.show');
-    Route::post('/teacher/advisory/{section}/promotions/evaluate', [TeacherSectionController::class, 'evaluatePromotions'])
+    Route::post('/teacher/advisory/{section}/promotions/bulk', [TeacherSectionController::class, 'bulkPromote'])
         ->middleware('teacher')
-        ->name('teacher.advisory.promotions.evaluate');
+        ->name('teacher.advisory.promotions.bulk');
+    Route::post('/teacher/advisory/{section}/promotions/{enrollment}', [TeacherSectionController::class, 'promote'])
+        ->middleware('teacher')
+        ->name('teacher.advisory.promotions.promote');
     Route::get('/teacher/sections/{assignment}', [TeacherSectionController::class, 'show'])
         ->middleware('teacher')
         ->name('teacher.sections.show');
@@ -489,6 +498,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/guidance/reports/age-for-grade', [GuidanceDashboardController::class, 'ageForGradeReport'])
         ->middleware('guidance')
         ->name('guidance.reports.age-for-grade');
+    Route::get('/guidance/reports/placement-test-recommendations/download', [GuidanceDashboardController::class, 'downloadPlacementTestRecommendations'])
+        ->middleware('guidance')
+        ->name('guidance.reports.placement-test-recommendations.download');
     Route::get('/guidance/sections', [GuidanceDashboardController::class, 'sectionsIndex'])
         ->middleware('guidance')
         ->name('guidance.sections.index');

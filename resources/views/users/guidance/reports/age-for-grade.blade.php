@@ -26,26 +26,25 @@
     $expectedRanges = \App\Support\PlacementAssessmentAdvisor::expectedRanges();
 @endphp
 
-<div class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-stretch xl:justify-between">
+<div class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
     <div class="flex min-w-0 flex-col justify-center">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Age Alignment Report</h1>
-        <p class="mt-1 max-w-2xl text-sm text-gray-600 md:text-base">Review student ages against expected grade-level ranges. Placement tests are suggested for overage students only.</p>
+        <h1 class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl">Age Alignment Report</h1>
     </div>
-    <div class="w-full rounded-xl border border-[#296374]/20 bg-[#296374]/5 p-4 shadow-sm xl:max-w-xl">
-        <div class="mb-3 flex items-start gap-2">
-            <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#296374] text-white">
+    <div class="w-full rounded-xl border border-[#296374]/20 bg-[#296374]/5 p-3 shadow-sm xl:max-w-3xl">
+        <div class="mb-2 flex items-center gap-2">
+            <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#296374] text-white">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </span>
             <div>
                 <p class="text-sm font-bold text-[#296374]">Expected age by grade</p>
-                <p class="text-xs text-gray-500">Measured at the start of the school year</p>
+                <p class="text-[11px] text-gray-500">Measured at the start of the school year</p>
             </div>
         </div>
-        <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             @foreach ($expectedRanges as $range)
-                <div class="rounded-lg border border-gray-100 bg-white px-2 py-2 text-center shadow-sm">
+                <div class="flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-center shadow-sm [&>p]:!mt-0 [&>p]:shrink-0">
                     <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500">{{ $range['label'] }}</p>
                     <p class="mt-0.5 text-sm font-bold text-gray-900">{{ $range['minimum_age'] }}–{{ $range['maximum_age'] }}</p>
                     <p class="text-[10px] text-gray-400">yrs</p>
@@ -100,6 +99,7 @@
     </div>
 </form>
 
+{{--
 <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
     <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Reviewed</p>
@@ -126,18 +126,25 @@
         <p class="mt-1 text-2xl font-bold text-[#296374]">{{ number_format($summary['marked_for_test'] ?? 0) }}</p>
     </div>
 </div>
+--}}
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
     <div class="xl:col-span-9">
-        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-100 px-5 py-4">
-                <h2 class="text-sm font-bold text-gray-900">Student records</h2>
-                <p class="mt-1 text-xs text-gray-500">Pending and active enrollments with recorded birthdates</p>
+        <div class="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-md shadow-slate-200/50">
+            <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-gray-900">Student records</h2>
+
+                </div>
+                <a href="{{ route('guidance.reports.placement-test-recommendations.download', request()->except(['page', 'per_page', 'alignment'])) }}" class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#296374]/20 bg-[#296374]/5 px-3 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/10">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
+                    Download recommendations
+                </a>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[640px] text-left text-sm">
                     <thead>
-                        <tr class="border-b border-gray-100 bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                        <tr class="border-b border-[#1f4d5a] bg-[#296374] text-[11px] font-bold uppercase tracking-wider text-white">
                             <th class="px-5 py-3">Student</th>
                             <th class="px-5 py-3">Grade</th>
                             <th class="px-5 py-3">Age</th>
@@ -147,25 +154,19 @@
                             @endif
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-slate-200">
                         @forelse($rows as $row)
                             @php
                                 $enrollment = $row['enrollment'];
                                 $student = $row['student'];
                                 $assessment = $row['assessment'];
-                                $recommendation = $row['recommendation'] ?? null;
                                 $status = $assessment['status'];
                                 $studentName = trim(($student->last_name ?? '').', '.($student->first_name ?? '').' '.($student->middle_name ?? ''));
                             @endphp
-                            <tr class="transition hover:bg-gray-50/80 {{ $enrollment->hasPlacementStatusMark() ? 'bg-[#296374]/[0.03]' : '' }}">
+                            <tr class="odd:bg-white even:bg-slate-50/70 transition hover:!bg-[#296374]/10 {{ $enrollment->hasPlacementStatusMark() ? 'font-medium' : '' }}">
                                 <td class="px-5 py-3">
                                     <p class="font-semibold text-gray-900">{{ $studentName ?: 'Unnamed student' }}</p>
                                     <p class="font-mono text-xs text-gray-500">{{ $student->lrn ?? '-' }}</p>
-                                    @if ($enrollment->hasPlacementStatusMark())
-                                        <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 {{ \App\Models\PlacementStatus::badgeClasses($enrollment->placement_status) }}">{{ $enrollment->placement_status_label }}</span>
-                                    @elseif ($recommendation)
-                                        <span class="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">Review suggested</span>
-                                    @endif
                                 </td>
                                 <td class="px-5 py-3">
                                     <p class="font-medium text-gray-800">{{ $enrollment->grade_level ? \App\Models\GradeLevel::valueToLabel($enrollment->grade_level) : '—' }}</p>
@@ -176,9 +177,6 @@
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusClasses[$status] ?? 'bg-gray-100 text-gray-700 ring-gray-200' }}">
                                         {{ $statusLabels[$status] ?? ucfirst($status) }}
                                     </span>
-                                    @if ($recommendation)
-                                        <p class="mt-1 text-[11px] text-gray-500">{{ $recommendation['summary'] }}</p>
-                                    @endif
                                 </td>
                                 @if ($showEnrollmentAction)
                                     <td class="px-5 py-3 text-right">
@@ -215,8 +213,16 @@
     <div class="xl:col-span-3">
         <div class="space-y-6 xl:sticky xl:top-24">
             <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h2 class="text-sm font-bold text-gray-900">Alignment ratio</h2>
-                <p class="mt-1 text-xs text-gray-500">Share of reviewed students by age status</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-gray-900">Alignment ratio</h2>
+                        <p class="mt-1 text-xs text-gray-500">Share of reviewed students by age status</p>
+                    </div>
+                    <button type="button" data-chart-download="alignmentRatioChart" data-filename="age-alignment-ratio" title="Download chart image" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374] disabled:cursor-not-allowed disabled:opacity-40" {{ ($ageAlignment['reviewed'] ?? 0) === 0 ? 'disabled' : '' }}>
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
+                        <span class="sr-only">Download alignment ratio chart</span>
+                    </button>
+                </div>
                 <div class="relative mx-auto mt-4 h-52 max-w-[220px]">
                     <canvas id="alignmentRatioChart"></canvas>
                     @if (($ageAlignment['reviewed'] ?? 0) === 0)
@@ -226,8 +232,16 @@
             </div>
 
             <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h2 class="text-sm font-bold text-gray-900">Average age by grade</h2>
-                <p class="mt-1 text-xs text-gray-500">Actual vs expected average at school year start</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-gray-900">Average age by grade</h2>
+                        <p class="mt-1 text-xs text-gray-500">Actual vs expected average at school year start</p>
+                    </div>
+                    <button type="button" data-chart-download="averageAgeByGradeChart" data-filename="average-age-by-grade" title="Download chart image" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374] disabled:cursor-not-allowed disabled:opacity-40" {{ count($ageAlignment['by_grade'] ?? []) === 0 ? 'disabled' : '' }}>
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
+                        <span class="sr-only">Download average age by grade chart</span>
+                    </button>
+                </div>
                 <div class="relative mt-4 h-64">
                     <canvas id="averageAgeByGradeChart"></canvas>
                     @if (count($ageAlignment['by_grade'] ?? []) === 0)
@@ -244,6 +258,32 @@
     document.addEventListener('DOMContentLoaded', function () {
         var ageAlignment = @json($ageAlignment);
         var byGrade = ageAlignment.by_grade || [];
+        var chartValueLabels = {
+            id: 'chartValueLabels',
+            afterDatasetsDraw: function (chart) {
+                var context = chart.ctx;
+                var isDoughnut = chart.config.type === 'doughnut';
+
+                chart.data.datasets.forEach(function (dataset, datasetIndex) {
+                    chart.getDatasetMeta(datasetIndex).data.forEach(function (element, index) {
+                        var value = dataset.data[index];
+
+                        if (value === null || value === undefined || value === '') {
+                            return;
+                        }
+
+                        var position = element.tooltipPosition();
+                        context.save();
+                        context.fillStyle = isDoughnut ? '#ffffff' : '#334155';
+                        context.font = '600 11px system-ui, sans-serif';
+                        context.textAlign = 'center';
+                        context.textBaseline = isDoughnut ? 'middle' : 'bottom';
+                        context.fillText(value, position.x, isDoughnut ? position.y : position.y - 6);
+                        context.restore();
+                    });
+                });
+            },
+        };
 
         if ((ageAlignment.reviewed || 0) > 0 && document.getElementById('alignmentRatioChart')) {
             new Chart(document.getElementById('alignmentRatioChart'), {
@@ -271,6 +311,7 @@
                         },
                     },
                 },
+                plugins: [chartValueLabels],
             });
         }
 
@@ -314,8 +355,34 @@
                         x: { grid: { display: false } },
                     },
                 },
+                plugins: [chartValueLabels],
             });
         }
+
+        document.querySelectorAll('[data-chart-download]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var canvas = document.getElementById(button.dataset.chartDownload);
+                var chart = canvas ? Chart.getChart(canvas) : null;
+
+                if (! chart) {
+                    return;
+                }
+
+                var padding = 64;
+                var imageCanvas = document.createElement('canvas');
+                imageCanvas.width = canvas.width + (padding * 2);
+                imageCanvas.height = canvas.height + (padding * 2);
+                var imageContext = imageCanvas.getContext('2d');
+                imageContext.fillStyle = '#ffffff';
+                imageContext.fillRect(0, 0, imageCanvas.width, imageCanvas.height);
+                imageContext.drawImage(canvas, padding, padding);
+
+                var link = document.createElement('a');
+                link.href = imageCanvas.toDataURL('image/png');
+                link.download = button.dataset.filename + '.png';
+                link.click();
+            });
+        });
     });
 </script>
 @endsection

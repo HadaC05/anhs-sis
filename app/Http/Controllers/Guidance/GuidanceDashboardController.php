@@ -19,6 +19,7 @@ use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
 use App\Models\LearnerType;
+use App\Models\PlacementStatus;
 use App\Models\PromotionStatus;
 use App\Models\Section;
 use App\Models\Staff;
@@ -434,7 +435,6 @@ class GuidanceDashboardController extends Controller
                     'enrollment' => $enrollment,
                     'student' => $enrollment->student,
                     'assessment' => $assessment,
-                    'recommendation' => PlacementAssessmentAdvisor::forEnrollment($enrollment),
                 ];
             })
             ->filter()
@@ -443,17 +443,6 @@ class GuidanceDashboardController extends Controller
         $ageAlignment = PlacementAssessmentAdvisor::summarizeAgeAlignment(
             $reportRows->pluck('enrollment'),
         );
-
-        $summary = [
-            'all' => $ageAlignment['reviewed'],
-            'appropriate' => $ageAlignment['appropriate'],
-            'overage' => $ageAlignment['overage'],
-            'underage' => $ageAlignment['underage'],
-            'average_age' => $ageAlignment['average_age'],
-            'marked_for_test' => $reportRows->filter(
-                fn (array $row): bool => $row['enrollment']->isPlacementRecommended(),
-            )->count(),
-        ];
 
         $filteredRows = $alignment !== '' && $alignment !== 'all'
             ? $reportRows->where('assessment.status', $alignment)->values()
@@ -475,11 +464,70 @@ class GuidanceDashboardController extends Controller
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),
             'gradeLevels' => GradeLevel::options(),
             'rows' => $paginatedRows,
-            'summary' => $summary,
             'ageAlignment' => $ageAlignment,
             'alignment' => $alignment,
             'gradeLevel' => $gradeLevel,
         ]);
+    }
+
+    public function downloadPlacementTestRecommendations(Request $request): StreamedResponse
+    {
+        $activeYear = AcademicYear::query()->where('status', true)->first();
+        $search = trim($request->string('search')->toString());
+        $gradeId = GradeLevel::idForValue($request->string('grade_level')->toString());
+        $academicYearId = $request->string('academic_year_id')->toString();
+
+        $enrollments = Enrollment::query()
+            ->with(['student', 'gradeLevel', 'section', 'academicYear', 'placementStatus'])
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::inProgressIds())
+            ->whereHas('placementStatus', fn ($query) => $query->where('slug', PlacementStatus::RECOMMENDED))
+            ->when($academicYearId !== '' && $academicYearId !== 'all', function ($query) use ($academicYearId) {
+                $query->where('SY_ID', $academicYearId);
+            })
+            ->when($academicYearId === '' && $activeYear, function ($query) use ($activeYear) {
+                $query->where('SY_ID', $activeYear->SY_ID);
+            })
+            ->when($gradeId, function ($query) use ($gradeId) {
+                $query->forGrade($gradeId);
+            })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('student', function ($studentQuery) use ($search) {
+                    $studentQuery->where('lrn', 'like', "%{$search}%")
+                        ->orWhere('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('middle_name', 'like', "%{$search}%");
+                });
+            })
+            ->orderByGrade()
+            ->orderBy('section_ID')
+            ->orderBy('enrollment_ID')
+            ->get();
+
+        $filename = 'placement-test-recommendations-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($enrollments): void {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, ['Student', 'LRN', 'School Year', 'Grade Level', 'Section', 'Age', 'Expected Age Range', 'Placement Test Status']);
+
+            foreach ($enrollments as $enrollment) {
+                $student = $enrollment->student;
+                $assessment = PlacementAssessmentAdvisor::assessmentForEnrollment($enrollment);
+
+                fputcsv($output, [
+                    trim(($student?->last_name ?? '').', '.($student?->first_name ?? '').' '.($student?->middle_name ?? '')),
+                    $student?->lrn ?? '',
+                    $enrollment->academicYear?->school_year ?? '',
+                    $enrollment->grade_level ? GradeLevel::valueToLabel($enrollment->grade_level) : '',
+                    $enrollment->section?->name ?? 'Unassigned',
+                    $assessment['age'] ?? '',
+                    $assessment ? "{$assessment['minimum_age']}-{$assessment['maximum_age']}" : '',
+                    $enrollment->placement_status_label,
+                ]);
+            }
+
+            fclose($output);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function verifyDocument(StudentDocument $document, Request $request): RedirectResponse

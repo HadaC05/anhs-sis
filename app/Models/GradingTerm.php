@@ -240,6 +240,35 @@ class GradingTerm extends Model
         return self::isJuniorHighPeriodOpen(self::currentEditablePeriodKey());
     }
 
+    /** True only when every configured Junior High term has been closed. */
+    public static function areJuniorHighTermsClosed(): bool
+    {
+        $periodKeys = array_column(self::configuredPeriods(), 'key');
+
+        if ($periodKeys === [] || ! Schema::hasTable('grading_terms')) {
+            return false;
+        }
+
+        return self::query()
+            ->whereIn('key', $periodKeys)
+            ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::closedId())
+            ->count() === count($periodKeys);
+    }
+
+    /** Close every configured Junior High term while leaving archived terms untouched. */
+    public static function closeAllJuniorHighTerms(): int
+    {
+        $periodKeys = array_column(self::configuredPeriods(), 'key');
+
+        if ($periodKeys === []) {
+            return 0;
+        }
+
+        return self::query()
+            ->whereIn('key', $periodKeys)
+            ->update(['junior_high_grading_period_status_ID' => GradingPeriodStatus::closedId()]);
+    }
+
     public static function fallbackPeriods(): array
     {
         return [
