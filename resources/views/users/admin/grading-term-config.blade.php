@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Grading Term Configuration')
 
@@ -14,7 +18,7 @@
     $activeTermCount = $terms->filter(fn ($term) => ! $term->isJuniorHighArchived())->count();
     $editingTermId = old('_form') === 'edit_term' ? old('term_id') : null;
     $editFormAction = $editingTermId
-        ? route('admin.grading-term-config.update', ['term' => $editingTermId])
+        ? route($managementRoutePrefix.'grading-term-config.update', ['term' => $editingTermId])
         : '#';
     $isJuniorHighTab = $activeTab === 'junior_high';
     $currentSeniorHighLabel = $currentSeniorHighPeriod['label'] ?? 'First Semester · Term 1';
@@ -104,7 +108,7 @@
             <h2 class="text-lg font-bold text-gray-900">Terms</h2>
             <p class="mt-1 text-sm text-gray-500">Open is the one editable term. Active and Closed are included; Archived is excluded from school operations.</p>
         </div>
-        <form action="{{ route('admin.grading-term-config.junior-high.close-all') }}" method="POST" onsubmit="return confirm('Close all configured Junior High terms? Teachers will no longer be able to enter grades for them.');">
+        <form action="{{ route($managementRoutePrefix.'grading-term-config.junior-high.close-all') }}" method="POST" onsubmit="return confirm('Close all configured Junior High terms? Teachers will no longer be able to enter grades for them.');">
             @csrf
             @method('PUT')
             <button type="submit" class="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700">Close all terms</button>
@@ -149,7 +153,7 @@
                                     <summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary>
                                     <div class="absolute right-0 z-20 mt-2 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
                                         @foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)
-                                            <form action="{{ route('admin.grading-term-config.junior-high-status.update', $term) }}" method="POST">
+                                            <form action="{{ route($managementRoutePrefix.'grading-term-config.junior-high-status.update', $term) }}" method="POST">
                                                 @csrf
                                                 @method('PUT')
                                                 <input type="hidden" name="status" value="{{ $status }}">
@@ -208,9 +212,9 @@
                             <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($semester->status?->slug) }}">{{ $semester->status?->name ?? 'Available' }}</span></td>
                             <td class="px-5 py-4 text-right">
                                 <div class="inline-flex items-center gap-2">
-                                    @if (! $isCurrentSemester && $semester->status?->slug !== 'closed')<form action="{{ route('admin.grading-term-config.senior-high.semester.update') }}" method="POST" class="inline" onsubmit="return confirm('Set {{ $semester->label }} as the active Senior High semester?');">@csrf @method('PUT')<input type="hidden" name="semester_ID" value="{{ $semester->semester_ID }}"><button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Set Active</button></form>@endif
+                                    @if (! $isCurrentSemester && $semester->status?->slug !== 'closed')<form action="{{ route($managementRoutePrefix.'grading-term-config.senior-high.semester.update') }}" method="POST" class="inline" onsubmit="return confirm('Set {{ $semester->label }} as the active Senior High semester?');">@csrf @method('PUT')<input type="hidden" name="semester_ID" value="{{ $semester->semester_ID }}"><button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Set Active</button></form>@endif
                                     @if ($semester->status?->slug !== 'closed')
-                                        <form action="{{ route('admin.grading-term-config.senior-high.semester.close', $semester) }}" method="POST" class="inline" onsubmit="return confirm('Close {{ $semester->label }} and all of its terms? Teachers will no longer be able to enter grades for this semester.');">
+                                        <form action="{{ route($managementRoutePrefix.'grading-term-config.senior-high.semester.close', $semester) }}" method="POST" class="inline" onsubmit="return confirm('Close {{ $semester->label }} and all of its terms? Teachers will no longer be able to enter grades for this semester.');">
                                             @csrf
                                             @method('PUT')
                                             <button type="submit" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-700">Close semester</button>
@@ -239,7 +243,7 @@
                         <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                             <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $term->label }} @if ($isCurrentTerm)<p class="mt-0.5 text-xs font-semibold text-[#296374]">Active term</p>@endif</td>
                             <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($term->seniorHighStatus?->slug) }}">{{ $term->seniorHighStatus?->name ?? 'Archived' }}</span></td>
-                            <td class="px-5 py-4 text-right"><details class="relative inline-block"><summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary><div class="absolute right-0 z-20 mt-2 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">@foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)<form action="{{ route('admin.grading-term-config.senior-high-status.update', $term) }}" method="POST">@csrf @method('PUT')<input type="hidden" name="status" value="{{ $status }}"><button type="submit" class="block w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $label }}</button></form>@endforeach</div></details></td>
+                            <td class="px-5 py-4 text-right"><details class="relative inline-block"><summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary><div class="absolute right-0 z-20 mt-2 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">@foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)<form action="{{ route($managementRoutePrefix.'grading-term-config.senior-high-status.update', $term) }}" method="POST">@csrf @method('PUT')<input type="hidden" name="status" value="{{ $status }}"><button type="submit" class="block w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $label }}</button></form>@endforeach</div></details></td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -267,7 +271,7 @@
             </div>
         </div>
 
-        <form action="{{ route('admin.grading-term-config.store') }}" method="POST">
+        <form action="{{ route($managementRoutePrefix.'grading-term-config.store') }}" method="POST">
             @csrf
             <input type="hidden" name="_form" value="add_term">
 
@@ -322,7 +326,7 @@
             </div>
         </div>
 
-        <form action="{{ route('admin.grading-term-config.settings.update') }}" method="POST">
+        <form action="{{ route($managementRoutePrefix.'grading-term-config.settings.update') }}" method="POST">
             @csrf
             @method('PUT')
             <input type="hidden" name="_form" value="max_terms">
@@ -487,7 +491,7 @@
 
     function openEditTermModal(term) {
         const form = document.getElementById('editTermForm');
-        const updateRouteTemplate = '{{ route('admin.grading-term-config.update', ['term' => '__TERM__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'grading-term-config.update', ['term' => '__TERM__']) }}';
 
         form.action = updateRouteTemplate.replace('__TERM__', term.term_ID);
         document.getElementById('edit_term_id').value = term.term_ID;

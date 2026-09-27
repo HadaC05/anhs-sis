@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Sections')
 
@@ -33,59 +37,59 @@
 
 <div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     <div class="border-b border-gray-100 px-4 py-4">
-        <form method="GET" action="{{ route('admin.section-config.index') }}" class="flex flex-wrap items-center gap-2">
-            <div class="relative min-w-[200px] flex-1">
+        <form method="GET" action="{{ route($managementRoutePrefix.'section-config.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="relative min-w-0 sm:col-span-2">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
                 </svg>
                 <input type="search" name="search" value="{{ request('search') }}" placeholder="Search section or room"
                     class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
             </div>
-            <select name="cluster_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select name="cluster_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All clusters</option>
                 @foreach ($clusters as $cluster)
                     <option value="{{ $cluster->cluster_ID }}" @selected((int) request('cluster_ID') === (int) $cluster->cluster_ID)>{{ $cluster->name }}</option>
                 @endforeach
             </select>
-            <select name="grade_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select name="grade_level" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All grades</option>
                 @foreach ($gradeLevels as $level)
                     <option value="{{ $level['value'] }}" @selected(request('grade_level') === $level['value'])>{{ $level['label'] }}</option>
                 @endforeach
             </select>
-            <select name="SY_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select name="SY_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All years</option>
                 @foreach ($academicYears as $year)
                     <option value="{{ $year->SY_ID }}" @selected((int) request('SY_ID') === (int) $year->SY_ID)>{{ $year->school_year }}</option>
                 @endforeach
             </select>
-            <select name="curriculum_grade_level_ID" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select name="curriculum_grade_level_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All curricula</option>
                 @foreach ($curriculums as $curriculum)
                     <option value="{{ $curriculum->curriculum_ID }}" @selected((int) request('curriculum_grade_level_ID') === (int) $curriculum->curriculum_ID)>{{ $curriculum->name }}</option>
                 @endforeach
             </select>
-            <select name="status" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select name="status" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="active" @selected(($status ?? 'active') === 'active')>Active</option>
                 <option value="inactive" @selected(($status ?? 'active') === 'inactive')>Inactive</option>
                 <option value="all" @selected(($status ?? 'active') === 'all')>All statuses</option>
             </select>
-            <select name="per_page" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select name="per_page" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 @foreach ([5, 10, 15, 25, 50] as $size)
                     <option value="{{ $size }}" {{ (int) ($perPage ?? 10) === $size ? 'selected' : '' }}>{{ $size }} per page</option>
                 @endforeach
             </select>
-            <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
+            <button type="submit" class="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
             @if (request()->hasAny(['search', 'cluster_ID', 'grade_level', 'SY_ID', 'curriculum_grade_level_ID', 'per_page', 'status']))
-                <a href="{{ route('admin.section-config.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                <a href="{{ route($managementRoutePrefix.'section-config.index') }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
             @endif
         </form>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[720px] border-collapse text-left">
+        <table class="w-full min-w-[1100px] border-collapse text-left">
             <thead>
-                <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                <tr class="border-b border-gray-300 bg-gray-100 whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-gray-600">
                     <th class="border-r border-gray-200 px-5 py-4">Name</th>
                     <th class="border-r border-gray-200 px-5 py-4">Cluster</th>
                     <th class="border-r border-gray-200 px-5 py-4">Grade</th>
@@ -138,7 +142,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                 </button>
-                                <form action="{{ route('admin.section-config.toggle-status', $section) }}" method="POST" class="inline" onsubmit="return confirm('{{ $section->status ? 'Archive this section?' : 'Activate this section?' }}');">
+                                <form action="{{ route($managementRoutePrefix.'section-config.toggle-status', $section) }}" method="POST" class="inline" onsubmit="return confirm('{{ $section->status ? 'Archive this section?' : 'Activate this section?' }}');">
                                     @csrf
                                     @method('PATCH')
                                     <button type="submit" class="rounded-lg p-2 text-gray-500 transition {{ $section->status ? 'hover:bg-amber-50 hover:text-amber-700' : 'hover:bg-emerald-50 hover:text-emerald-600' }}" title="{{ $section->status ? 'Archive' : 'Activate' }}">
@@ -173,9 +177,9 @@
 </div>
 
 <div id="sectionModal" role="dialog" aria-modal="true" aria-labelledby="sectionModalTitle" data-open="{{ $modalOpen ? 'true' : 'false' }}"
-    class="fixed inset-0 z-[100] {{ $modalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
-    <div class="mx-auto w-full max-w-2xl overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
-        <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
+    class="fixed inset-0 z-[100] {{ $modalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4">
+    <div class="mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
+        <div class="shrink-0 border-b border-gray-300 bg-[#296374] px-6 py-4">
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">School management</p>
@@ -189,11 +193,11 @@
             </div>
         </div>
 
-        <form id="sectionForm" action="{{ route('admin.section-config.store') }}" method="POST">
+        <form id="sectionForm" class="flex min-h-0 flex-col" action="{{ route($managementRoutePrefix.'section-config.store') }}" method="POST">
             @csrf
             <input type="hidden" id="section_method" name="_method" value="POST">
 
-            <div class="space-y-4 px-6 py-5">
+            <div class="min-h-0 space-y-4 overflow-y-auto px-6 py-5">
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label for="section_name" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Section Name <span class="text-red-500">*</span></label>
@@ -298,7 +302,7 @@
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
+            <div class="flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
                 <button type="button" onclick="closeSectionModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
                     Cancel
                 </button>
@@ -311,13 +315,23 @@
 </div>
 
 <script>
+    // Keep the dialog above the portal header and outside container-query boundaries.
+    const sectionDialog = document.getElementById('sectionModal');
+    document.body.appendChild(sectionDialog);
+    let sectionDialogTrigger = null;
+    let sectionBodyOverflow = document.body.style.overflow;
+
+    if (sectionDialog.dataset.open === 'true') {
+        document.body.style.overflow = 'hidden';
+    }
+
     function openSectionModal(section = null) {
         const form = document.getElementById('sectionForm');
         const method = document.getElementById('section_method');
         const title = document.getElementById('sectionModalTitle');
         const submit = document.getElementById('sectionSubmit');
         const modal = document.getElementById('sectionModal');
-        const updateRouteTemplate = '{{ route('admin.section-config.update', ['section' => '__SECTION__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'section-config.update', ['section' => '__SECTION__']) }}';
 
         if (section) {
             title.textContent = 'Edit Section';
@@ -335,12 +349,17 @@
         } else {
             title.textContent = 'Add Section';
             submit.textContent = 'Save Section';
-            form.action = '{{ route('admin.section-config.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'section-config.store') }}';
             method.value = 'POST';
             form.reset();
             method.value = 'POST';
         }
 
+        sectionDialogTrigger = document.activeElement;
+        if (modal.dataset.open !== 'true') {
+            sectionBodyOverflow = document.body.style.overflow;
+        }
+        document.body.style.overflow = 'hidden';
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         modal.setAttribute('data-open', 'true');
@@ -353,6 +372,8 @@
         modal.classList.add('hidden');
         modal.classList.remove('flex');
         modal.setAttribute('data-open', 'false');
+        document.body.style.overflow = sectionBodyOverflow;
+        sectionDialogTrigger?.focus();
     }
 
     document.getElementById('sectionModal').addEventListener('click', function (e) {
@@ -362,6 +383,19 @@
     });
 
     document.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab' && sectionDialog.dataset.open === 'true') {
+            const fields = Array.from(sectionDialog.querySelectorAll('button, input, select, a[href], [tabindex="0"]'))
+                .filter((field) => !field.disabled && field.getClientRects().length > 0);
+            const first = fields[0];
+            const last = fields[fields.length - 1];
+            if (e.shiftKey && (document.activeElement === first || !sectionDialog.contains(document.activeElement))) {
+                e.preventDefault();
+                last?.focus();
+            } else if (!e.shiftKey && (document.activeElement === last || !sectionDialog.contains(document.activeElement))) {
+                e.preventDefault();
+                first?.focus();
+            }
+        }
         if (e.key === 'Escape' && document.getElementById('sectionModal').getAttribute('data-open') === 'true') {
             closeSectionModal();
         }

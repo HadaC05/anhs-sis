@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Curriculum')
 
@@ -91,11 +95,11 @@
 <div class="mt-4 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     <div id="curriculaTabPanel" class="{{ $activeTab === 'curricula' ? '' : 'hidden' }}">
         <div class="flex items-center justify-between border-b border-gray-100 bg-[#296374]/[0.03] px-4 py-4"><h2 class="text-sm font-bold text-gray-800">Curricula</h2><button type="button" onclick="openMasterCurriculumModal()" class="rounded-lg px-4 py-2 text-sm font-bold text-white" style="background-color:#296374">Add Curriculum</button></div>
-        <div class="overflow-x-auto"><table class="w-full min-w-[620px] text-left text-sm"><thead><tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600"><th class="px-5 py-4">Name</th><th class="px-5 py-4">Description</th><th class="px-5 py-4">Status</th><th class="px-5 py-4 text-right">Report</th><th class="px-5 py-4 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@forelse ($masterCurricula as $curricula)<tr><td class="px-5 py-4 font-semibold text-gray-900">{{ $curricula->name }}</td><td class="px-5 py-4 text-gray-700">{{ $curricula->description ?: '—' }}</td><td class="px-5 py-4">{{ $curricula->dataStatus?->label ?? '—' }}</td><td class="px-5 py-4 text-right"><a href="{{ route('admin.curriculum-config.curricula.report', $curricula) }}" target="_blank" title="Preview report" class="mr-2 inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></a><a href="{{ route('admin.curriculum-config.curricula.report', ['curricula' => $curricula, 'download' => 1]) }}" title="Download report" class="inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></a></td><td class="px-5 py-4 text-right"><button type="button" title="Edit" onclick='openMasterCurriculumModal(@json(['curricula_ID' => $curricula->curricula_ID, 'name' => $curricula->name, 'description' => $curricula->description]))' class="mr-2 inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><form method="POST" action="{{ route('admin.curriculum-config.curricula.toggle-status', $curricula) }}" class="inline">@csrf @method('PATCH')<button type="submit" title="{{ $curricula->dataStatus?->key === 'active' ? 'Archive' : 'Activate' }}" class="inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg></button></form></td></tr>@empty<tr><td colspan="5" class="px-5 py-12 text-center text-gray-500">No curricula yet.</td></tr>@endforelse</tbody></table></div>
+        <div class="overflow-x-auto"><table class="w-full min-w-[620px] text-left text-sm"><thead><tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600"><th class="px-5 py-4">Name</th><th class="px-5 py-4">Description</th><th class="px-5 py-4">Status</th><th class="px-5 py-4 text-right">Report</th><th class="px-5 py-4 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@forelse ($masterCurricula as $curricula)<tr><td class="px-5 py-4 font-semibold text-gray-900">{{ $curricula->name }}</td><td class="px-5 py-4 text-gray-700">{{ $curricula->description ?: '—' }}</td><td class="px-5 py-4">{{ $curricula->dataStatus?->label ?? '—' }}</td><td class="px-5 py-4 text-right"><a href="{{ route($managementRoutePrefix.'curriculum-config.curricula.report', $curricula) }}" target="_blank" title="Preview report" class="mr-2 inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></a><a href="{{ route($managementRoutePrefix.'curriculum-config.curricula.report', ['curricula' => $curricula, 'download' => 1]) }}" title="Download report" class="inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></a></td><td class="px-5 py-4 text-right"><button type="button" title="Edit" onclick='openMasterCurriculumModal(@json(['curricula_ID' => $curricula->curricula_ID, 'name' => $curricula->name, 'description' => $curricula->description]))' class="mr-2 inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><form method="POST" action="{{ route($managementRoutePrefix.'curriculum-config.curricula.toggle-status', $curricula) }}" class="inline">@csrf @method('PATCH')<button type="submit" title="{{ $curricula->dataStatus?->key === 'active' ? 'Archive' : 'Activate' }}" class="inline-flex rounded p-2 text-[#296374] hover:bg-[#296374]/10"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg></button></form></td></tr>@empty<tr><td colspan="5" class="px-5 py-12 text-center text-gray-500">No curricula yet.</td></tr>@endforelse</tbody></table></div>
     </div>
     <div id="gradeLevelsTabPanel" class="{{ $activeTab === 'grade_levels' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.curriculum-config.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route($managementRoutePrefix.'curriculum-config.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="grade_levels">
                 <input type="hidden" name="curriculum_subjects_search" value="{{ request('curriculum_subjects_search') }}">
                 <input type="hidden" name="curriculum_subjects_curriculum_ID" value="{{ request('curriculum_subjects_curriculum_ID') }}">
@@ -124,7 +128,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
                 @if (request()->hasAny(['curriculum_search', 'curriculum_status', 'curriculum_per_page']))
-                    <a href="{{ route('admin.curriculum-config.index', ['tab' => 'grade_levels']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                    <a href="{{ route($managementRoutePrefix.'curriculum-config.index', ['tab' => 'grade_levels']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
             </form>
         </div>
@@ -177,7 +181,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </button>
-                                    <form action="{{ route('admin.curriculum-config.toggle-status', $curriculum) }}" method="POST" class="inline" onsubmit="return confirm('{{ $curriculum->status ? 'Archive this curriculum?' : 'Activate this curriculum?' }}');">
+                                    <form action="{{ route($managementRoutePrefix.'curriculum-config.toggle-status', $curriculum) }}" method="POST" class="inline" onsubmit="return confirm('{{ $curriculum->status ? 'Archive this curriculum?' : 'Activate this curriculum?' }}');">
                                         @csrf
                                         @method('PATCH')
                                         <button type="submit" class="rounded-lg p-2 text-gray-500 transition {{ $curriculum->status ? 'hover:bg-amber-50 hover:text-amber-700' : 'hover:bg-emerald-50 hover:text-emerald-600' }}" title="{{ $curriculum->status ? 'Archive' : 'Activate' }}">
@@ -213,7 +217,7 @@
 
     <div id="curriculumSubjectsTabPanel" class="{{ $activeTab === 'curriculum_subjects' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.curriculum-config.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route($managementRoutePrefix.'curriculum-config.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="curriculum_subjects">
                 <input type="hidden" name="curriculum_search" value="{{ request('curriculum_search') }}">
                 <input type="hidden" name="curriculum_status" value="{{ request('curriculum_status') }}">
@@ -258,7 +262,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
                 @if (request()->hasAny(['curriculum_subjects_search', 'curriculum_subjects_curriculum_ID', 'curriculum_subjects_cluster_ID', 'curriculum_subjects_grade_level', 'curriculum_subjects_semester', 'curriculum_subjects_per_page']))
-                    <a href="{{ route('admin.curriculum-config.index', ['tab' => 'curriculum_subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                    <a href="{{ route($managementRoutePrefix.'curriculum-config.index', ['tab' => 'curriculum_subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
             </form>
         </div>
@@ -334,7 +338,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </button>
-                                    <form action="{{ route('admin.curriculum-config.subjects.delete', $item) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject from the curriculum?');">
+                                    <form action="{{ route($managementRoutePrefix.'curriculum-config.subjects.delete', $item) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject from the curriculum?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600" title="Remove">
@@ -360,7 +364,7 @@
 
     <div id="curriculumOverviewTabPanel" class="{{ $activeTab === 'curriculum_overview' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.curriculum-config.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route($managementRoutePrefix.'curriculum-config.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="curriculum_overview">
                 <input type="hidden" name="curriculum_search" value="{{ request('curriculum_search') }}">
                 <input type="hidden" name="curriculum_status" value="{{ request('curriculum_status') }}">
@@ -380,7 +384,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
                 @if (request()->filled('overview_curriculum_ID'))
-                    <a href="{{ route('admin.curriculum-config.index', ['tab' => 'curriculum_overview']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                    <a href="{{ route($managementRoutePrefix.'curriculum-config.index', ['tab' => 'curriculum_overview']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
             </form>
         </div>
@@ -456,7 +460,7 @@
                 </button>
             </div>
         </div>
-        <form id="gradeLevelForm" method="POST" action="{{ route('admin.curriculum-config.store') }}">
+        <form id="gradeLevelForm" method="POST" action="{{ route($managementRoutePrefix.'curriculum-config.store') }}">
             @csrf
             <input type="hidden" name="_form" value="grade_level">
             <input id="grade_level_method" type="hidden" name="_method" value="POST">
@@ -523,7 +527,7 @@
                 </button>
             </div>
         </div>
-        <form id="curriculumForm" action="{{ route('admin.curriculum-config.store') }}" method="POST">
+        <form id="curriculumForm" action="{{ route($managementRoutePrefix.'curriculum-config.store') }}" method="POST">
             @csrf
             <input type="hidden" name="_form" value="curriculum">
             <input type="hidden" id="curriculum_method" name="_method" value="POST">
@@ -573,7 +577,7 @@
                 </button>
             </div>
         </div>
-        <form id="curriculumSubjectForm" action="{{ route('admin.curriculum-config.subjects.store') }}" method="POST" class="flex min-h-0 flex-1 flex-col">
+        <form id="curriculumSubjectForm" action="{{ route($managementRoutePrefix.'curriculum-config.subjects.store') }}" method="POST" class="flex min-h-0 flex-1 flex-col">
             @csrf
             <input type="hidden" name="_form" value="curriculum_subject">
             <input type="hidden" id="curriculum_subject_method" name="_method" value="POST">
@@ -716,7 +720,7 @@
         const title = document.getElementById('curriculumModalTitle');
         const submit = document.getElementById('curriculumSubmit');
         const modal = document.getElementById('curriculumModal');
-        const updateRouteTemplate = '{{ route('admin.curriculum-config.update', ['curriculum' => '__CURR__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'curriculum-config.update', ['curriculum' => '__CURR__']) }}';
 
         if (curriculum) {
             title.textContent = 'Edit Curriculum';
@@ -728,7 +732,7 @@
         } else {
             title.textContent = 'Add Curriculum';
             submit.textContent = 'Save Curriculum';
-            form.action = '{{ route('admin.curriculum-config.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'curriculum-config.store') }}';
             method.value = 'POST';
             form.reset();
             method.value = 'POST';
@@ -746,13 +750,13 @@
         const title = document.getElementById('curriculumModalTitle');
         const submit = document.getElementById('curriculumSubmit');
         const modal = document.getElementById('curriculumModal');
-        const updateRouteTemplate = '{{ route('admin.curriculum-config.curricula.update', ['curricula' => '__CURRICULA__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'curriculum-config.curricula.update', ['curricula' => '__CURRICULA__']) }}';
 
         title.textContent = curriculum ? 'Edit Curriculum' : 'Add Curriculum';
         submit.textContent = curriculum ? 'Update Curriculum' : 'Save Curriculum';
         form.action = curriculum
             ? updateRouteTemplate.replace('__CURRICULA__', curriculum.curricula_ID)
-            : '{{ route('admin.curriculum-config.curricula.store') }}';
+            : '{{ route($managementRoutePrefix.'curriculum-config.curricula.store') }}';
         method.value = curriculum ? 'PUT' : 'POST';
         document.getElementById('curriculum_name').value = curriculum?.name || '';
         document.getElementById('curriculum_description').value = curriculum?.description || '';
@@ -787,7 +791,7 @@
     }
     function openGradeLevelModal(item = null) {
         const form = document.getElementById('gradeLevelForm');
-        form.action = item ? '{{ route('admin.curriculum-config.update', ['curriculum' => '__ID__']) }}'.replace('__ID__', item.curriculum_ID) : '{{ route('admin.curriculum-config.store') }}';
+        form.action = item ? '{{ route($managementRoutePrefix.'curriculum-config.update', ['curriculum' => '__ID__']) }}'.replace('__ID__', item.curriculum_ID) : '{{ route($managementRoutePrefix.'curriculum-config.store') }}';
         document.getElementById('grade_level_method').value = item ? 'PUT' : 'POST';
         document.getElementById('grade_level_curricula_id').value = item?.curricula_ID || document.getElementById('grade_level_curricula_id').value;
         document.getElementById('grade_level_grade_id').value = item?.grade_ID || '';
@@ -833,7 +837,7 @@
         const submit = document.getElementById('curriculumSubjectSubmit');
         const modal = document.getElementById('curriculumSubjectModal');
         const editMode = document.getElementById('curriculum_subject_edit_mode');
-        const updateRouteTemplate = '{{ route('admin.curriculum-config.subjects.update', ['curriculumSubject' => '__ITEM__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'curriculum-config.subjects.update', ['curriculumSubject' => '__ITEM__']) }}';
 
         if (item) {
             title.textContent = 'Edit Assignment';
@@ -849,7 +853,7 @@
         } else {
             title.textContent = curriculumId ? 'Edit Subjects' : 'Assign Subjects';
             submit.textContent = curriculumId ? 'Save Subjects' : 'Assign Subjects';
-            form.action = '{{ route('admin.curriculum-config.subjects.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'curriculum-config.subjects.store') }}';
             method.value = 'POST';
             form.reset();
             method.value = 'POST';

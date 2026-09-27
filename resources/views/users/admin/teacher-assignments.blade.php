@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Teacher Assignments')
 
@@ -79,7 +83,7 @@
 <div class="mt-4 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     <section data-assignment-panel="advisory" class="{{ $activeTab === 'advisory' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.teacher-assignments.index') }}" class="flex flex-wrap items-center gap-1.5">
+            <form method="GET" action="{{ route($managementRoutePrefix.'teacher-assignments.index') }}" class="flex flex-wrap items-center gap-1.5">
                 <div class="relative"><svg class="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path></svg><input type="search" name="advisory_search" value="{{ $advisorySearch }}" placeholder="Search" class="h-7 w-32 border border-gray-200 bg-white pl-7 pr-2 text-[10px] text-gray-700 outline-none focus:border-[#296374]"></div>
                 <select name="advisory_SY_ID" class="h-7 border border-gray-200 bg-white px-2 text-[10px] font-medium text-gray-700 outline-none focus:border-[#296374]">
                     <option value="">All school years</option>
@@ -100,7 +104,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-7 items-center border border-[#296374] px-2.5 text-[10px] font-bold text-white" style="background-color: #296374;">Apply</button>
                 @if (request()->hasAny(['advisory_search', 'advisory_SY_ID', 'advisory_grade_level', 'advisory_per_page']))
-                    <a href="{{ route('admin.teacher-assignments.index') }}" class="inline-flex h-7 items-center px-2 text-[10px] font-medium text-red-500 hover:underline">Clear Filters</a>
+                    <a href="{{ route($managementRoutePrefix.'teacher-assignments.index') }}" class="inline-flex h-7 items-center px-2 text-[10px] font-medium text-red-500 hover:underline">Clear Filters</a>
                 @endif
             </form>
         </div>
@@ -157,7 +161,7 @@
 
     <section data-assignment-panel="subjects" class="{{ $activeTab === 'subjects' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.teacher-assignments.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route($managementRoutePrefix.'teacher-assignments.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="subjects">
                 <div class="relative min-w-[200px] flex-1">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -191,7 +195,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
                 @if (request()->hasAny(['search', 'grade_level', 'cluster_ID', 'SY_ID', 'per_page']))
-                    <a href="{{ route('admin.teacher-assignments.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                    <a href="{{ route($managementRoutePrefix.'teacher-assignments.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
                 <div class="ml-auto flex items-center gap-2">
                     <button type="button" onclick="openBulkModal()" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 transition hover:border-[#296374]/30 hover:text-[#296374]">Bulk Assign</button>
@@ -244,7 +248,7 @@
                         @endif
                     </div>
                     {{-- Legacy compact table retained below for source-history continuity.
-                    <div class="border-t border-gray-100 bg-gray-50 px-5 py-3">@if ($subjectAssignments->isEmpty())<p class="py-3 text-sm text-gray-500">No assignments yet.</p>@else<div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-[10px] font-bold uppercase tracking-wider text-gray-400"><tr><th class="pb-2">Section</th><th class="pb-2">Grade Level</th><th class="pb-2">Teacher</th><th class="pb-2">Semester</th><th class="pb-2 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@foreach ($subjectAssignments as $assignment) @php $section = $assignment->section; $teacher = $assignment->staff; @endphp<tr><td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td><td class="py-3 text-gray-600">{{ optional($section?->gradeLevel)->grade_label ?? '—' }}</td><td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td><td class="py-3 text-gray-600">{{ optional($assignment->curriculumSubject)->semester ? ucfirst($assignment->curriculumSubject->semester) : '—' }}</td><td class="py-3 text-right"><button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="rounded-lg px-2 py-1 text-xs font-semibold text-[#296374] hover:bg-white">Edit</button><form action="{{ route('admin.teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">@csrf @method('DELETE')<button type="submit" class="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Remove</button></form></td></tr>@endforeach</tbody></table></div>@endif</div>
+                    <div class="border-t border-gray-100 bg-gray-50 px-5 py-3">@if ($subjectAssignments->isEmpty())<p class="py-3 text-sm text-gray-500">No assignments yet.</p>@else<div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-[10px] font-bold uppercase tracking-wider text-gray-400"><tr><th class="pb-2">Section</th><th class="pb-2">Grade Level</th><th class="pb-2">Teacher</th><th class="pb-2">Semester</th><th class="pb-2 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@foreach ($subjectAssignments as $assignment) @php $section = $assignment->section; $teacher = $assignment->staff; @endphp<tr><td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td><td class="py-3 text-gray-600">{{ optional($section?->gradeLevel)->grade_label ?? '—' }}</td><td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td><td class="py-3 text-gray-600">{{ optional($assignment->curriculumSubject)->semester ? ucfirst($assignment->curriculumSubject->semester) : '—' }}</td><td class="py-3 text-right"><button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="rounded-lg px-2 py-1 text-xs font-semibold text-[#296374] hover:bg-white">Edit</button><form action="{{ route($managementRoutePrefix.'teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">@csrf @method('DELETE')<button type="submit" class="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Remove</button></form></td></tr>@endforeach</tbody></table></div>@endif</div>
                     --}}
                 </details>
             @empty
@@ -298,7 +302,7 @@
                                         </svg>
                                     </button>
                                     @if (($assignment->locked_grades_count ?? 0) > 0)
-                                        <form action="{{ route('admin.teacher-assignments.unlock-grades', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Unlock submitted or approved grades for this assignment? The teacher will be able to edit and resubmit them.');">
+                                        <form action="{{ route($managementRoutePrefix.'teacher-assignments.unlock-grades', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Unlock submitted or approved grades for this assignment? The teacher will be able to edit and resubmit them.');">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="rounded-lg p-2 text-gray-500 transition hover:bg-amber-50 hover:text-amber-700" title="Unlock Grades">
@@ -308,7 +312,7 @@
                                             </button>
                                         </form>
                                     @endif
-                                    <form action="{{ route('admin.teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">
+                                    <form action="{{ route($managementRoutePrefix.'teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600" title="Delete">
@@ -340,7 +344,7 @@
 <div id="assignAdvisoryModal" role="dialog" aria-modal="true" aria-labelledby="assignAdvisoryModalTitle" data-open="{{ $assignAdvisoryModalOpen ? 'true' : 'false' }}" class="fixed inset-0 z-[100] {{ $assignAdvisoryModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
     <div class="mx-auto w-full max-w-3xl overflow-visible rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div class="border-b border-gray-300 bg-[#296374] px-6 py-4"><div class="flex items-start justify-between gap-4"><div><p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">School management</p><h3 id="assignAdvisoryModalTitle" class="mt-1 text-xl font-bold tracking-tight text-white">Assign Adviser</h3></div><button type="button" onclick="closeAssignAdvisoryModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10" aria-label="Close">×</button></div></div>
-        <form action="{{ route('admin.teacher-assignments.advisory.assign') }}" method="POST">
+        <form action="{{ route($managementRoutePrefix.'teacher-assignments.advisory.assign') }}" method="POST">
             @csrf <input type="hidden" name="_form" value="advisory">
             <div class="space-y-4 px-6 py-5">
                 <div class="grid gap-4 md:grid-cols-[minmax(180px,0.7fr)_minmax(0,1.3fr)]">
@@ -357,7 +361,7 @@
 <div id="advisoryModal" role="dialog" aria-modal="true" aria-labelledby="advisoryModalTitle" data-open="{{ $advisoryModalOpen ? 'true' : 'false' }}" class="fixed inset-0 z-[100] {{ $advisoryModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
     <div class="mx-auto w-full max-w-xl overflow-visible rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div class="border-b border-gray-300 bg-[#296374] px-6 py-4"><div class="flex items-start justify-between gap-4"><div><p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">School management</p><h3 id="advisoryModalTitle" class="mt-1 text-xl font-bold tracking-tight text-white">Edit Adviser</h3></div><button type="button" onclick="closeAdvisoryModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10" aria-label="Close">×</button></div></div>
-        <form id="advisoryEditForm" action="{{ $advisoryModalOpen && old('section_ID') ? route('admin.teacher-assignments.advisory.update', ['section' => old('section_ID')]) : '#' }}" method="POST">
+        <form id="advisoryEditForm" action="{{ $advisoryModalOpen && old('section_ID') ? route($managementRoutePrefix.'teacher-assignments.advisory.update', ['section' => old('section_ID')]) : '#' }}" method="POST">
             @csrf @method('PUT')
             <input type="hidden" name="_form" value="advisory-edit"><input type="hidden" id="edit_advisory_section_id" name="section_ID" value="{{ old('section_ID') }}">
             <div class="space-y-4 px-6 py-5"><div><p class="text-xs font-bold uppercase tracking-wide text-gray-600">Assignment</p><p id="edit_advisory_current_section" class="mt-1 text-sm font-semibold text-gray-900"></p></div><div class="grid gap-4 sm:grid-cols-2"><div><label for="edit_advisory_grade_selector" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Grade Level</label><select id="edit_advisory_grade_selector" class="{{ $fieldClass }} border-gray-200"><option value="">Select grade level</option>@foreach ($gradeLevels as $level)<option value="{{ $level['value'] }}">{{ $level['label'] }}</option>@endforeach</select></div><div><label for="edit_advisory_section_search" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Assign to section</label><input id="edit_advisory_section_search" type="search" placeholder="Search section" class="mb-2 {{ $fieldClass }} border-gray-200"><select id="edit_advisory_target_section_id" name="target_section_ID" class="{{ $fieldClass }} {{ $errors->has('target_section_ID') && old('_form') === 'advisory-edit' ? 'border-red-300' : 'border-gray-200' }}"><option value="">Not assigned to any section</option>@foreach ($sections as $availableSection)<option value="{{ $availableSection->section_ID }}" data-grade="{{ $availableSection->grade_level }}" data-assigned="{{ $availableSection->staff_ID ? 'true' : 'false' }}" @selected((string) old('target_section_ID') === (string) $availableSection->section_ID)>{{ $availableSection->name }} · {{ $availableSection->academicYear?->school_year ?? '—' }}</option>@endforeach</select>@error('target_section_ID') @if (old('_form') === 'advisory-edit')<p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>@endif @enderror</div></div><p class="text-xs text-gray-500">Choose another unassigned section, keep the current one, or remove the advisory assignment.</p></div>
@@ -382,7 +386,7 @@
                 </button>
             </div>
         </div>
-        <form id="single-assignment-form" action="{{ route('admin.teacher-assignments.store') }}" method="POST">
+        <form id="single-assignment-form" action="{{ route($managementRoutePrefix.'teacher-assignments.store') }}" method="POST">
             @csrf
             <input type="hidden" name="_form" value="assignment">
             <div class="space-y-4 px-6 py-5">
@@ -460,7 +464,7 @@
                 </button>
             </div>
         </div>
-        <form id="bulk-assignment-form" action="{{ route('admin.teacher-assignments.bulk') }}" method="POST">
+        <form id="bulk-assignment-form" action="{{ route($managementRoutePrefix.'teacher-assignments.bulk') }}" method="POST">
             @csrf
             <input type="hidden" name="_form" value="bulk">
             <div class="space-y-5 px-6 py-5">
@@ -604,7 +608,7 @@
                 </button>
             </div>
         </div>
-        <form id="reassignForm" action="{{ $reassignModalOpen && old('assignment_ID') ? route('admin.teacher-assignments.update', ['assignment' => old('assignment_ID')]) : '#' }}" method="POST">
+        <form id="reassignForm" action="{{ $reassignModalOpen && old('assignment_ID') ? route($managementRoutePrefix.'teacher-assignments.update', ['assignment' => old('assignment_ID')]) : '#' }}" method="POST">
             @csrf
             @method('PUT')
             <input type="hidden" name="_form" value="reassign">
@@ -655,7 +659,7 @@
 
     function openAdvisoryModal(sectionId, sectionName, gradeLevel) {
         const form = document.getElementById('advisoryEditForm');
-        const updateRouteTemplate = '{{ route('admin.teacher-assignments.advisory.update', ['section' => '__SECTION__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'teacher-assignments.advisory.update', ['section' => '__SECTION__']) }}';
         form.action = updateRouteTemplate.replace('__SECTION__', sectionId);
         document.getElementById('edit_advisory_section_id').value = sectionId;
         document.getElementById('edit_advisory_current_section').textContent = sectionName;
@@ -694,7 +698,7 @@
 
     function openReassignModal(assignmentId, staffId) {
         const form = document.getElementById('reassignForm');
-        const updateRouteTemplate = '{{ route('admin.teacher-assignments.update', ['assignment' => '__ASSIGNMENT__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'teacher-assignments.update', ['assignment' => '__ASSIGNMENT__']) }}';
         form.action = updateRouteTemplate.replace('__ASSIGNMENT__', assignmentId);
         document.getElementById('reassign_assignment_id').value = assignmentId;
         document.getElementById('reassign_staff_id').value = staffId || '';

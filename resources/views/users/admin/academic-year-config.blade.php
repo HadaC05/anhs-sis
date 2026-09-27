@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Academic Year')
 
@@ -68,7 +72,7 @@
     </div>
 
     <div class="border-b border-gray-100 px-4 py-4">
-        <form method="GET" action="{{ route('admin.academic-year-config.index') }}" class="flex flex-wrap items-center gap-2">
+        <form method="GET" action="{{ route($managementRoutePrefix.'academic-year-config.index') }}" class="flex flex-wrap items-center gap-2">
             <div class="relative min-w-[200px] flex-1">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
@@ -88,7 +92,7 @@
             </select>
             <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
             @if (request()->hasAny(['search', 'status', 'per_page']))
-                <a href="{{ route('admin.academic-year-config.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                <a href="{{ route($managementRoutePrefix.'academic-year-config.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
             @endif
         </form>
     </div>
@@ -135,7 +139,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                 </button>
-                                <form action="{{ route('admin.academic-year-config.toggle-status', $year) }}" method="POST" class="inline" onsubmit="return confirm('{{ $year->status ? 'Archive this academic year?' : ($currentYear ? 'Activate this academic year? '.$currentYear->school_year.' will be archived.' : 'Activate this academic year?') }}');">
+                                <form action="{{ route($managementRoutePrefix.'academic-year-config.toggle-status', $year) }}" method="POST" class="inline" onsubmit="return confirm('{{ $year->status ? 'Archive this academic year?' : ($currentYear ? 'Activate this academic year? '.$currentYear->school_year.' will be archived.' : 'Activate this academic year?') }}');">
                                     @csrf
                                     @method('PATCH')
                                     <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 transition {{ $year->status ? 'text-amber-700 ring-amber-200 hover:bg-amber-50' : 'text-emerald-700 ring-emerald-200 hover:bg-emerald-50' }}">
@@ -178,7 +182,7 @@
             </div>
         </div>
 
-        <form id="academicYearForm" action="{{ route('admin.academic-year-config.store') }}" method="POST">
+        <form id="academicYearForm" action="{{ route($managementRoutePrefix.'academic-year-config.store') }}" method="POST">
             @csrf
             <input type="hidden" id="academic_year_method" name="_method" value="POST">
 
@@ -313,7 +317,7 @@
         const title = document.getElementById('academicYearModalTitle');
         const subtitle = document.getElementById('academicYearModalSubtitle');
         const submit = document.getElementById('academicYearSubmit');
-        const updateRouteTemplate = '{{ route('admin.academic-year-config.update', ['academicYear' => '__SY__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'academic-year-config.update', ['academicYear' => '__SY__']) }}';
         const modal = document.getElementById('academicYearModal');
 
         if (year) {
@@ -332,7 +336,7 @@
                 subtitle.textContent = 'Set the coverage dates. The school year name is filled automatically.';
             }
             submit.textContent = 'Save Academic Year';
-            form.action = '{{ route('admin.academic-year-config.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'academic-year-config.store') }}';
             method.value = 'POST';
             form.reset();
             document.getElementById('start_year').value = '';

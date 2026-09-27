@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Subjects')
 
@@ -88,7 +92,7 @@
 
     <div id="subjectsTabPanel" class="{{ $activeTab === 'subjects' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.subject-config.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route($managementRoutePrefix.'subject-config.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="subjects">
                 <input type="hidden" name="preferred_courses_search" value="{{ request('preferred_courses_search') }}">
                 <input type="hidden" name="preferred_courses_cluster_ID" value="{{ request('preferred_courses_cluster_ID') }}">
@@ -124,7 +128,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
                 @if (request()->hasAny(['search', 'type', 'school_level', 'status', 'per_page']))
-                    <a href="{{ route('admin.subject-config.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                    <a href="{{ route($managementRoutePrefix.'subject-config.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
             </form>
         </div>
@@ -179,7 +183,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </button>
-                                    <form action="{{ route('admin.subject-config.delete', $subject) }}" method="POST" class="inline" onsubmit="return confirm('{{ $subject->status === 'active' ? 'Archive this subject?' : 'Restore this subject?' }}');">
+                                    <form action="{{ route($managementRoutePrefix.'subject-config.delete', $subject) }}" method="POST" class="inline" onsubmit="return confirm('{{ $subject->status === 'active' ? 'Archive this subject?' : 'Restore this subject?' }}');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rounded-lg p-2 text-gray-500 transition {{ $subject->status === 'active' ? 'hover:bg-amber-50 hover:text-amber-700' : 'hover:bg-emerald-50 hover:text-emerald-600' }}" title="{{ $subject->status === 'active' ? 'Archive' : 'Restore' }}">
@@ -215,7 +219,7 @@
 
     <div id="preferredCoursesTabPanel" class="{{ $activeTab === 'preferred_courses' ? '' : 'hidden' }}">
         <div class="border-b border-gray-100 px-4 py-4">
-            <form method="GET" action="{{ route('admin.subject-config.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route($managementRoutePrefix.'subject-config.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="preferred_courses">
                 <input type="hidden" name="search" value="{{ request('search') }}">
                 <input type="hidden" name="type" value="{{ request('type') }}">
@@ -243,7 +247,7 @@
                 </select>
                 <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
                 @if (request()->hasAny(['preferred_courses_search', 'preferred_courses_cluster_ID', 'preferred_courses_per_page']))
-                    <a href="{{ route('admin.subject-config.index', ['tab' => 'preferred_courses']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                    <a href="{{ route($managementRoutePrefix.'subject-config.index', ['tab' => 'preferred_courses']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
             </form>
         </div>
@@ -280,7 +284,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </button>
-                                    <form action="{{ route('admin.subject-config.preferred-courses.delete', $course) }}" method="POST" class="inline" onsubmit="return confirm('Delete this preferred course?');">
+                                    <form action="{{ route($managementRoutePrefix.'subject-config.preferred-courses.delete', $course) }}" method="POST" class="inline" onsubmit="return confirm('Delete this preferred course?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600" title="Delete">
@@ -326,7 +330,7 @@
             </div>
         </div>
 
-        <form id="subjectForm" action="{{ route('admin.subject-config.store') }}" method="POST">
+        <form id="subjectForm" action="{{ route($managementRoutePrefix.'subject-config.store') }}" method="POST">
             @csrf
             <input type="hidden" name="_form" value="subject">
             <input type="hidden" id="subject_method" name="_method" value="POST">
@@ -406,7 +410,7 @@
             </div>
         </div>
 
-        <form id="preferredCourseForm" action="{{ route('admin.subject-config.preferred-courses.store') }}" method="POST">
+        <form id="preferredCourseForm" action="{{ route($managementRoutePrefix.'subject-config.preferred-courses.store') }}" method="POST">
             @csrf
             <input type="hidden" name="_form" value="preferred_course">
             <input type="hidden" id="preferred_course_method" name="_method" value="POST">
@@ -504,7 +508,7 @@
         const title = document.getElementById('subjectModalTitle');
         const submit = document.getElementById('subjectSubmit');
         const modal = document.getElementById('subjectModal');
-        const updateRouteTemplate = '{{ route('admin.subject-config.update', ['subject' => '__SUBJECT__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'subject-config.update', ['subject' => '__SUBJECT__']) }}';
 
         if (subject) {
             title.textContent = 'Edit Subject';
@@ -518,7 +522,7 @@
         } else {
             title.textContent = 'Add Subject';
             submit.textContent = 'Save Subject';
-            form.action = '{{ route('admin.subject-config.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'subject-config.store') }}';
             method.value = 'POST';
             form.reset();
             method.value = 'POST';
@@ -543,7 +547,7 @@
         const title = document.getElementById('preferredCourseModalTitle');
         const submit = document.getElementById('preferredCourseSubmit');
         const modal = document.getElementById('preferredCourseModal');
-        const updateRouteTemplate = '{{ route('admin.subject-config.preferred-courses.update', ['preferredCourse' => '__COURSE__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'subject-config.preferred-courses.update', ['preferredCourse' => '__COURSE__']) }}';
 
         if (course) {
             title.textContent = 'Edit Preferred Course';
@@ -556,7 +560,7 @@
         } else {
             title.textContent = 'Add Preferred Course';
             submit.textContent = 'Save Preferred Course';
-            form.action = '{{ route('admin.subject-config.preferred-courses.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'subject-config.preferred-courses.store') }}';
             method.value = 'POST';
             form.reset();
             method.value = 'POST';

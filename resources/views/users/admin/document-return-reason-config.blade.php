@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Document Return Reasons')
 
@@ -34,7 +38,7 @@
 
 <div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     <div class="border-b border-gray-100 px-4 py-4">
-        <form method="GET" action="{{ route('admin.document-return-reason-config.index') }}" class="flex flex-wrap items-center gap-2">
+        <form method="GET" action="{{ route($managementRoutePrefix.'document-return-reason-config.index') }}" class="flex flex-wrap items-center gap-2">
             <div class="relative min-w-[200px] flex-1">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
@@ -49,7 +53,7 @@
             </select>
             <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
             @if (request()->hasAny(['search', 'per_page']))
-                <a href="{{ route('admin.document-return-reason-config.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                <a href="{{ route($managementRoutePrefix.'document-return-reason-config.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
             @endif
         </form>
     </div>
@@ -83,7 +87,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                 </button>
-                                <form action="{{ route('admin.document-return-reason-config.delete', $reason) }}" method="POST" class="inline" onsubmit="return confirm('Delete this document return reason?');">
+                                <form action="{{ route($managementRoutePrefix.'document-return-reason-config.delete', $reason) }}" method="POST" class="inline" onsubmit="return confirm('Delete this document return reason?');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600" title="Delete">
@@ -128,7 +132,7 @@
             </div>
         </div>
 
-        <form id="documentReturnReasonForm" action="{{ route('admin.document-return-reason-config.store') }}" method="POST">
+        <form id="documentReturnReasonForm" action="{{ route($managementRoutePrefix.'document-return-reason-config.store') }}" method="POST">
             @csrf
             <input type="hidden" id="document_return_reason_method" name="_method" value="POST">
 
@@ -170,7 +174,7 @@
         const title = document.getElementById('documentReturnReasonModalTitle');
         const submit = document.getElementById('documentReturnReasonSubmit');
         const modal = document.getElementById('documentReturnReasonModal');
-        const updateRouteTemplate = '{{ route('admin.document-return-reason-config.update', ['documentReturnReason' => '__REASON__']) }}';
+        const updateRouteTemplate = '{{ route($managementRoutePrefix.'document-return-reason-config.update', ['documentReturnReason' => '__REASON__']) }}';
 
         if (reason) {
             title.textContent = 'Edit Reason';
@@ -182,7 +186,7 @@
         } else {
             title.textContent = 'Add Reason';
             submit.textContent = 'Save Reason';
-            form.action = '{{ route('admin.document-return-reason-config.store') }}';
+            form.action = '{{ route($managementRoutePrefix.'document-return-reason-config.store') }}';
             method.value = 'POST';
             form.reset();
             method.value = 'POST';

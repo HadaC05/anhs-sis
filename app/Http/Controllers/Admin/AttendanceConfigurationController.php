@@ -58,7 +58,7 @@ class AttendanceConfigurationController extends Controller
         });
 
         return redirect()
-            ->route('admin.attendance-config.index', ['sy_id' => $syId])
+            ->route($request->routeIs('principal.*') ? 'principal.attendance-config.index' : 'admin.attendance-config.index', ['sy_id' => $syId])
             ->with('success', 'School days updated successfully.');
     }
 }

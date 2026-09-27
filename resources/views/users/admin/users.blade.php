@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Users')
 
@@ -37,7 +41,7 @@ $roleCardStyles = [
 @endif
 
 <div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
-    <a href="{{ route('admin.users', ['tab' => 'staff']) }}" class="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#296374]/30 hover:shadow-md">
+    <a href="{{ route($managementRoutePrefix.'users', ['tab' => 'staff']) }}" class="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#296374]/30 hover:shadow-md">
         <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Total Users</p>
         <p class="mt-2 text-3xl font-bold text-gray-900">{{ number_format($totalUsers) }}</p>
         <p class="mt-1 text-xs text-gray-500">Staff + student accounts</p>
@@ -46,8 +50,8 @@ $roleCardStyles = [
     @php
     $styles = $roleCardStyles[$roleName] ?? ['text' => 'text-gray-800', 'hover' => 'hover:border-gray-300'];
     $cardUrl = $roleName === 'student'
-    ? route('admin.users', ['tab' => 'students'])
-    : route('admin.users', ['tab' => 'staff', 'role' => $roleName]);
+    ? route($managementRoutePrefix.'users', ['tab' => 'students'])
+    : route($managementRoutePrefix.'users', ['tab' => 'staff', 'role' => $roleName]);
     @endphp
     <a href="{{ $cardUrl }}" class="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md {{ $styles['hover'] }}">
         <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ ucfirst($roleName) }}</p>
@@ -64,12 +68,12 @@ $roleCardStyles = [
             <p class="mt-1 text-sm text-gray-500">{{ $activeTab === 'students' ? 'Student portal usernames and login status' : 'Personnel accounts across all staff roles' }}</p>
         </div>
         <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-            <a href="{{ route('admin.users', array_merge(request()->except(['tab', 'page', 'role']), ['tab' => 'staff'])) }}"
+            <a href="{{ route($managementRoutePrefix.'users', array_merge(request()->except(['tab', 'page', 'role']), ['tab' => 'staff'])) }}"
                 class="rounded-md px-4 py-2 text-sm font-semibold transition {{ $activeTab === 'staff' ? 'bg-white text-[#296374] shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
                 Staff
                 <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs {{ $activeTab === 'staff' ? 'bg-[#296374] text-white' : 'bg-gray-200 text-gray-600' }}">{{ $staffCount }}</span>
             </a>
-            <a href="{{ route('admin.users', array_merge(request()->except(['tab', 'page', 'role']), ['tab' => 'students'])) }}"
+            <a href="{{ route($managementRoutePrefix.'users', array_merge(request()->except(['tab', 'page', 'role']), ['tab' => 'students'])) }}"
                 class="rounded-md px-4 py-2 text-sm font-semibold transition {{ $activeTab === 'students' ? 'bg-white text-[#296374] shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
                 Students
                 <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs {{ $activeTab === 'students' ? 'bg-[#296374] text-white' : 'bg-gray-200 text-gray-600' }}">{{ $studentCount }}</span>
@@ -78,7 +82,7 @@ $roleCardStyles = [
     </div>
 
     <div class="border-b border-gray-100 px-4 py-4">
-        <form method="GET" action="{{ route('admin.users') }}" class="flex flex-wrap items-center gap-2">
+        <form method="GET" action="{{ route($managementRoutePrefix.'users') }}" class="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="{{ $activeTab }}">
             <div class="relative min-w-[200px] flex-1">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,7 +113,7 @@ $roleCardStyles = [
             </select>
             <button type="submit" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
             @if(request()->hasAny(['search', 'role', 'status', 'per_page']))
-            <a href="{{ route('admin.users', ['tab' => $activeTab]) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+            <a href="{{ route($managementRoutePrefix.'users', ['tab' => $activeTab]) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
             @endif
         </form>
     </div>
@@ -195,7 +199,7 @@ $roleCardStyles = [
                             </button>
                             @endif
                             @if($activeTab === 'students' || $user->id !== auth()->user()?->staff_id)
-                            <form action="{{ route('admin.users.toggle-status', $user->id) }}" method="POST" class="inline">
+                            <form action="{{ route($managementRoutePrefix.'users.toggle-status', $user->id) }}" method="POST" class="inline">
                                 @csrf
                                 @method('PATCH')
                                 @if($activeTab === 'students')
@@ -258,7 +262,7 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
             </div>
         </div>
 
-        <form id="addStaffForm" action="{{ route('admin.users.store') }}" method="POST" class="flex min-h-0 flex-1 flex-col">
+        <form id="addStaffForm" action="{{ route($managementRoutePrefix.'users.store') }}" method="POST" class="flex min-h-0 flex-1 flex-col">
             @csrf
             <input type="hidden" name="_form" value="add_staff">
 
@@ -525,7 +529,7 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
     }
 
     function openEditModal(user) {
-        document.getElementById('editForm').action = '/admin/users/' + user.id;
+        document.getElementById('editForm').action = @js(route($managementRoutePrefix.'users.update', ['user' => '__USER__'])).replace('__USER__', user.id);
         document.getElementById('edit_username').value = user.username;
         document.getElementById('edit_email').value = user.email;
         document.getElementById('edit_role').value = user.role.role_name;
@@ -539,7 +543,7 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
     }
 
     function openEditStudentModal(data) {
-        document.getElementById('editStudentForm').action = '/admin/users/' + data.id;
+        document.getElementById('editStudentForm').action = @js(route($managementRoutePrefix.'users.update', ['user' => '__USER__'])).replace('__USER__', data.id);
         document.getElementById('edit_student_email').value = data.email;
 
         if (data) {

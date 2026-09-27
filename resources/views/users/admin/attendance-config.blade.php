@@ -1,4 +1,8 @@
-@extends('users.admin.layout')
+@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
+
+@php
+    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
+@endphp
 
 @section('title', 'Attendance Configuration')
 
@@ -76,7 +80,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
             @if ($academicYears->isNotEmpty())
-                <form method="GET" action="{{ route('admin.attendance-config.index') }}" class="flex flex-wrap items-center gap-2">
+                <form method="GET" action="{{ route($managementRoutePrefix.'attendance-config.index') }}" class="flex flex-wrap items-center gap-2">
                     <label for="sy_id" class="text-xs font-bold uppercase tracking-wide text-gray-500">Academic Year</label>
                     <select id="sy_id" name="sy_id" onchange="this.form.submit()"
                         class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
@@ -105,7 +109,7 @@
             Add an academic year first to configure monthly school days.
         </div>
     @else
-        <form id="attendanceForm" action="{{ route('admin.attendance-config.update') }}" method="POST">
+        <form id="attendanceForm" action="{{ route($managementRoutePrefix.'attendance-config.update') }}" method="POST">
             @csrf
             @method('PUT')
             <input type="hidden" name="SY_ID" value="{{ $selectedYear->SY_ID }}">
