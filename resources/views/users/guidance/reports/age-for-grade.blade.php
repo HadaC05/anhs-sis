@@ -61,7 +61,7 @@
 @endif
 
 <form method="GET" action="{{ route($reportRoute) }}" class="mb-6">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+    <div class="{{ ($layout ?? '') === 'users.principal.layout' ? 'principal-filters' : '' }} flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
         <select name="alignment" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             @foreach ($alignmentOptions as $value => $label)
                 <option value="{{ $value }}" {{ $alignment === $value ? 'selected' : '' }}>{{ $label }}</option>
@@ -136,7 +136,7 @@
                     <h2 class="text-sm font-bold text-gray-900">Student records</h2>
 
                 </div>
-                <a href="{{ route('guidance.reports.placement-test-recommendations.download', request()->except(['page', 'per_page', 'alignment'])) }}" class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#296374]/20 bg-[#296374]/5 px-3 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/10">
+                <a href="{{ route($recommendationsDownloadRoute ?? 'guidance.reports.placement-test-recommendations.download', request()->only(['search', 'grade_level', 'academic_year_id'])) }}" class="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#296374]/20 bg-[#296374]/5 px-3 py-2 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/10 sm:w-auto">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
                     Download recommendations
                 </a>

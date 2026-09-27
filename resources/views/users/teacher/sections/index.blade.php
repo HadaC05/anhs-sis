@@ -91,7 +91,6 @@ $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator 
     @foreach ($sectionList as $section)
     @php
     $assignments = $section->teacherSubjectAssignments ?? collect();
-    $importAssignment = $assignments->first();
     $cap = (int) ($section->capacity ?? 0);
     $count = (int) ($section->active_enrollments_count ?? 0);
     $pct = $cap > 0 ? min(100, (int) round(100 * $count / $cap)) : 0;
@@ -209,29 +208,6 @@ $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator 
                 @endforelse
             </div>
 
-            <details class="group/import mt-4">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2 transition hover:border-emerald-300 hover:bg-emerald-50/50 [&::-webkit-details-marker]:hidden">
-                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Class List Import</span>
-                    <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open/import:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </summary>
-                <div class="mt-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
-                    <p class="text-[10px] text-gray-500">Upload XLSX, CSV, or TXT with LRN and learner name columns.</p>
-                    @if ($importAssignment)
-                    <form action="{{ route('teacher.sections.class-list.import', $importAssignment) }}" method="POST" enctype="multipart/form-data" class="mt-3 space-y-2">
-                        @csrf
-                        <label class="sr-only" for="class_list_{{ $section->section_ID }}">Class List File</label>
-                        <input id="class_list_{{ $section->section_ID }}" type="file" name="class_list" accept=".xlsx,.csv,.txt" required class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-700 file:mr-2 file:rounded-md file:border-0 file:bg-[#296374] file:px-2 file:py-1 file:text-[10px] file:font-bold file:text-white">
-                        <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-700">
-                            Import Class List
-                        </button>
-                    </form>
-                    @else
-                    <p class="mt-2 rounded-lg bg-white px-3 py-2 text-[10px] text-gray-500">Import becomes available when a subject is assigned.</p>
-                    @endif
-                </div>
-            </details>
         </details>
     </div>
     @endforeach

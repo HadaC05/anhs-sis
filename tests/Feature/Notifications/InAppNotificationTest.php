@@ -215,6 +215,75 @@ test('students are notified when their approved grades are released', function (
     });
 });
 
+test('grade releases default to all statuses and support status filters', function () {
+    ['principal' => $principal, 'assignment' => $pending] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    ['assignment' => $released] = createInAppNotificationGradeAssignment(GradeStatus::RELEASED);
+    ['assignment' => $submitted] = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
+
+    $this->actingAs($principal)->get(route('principal.grade-releases', ['academic_year_id' => '']))
+        ->assertOk()
+        ->assertViewHas('filters', fn ($filters) => $filters['status'] === 'all')
+        ->assertViewHas('assignments', fn ($rows) => $rows->count() === 2 && ! $rows->contains($submitted))
+        ->assertSeeInOrder(['name="search"', 'name="status"', 'name="subject_id"'], false);
+
+    $this->get(route('principal.grade-releases', ['status' => 'approved', 'academic_year_id' => '']))
+        ->assertOk()
+        ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [$pending->assignment_ID]);
+
+    $this->get(route('principal.grade-releases', ['status' => 'released', 'academic_year_id' => '']))
+        ->assertOk()
+        ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [$released->assignment_ID]);
+
+    $this->get(route('principal.grade-releases', ['status' => 'all', 'academic_year_id' => '']))
+        ->assertOk()
+        ->assertViewHas('assignments', fn ($rows) => $rows->count() === 2 && ! $rows->contains($submitted));
+
+    $this->get(route('principal.grade-releases', ['status' => 'invalid']))
+        ->assertSessionHasErrors('status');
+});
+
+test('grade release term options exclude archived terms for the selected school level', function () {
+    ['principal' => $principal] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $term = \App\Models\GradingTerm::query()->firstOrFail();
+    $term->update([
+        'junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::archivedId(),
+        'senior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::activeId(),
+    ]);
+
+    $this->actingAs($principal)->get(route('principal.grade-releases', [
+        'grade_level' => GradeLevel::query()->where('grade_label', 'Grade 7')->value('grade_ID'),
+    ]))->assertOk()->assertViewHas('terms', fn ($terms) => ! $terms->contains($term));
+
+    $this->get(route('principal.grade-releases', [
+        'grade_level' => GradeLevel::query()->where('grade_label', 'Grade 11')->value('grade_ID'),
+    ]))->assertOk()->assertViewHas('terms', fn ($terms) => $terms->contains($term));
+
+    $term->update(['senior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::archivedId()]);
+    $this->get(route('principal.grade-releases'))
+        ->assertOk()->assertViewHas('terms', fn ($terms) => ! $terms->contains($term));
+});
+
+test('bulk grade release updates multiple selected assignments and leaves other grades unchanged', function () {
+    Notification::fake();
+    ['principal' => $principal, 'assignment' => $first] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    ['assignment' => $second] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    ['assignment' => $unselected] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    ['assignment' => $submitted] = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
+
+    $this->actingAs($principal)->from(route('principal.grade-releases'))
+        ->post(route('principal.grade-releases.bulk-release'), [
+            'assignment_ids' => [$first->assignment_ID, $second->assignment_ID, $submitted->assignment_ID],
+        ])->assertRedirect()->assertSessionHas('status', '2 grade record(s) released to students.');
+
+    expect($first->grades()->first()->status)->toBe(GradeStatus::RELEASED)
+        ->and($second->grades()->first()->status)->toBe(GradeStatus::RELEASED)
+        ->and($unselected->grades()->first()->status)->toBe(GradeStatus::APPROVED)
+        ->and($submitted->grades()->first()->status)->toBe(GradeStatus::SUBMITTED);
+
+    $this->post(route('principal.grade-releases.bulk-release'), ['assignment_ids' => []])
+        ->assertSessionHasErrors('assignment_ids');
+});
+
 test('teachers are notified when approved grades are bulk released', function () {
     Notification::fake();
 

@@ -76,6 +76,8 @@ test('principal can view the age alignment report', function () {
     $response->assertOk();
     $response->assertSee('Age Alignment Report');
     $response->assertSee('Student records');
+    $response->assertSee(route('principal.reports.placement-test-recommendations.download'), false);
+    $response->assertDontSee(route('guidance.reports.placement-test-recommendations.download'), false);
     $response->assertSee('Expected age by grade');
     $response->assertSee('value="overage" selected', false);
     $response->assertDontSee('>Expected</th>', false);

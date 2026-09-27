@@ -3,5 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content')
-@include('users.partials.enrollment-dashboard', ['dashboardContext' => 'principal'])
+<div class="principal-dashboard">
+    @include('users.partials.enrollment-dashboard', ['dashboardContext' => 'principal'])
+</div>
 @endsection

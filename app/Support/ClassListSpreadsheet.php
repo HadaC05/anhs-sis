@@ -12,12 +12,17 @@ class ClassListSpreadsheet
 {
     public static function rowsFromUpload(UploadedFile $file): array
     {
-        $extension = Str::lower($file->getClientOriginalExtension());
+        return self::rowsFromPath($file->getRealPath(), $file->getClientOriginalExtension());
+    }
+
+    public static function rowsFromPath(string $path, string $extension): array
+    {
+        $extension = Str::lower($extension);
 
         return match ($extension) {
-            'csv', 'txt' => self::rowsFromCsv($file->getRealPath()),
-            'xlsx' => self::rowsFromXlsx($file),
-            'pdf' => self::rowsFromPdf($file),
+            'csv', 'txt' => self::rowsFromCsv($path),
+            'xlsx' => self::rowsFromXlsxPath($path),
+            'pdf' => self::rowsFromPdfPath($path),
             default => throw new RuntimeException('Only CSV, XLSX, and text-based PDF class list files are supported.'),
         };
     }
@@ -27,10 +32,10 @@ class ClassListSpreadsheet
      * CSV/XLSX importer.  SF-1 lists a learner's LRN, sex, birth date, and
      * name together, even when the PDF has no machine-readable table grid.
      */
-    private static function rowsFromPdf(UploadedFile $file): array
+    private static function rowsFromPdfPath(string $path): array
     {
         try {
-            $text = (new Parser)->parseFile($file->getRealPath())->getText();
+            $text = (new Parser)->parseFile($path)->getText();
         } catch (\Throwable) {
             throw new RuntimeException('The PDF could not be read. Upload the original text-based SF-1 export, not a scanned image.');
         }
@@ -75,14 +80,14 @@ class ClassListSpreadsheet
         return $rows;
     }
 
-    private static function rowsFromXlsx(UploadedFile $file): array
+    private static function rowsFromXlsxPath(string $path): array
     {
         if (! class_exists(ZipArchive::class)) {
             throw new RuntimeException('XLSX import requires the PHP zip extension.');
         }
 
         $zip = new ZipArchive;
-        if ($zip->open($file->getRealPath()) !== true) {
+        if ($zip->open($path) !== true) {
             throw new RuntimeException('The uploaded XLSX file could not be opened.');
         }
 

@@ -1,6 +1,8 @@
 <?php
 
+use App\Jobs\ProcessAdvisoryClassListImport;
 use App\Models\AcademicYear;
+use App\Models\AdvisoryClassListImport;
 use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
@@ -16,7 +18,10 @@ use App\Models\Student;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 
 function createTeacherSectionGradeFixtures(): array
 {
@@ -114,6 +119,43 @@ test('teacher subject list identifies subjects with no grade records as ungraded
     $response->assertOk()
         ->assertSee('ENG11 - English 11')
         ->assertSee('Grade status: Ungraded');
+});
+
+test('subject class lists no longer provide an import route', function () {
+    expect(Route::has('teacher.sections.class-list.import'))->toBeFalse()
+        ->and(Route::has('teacher.advisory.class-list.import'))->toBeTrue();
+});
+
+test('advisory class list uploads are queued and then imported by the worker', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $section = $assignment->section;
+    $csv = "LRN,Name,Sex,Birth Date\n987654321098,\"Cruz, Juan\",M,2010-01-01\n";
+
+    Queue::fake();
+
+    $response = $this->actingAs($teacher)
+        ->from(route('teacher.advisory.class-list.index', $section))
+        ->post(route('teacher.advisory.class-list.import', $section), [
+            'class_list' => UploadedFile::fake()->createWithContent('students.csv', $csv),
+        ]);
+
+    $response->assertRedirect(route('teacher.advisory.class-list.index', $section))
+        ->assertSessionHas('status', 'Student import queued. You can keep using the system; this page will show the result when it finishes.');
+
+    $import = AdvisoryClassListImport::query()->sole();
+
+    expect($import->status)->toBe('queued')
+        ->and(Student::query()->where('lrn', '987654321098')->exists())->toBeFalse();
+    Queue::assertPushed(ProcessAdvisoryClassListImport::class, fn (ProcessAdvisoryClassListImport $job): bool => $job->importId === $import->id);
+
+    (new ProcessAdvisoryClassListImport($import->id))->handle(app(\App\Http\Controllers\Teacher\TeacherSectionController::class));
+
+    $import->refresh();
+    expect($import->status)->toBe('completed')
+        ->and($import->result['createdStudents'])->toBe(1)
+        ->and($import->result['createdEnrollments'])->toBe(1)
+        ->and($import->file_contents)->toBeNull()
+        ->and(Student::query()->where('lrn', '987654321098')->exists())->toBeTrue();
 });
 
 test('teacher subject list displays the configured grade status from its status ID', function () {

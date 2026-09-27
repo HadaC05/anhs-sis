@@ -17,9 +17,8 @@ services:
         fromDatabase:
           name: anhs-sis-db
           property: connectionString
-      # A worker is not included yet, so jobs run within the web request.
       - key: QUEUE_CONNECTION
-        value: sync
+        value: database
       - key: CACHE_STORE
         value: database
       - key: SESSION_DRIVER
@@ -40,6 +39,32 @@ services:
       #   value: /var/data
       # - key: FILESYSTEM_DISK
       #   value: public
+
+  - type: worker
+    name: anhs-sis-worker
+    runtime: docker
+    dockerCommand: php artisan queue:work database --tries=1 --timeout=1200 --sleep=2
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: anhs-sis-db
+          property: connectionString
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: APP_KEY
+        fromService:
+          name: anhs-sis
+          type: web
+          envVarKey: APP_KEY
 
 databases:
   - name: anhs-sis-db

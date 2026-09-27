@@ -22,6 +22,29 @@
     </div>
 @endif
 
+@if ($latestImport)
+    @php
+        $importResult = $latestImport->result ?? [];
+    @endphp
+    @if (in_array($latestImport->status, ['queued', 'processing'], true))
+        <div class="mb-4 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
+            <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+            <span>Student import {{ $latestImport->status }}. This page refreshes automatically when it is finished.</span>
+        </div>
+    @elseif ($latestImport->status === 'completed')
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
+            Student import complete. Students created: {{ $importResult['createdStudents'] ?? 0 }}. Students updated: {{ $importResult['updatedStudents'] ?? 0 }}. Enrollments added: {{ $importResult['createdEnrollments'] ?? 0 }}. Already enrolled here: {{ $importResult['existingEnrollments'] ?? 0 }}.
+            @if ($importResult['failedEnrollments'] ?? false)
+                Some learners could not be enrolled because they are assigned to another class or this class is full.
+            @endif
+        </div>
+    @elseif ($latestImport->status === 'failed')
+        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            Import failed: {{ $latestImport->failure_message }}
+        </div>
+    @endif
+@endif
+
 <div class="overflow-hidden rounded-xl border border-[#296374]/35 bg-[#eef5f7] shadow-md shadow-[#296374]/10">
     <div class="flex flex-col gap-4 border-b border-gray-100 bg-gray-50/60 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
         <div class="min-w-0">
@@ -42,7 +65,7 @@
                 @endif
             </form>
         </div>
-        <button type="button" id="import-students-trigger" class="inline-flex h-10 items-center justify-center rounded-lg bg-[#296374] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#1f4e5c]">Import Students</button>
+        <button type="button" id="import-students-trigger" @disabled($latestImport && in_array($latestImport->status, ['queued', 'processing'], true)) class="inline-flex h-10 items-center justify-center rounded-lg bg-[#296374] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#1f4e5c] disabled:cursor-not-allowed disabled:opacity-60">Import Students</button>
     </div>
     <div id="student-import-panel" class="{{ $errors->has('class_list') ? 'flex' : 'hidden' }} fixed inset-0 z-[100] items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true">
         <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
@@ -182,5 +205,8 @@
         button.addEventListener('click', function () { button.parentElement.remove(); });
     });
     setTimeout(function () { document.getElementById('class-list-import-toasts')?.remove(); }, 6000);
+    @if ($latestImport && in_array($latestImport->status, ['queued', 'processing'], true))
+        setTimeout(function () { window.location.reload(); }, 5000);
+    @endif
 </script>
 @endsection

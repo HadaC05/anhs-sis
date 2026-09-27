@@ -99,8 +99,10 @@ test('age alignment report can show all alignments when requested', function () 
         ->assertSee('Learner, Ontrack');
 });
 
-test('guidance counselor can download placement test recommendations from the age alignment report', function () {
+test('authorized staff can download placement test recommendations from the age alignment report', function (string $roleName, string $downloadRoute) {
     [$user, $academicYear, $gradeLevel] = createGuidanceAgeAlignmentFixtures();
+    $user->role()->associate(Role::query()->firstOrCreate(['role_name' => $roleName]));
+    $user->save();
     $recommended = Student::query()->create([
         'lrn' => '555555555555',
         'first_name' => 'Placement',
@@ -130,7 +132,7 @@ test('guidance counselor can download placement test recommendations from the ag
         ]);
     }
 
-    $response = $this->actingAs($user)->get(route('guidance.reports.placement-test-recommendations.download'));
+    $response = $this->actingAs($user)->get(route($downloadRoute));
 
     $response->assertOk();
     $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
@@ -138,7 +140,10 @@ test('guidance counselor can download placement test recommendations from the ag
         ->toContain('Placement Test Status')
         ->toContain('Candidate, Placement')
         ->not->toContain('Included, Not');
-});
+})->with([
+    'guidance counselor' => ['guidance counselor', 'guidance.reports.placement-test-recommendations.download'],
+    'principal' => ['principal', 'principal.reports.placement-test-recommendations.download'],
+]);
 
 /**
  * @return array{0: User, 1: AcademicYear, 2: GradeLevel}

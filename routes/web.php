@@ -348,9 +348,6 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/teacher/sections/{assignment}', [TeacherSectionController::class, 'show'])
         ->middleware('teacher')
         ->name('teacher.sections.show');
-    Route::post('/teacher/sections/{assignment}/class-list/import', [TeacherSectionController::class, 'importClassList'])
-        ->middleware('teacher')
-        ->name('teacher.sections.class-list.import');
     Route::post('/teacher/sections/{assignment}/grades', [TeacherSectionController::class, 'storeGrades'])
         ->middleware('teacher')
         ->name('teacher.sections.grades.store');
@@ -416,6 +413,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/principal/reports/age-for-grade', [PrincipalDashboardController::class, 'ageForGradeReport'])
         ->middleware('principal')
         ->name('principal.reports.age-for-grade');
+    Route::get('/principal/reports/placement-test-recommendations/download', [GuidanceDashboardController::class, 'downloadPlacementTestRecommendations'])
+        ->middleware('principal')
+        ->name('principal.reports.placement-test-recommendations.download');
     Route::get('/principal/grade-releases/{assignment}', [PrincipalDashboardController::class, 'showGradeRelease'])
         ->middleware('principal')
         ->name('principal.grade-releases.show');

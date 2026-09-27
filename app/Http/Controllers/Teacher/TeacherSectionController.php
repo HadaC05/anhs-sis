@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Teacher\StoreTeacherSectionGradesRequest;
+use App\Jobs\ProcessAdvisoryClassListImport;
 use App\Models\AcademicYear;
+use App\Models\AdvisoryClassListImport;
 use App\Models\Cluster;
 use App\Models\Enrollment;
 use App\Models\EnrollmentMonthlyAttendance;
@@ -24,7 +26,6 @@ use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
-use App\Support\ClassListSpreadsheet;
 use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
@@ -325,7 +326,24 @@ class TeacherSectionController extends Controller
             ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
             ->values();
 
-        return view('users.teacher.advisory.class-list', compact('section', 'enrollments', 'search', 'sex'));
+        $latestImport = AdvisoryClassListImport::query()
+            ->select([
+                'id',
+                'section_ID',
+                'requested_by',
+                'original_filename',
+                'status',
+                'result',
+                'failure_message',
+                'started_at',
+                'completed_at',
+            ])
+            ->where('section_ID', $section->section_ID)
+            ->where('requested_by', $request->user()->staff_id)
+            ->latest('id')
+            ->first();
+
+        return view('users.teacher.advisory.class-list', compact('section', 'enrollments', 'search', 'sex', 'latestImport'));
     }
 
     public function advisoryStudentProfile(Request $request, Section $section, Enrollment $enrollment): View
@@ -1151,153 +1169,6 @@ class TeacherSectionController extends Controller
         return back()->with('status', 'Grades saved and submitted successfully.');
     }
 
-    public function importClassList(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse
-    {
-        $this->authorizeAssignment($request, $assignment);
-
-        $validated = $request->validate([
-            'class_list' => ['required', 'file', 'max:15360', 'mimes:csv,txt,xlsx,pdf'],
-        ]);
-
-        $assignment->load(['section.gradeLevel', 'section.academicYear']);
-        $section = $assignment->section;
-
-        if (! $section) {
-            return back()->withErrors(['class_list' => 'This assignment has no section to import students into.']);
-        }
-
-        try {
-            $rows = ClassListSpreadsheet::rowsFromUpload($validated['class_list']);
-            $records = $this->classListRecords($rows);
-        } catch (\Throwable $exception) {
-            return back()->withErrors(['class_list' => $exception->getMessage()]);
-        }
-
-        if ($records === []) {
-            return back()->withErrors(['class_list' => 'No valid learner rows were found. Make sure the file has LRN and learner name columns.']);
-        }
-
-        $result = DB::transaction(function () use ($records, $section, $request): array {
-            $enrollmentYear = (int) ($section->academicYear?->start_date?->year ?? now()->year);
-            $createdStudents = 0;
-            $updatedStudents = 0;
-            $createdEnrollments = 0;
-            $existingEnrollments = 0;
-            $failedEnrollments = false;
-            $activeEnrollmentCount = Enrollment::query()
-                ->where('section_ID', $section->section_ID)
-                ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-                ->count();
-
-            foreach ($records as $record) {
-                $student = Student::query()->where('lrn', $record['lrn'])->first();
-                $defaultPassword = StudentCredentials::defaultPassword(
-                    $record['first_name'],
-                    $record['last_name'],
-                    $enrollmentYear,
-                );
-
-                if (! $student) {
-                    $student = Student::query()->create([
-                        'username' => StudentCredentials::usernameFromLrn($record['lrn']),
-                        'password' => Hash::make($defaultPassword),
-                        'change_password' => true,
-                        'password_changed_at' => null,
-                        'lrn' => $record['lrn'],
-                        'first_name' => $record['first_name'],
-                        'middle_name' => $record['middle_name'],
-                        'last_name' => $record['last_name'],
-                        'suffix' => $record['suffix'],
-                        'sex' => $record['sex'],
-                        'birthdate' => $record['birthdate'],
-                        'mother_tongue' => $record['mother_tongue'],
-                        'status' => 'approved',
-                        'activated_by' => $request->user()?->staff_id,
-                        'activated_at' => now(),
-                    ]);
-                    $createdStudents++;
-                } else {
-                    $updates = $this->missingStudentUpdates($student, $record);
-                    if ($student->username === null && ! Student::query()->where('username', $record['lrn'])->whereKeyNot($student->id)->exists()) {
-                        $updates['username'] = StudentCredentials::usernameFromLrn($record['lrn']);
-                    }
-                    if ($student->password === null) {
-                        $updates['password'] = Hash::make($defaultPassword);
-                        $updates['change_password'] = true;
-                        $updates['password_changed_at'] = null;
-                    }
-                    if (! in_array($student->status, ['approved', 'active'], true)) {
-                        $updates['status'] = 'approved';
-                    }
-
-                    if ($updates !== []) {
-                        $student->update($updates);
-                        $updatedStudents++;
-                    }
-                }
-
-                $this->importStudentSf1Details($student, $record);
-
-                $conflictingEnrollment = Enrollment::query()
-                    ->where('student_ID', $student->id)
-                    ->where('SY_ID', $section->SY_ID)
-                    ->where('section_ID', '!=', $section->section_ID)
-                    ->first();
-
-                if ($conflictingEnrollment) {
-                    $failedEnrollments = true;
-
-                    continue;
-                }
-
-                $existingEnrollment = Enrollment::query()
-                    ->where('student_ID', $student->id)
-                    ->where('section_ID', $section->section_ID)
-                    ->where('SY_ID', $section->SY_ID)
-                    ->first();
-
-                if (! $existingEnrollment && (int) $section->capacity > 0 && $activeEnrollmentCount >= (int) $section->capacity) {
-                    $failedEnrollments = true;
-
-                    continue;
-                }
-
-                $enrollment = Enrollment::query()->firstOrCreate(
-                    [
-                        'student_ID' => $student->id,
-                        'section_ID' => $section->section_ID,
-                        'SY_ID' => $section->SY_ID,
-                    ],
-                    [
-                        'curriculum_grade_level_ID' => $section->curriculum_grade_level_ID,
-                        'course_ID' => null,
-                        'learner_type' => 'regular',
-                        'enrollment_status' => EnrollmentStatus::ENROLLED,
-                    ]
-                );
-
-                if ($enrollment->wasRecentlyCreated) {
-                    $createdEnrollments++;
-                    $activeEnrollmentCount++;
-                } else {
-                    $existingEnrollments++;
-                }
-            }
-
-            return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments');
-        });
-
-        $message = "Class list import complete. Students created: {$result['createdStudents']}. Students updated: {$result['updatedStudents']}. Enrollments added: {$result['createdEnrollments']}. Already enrolled here: {$result['existingEnrollments']}.";
-
-        $redirect = back()->with('status', $message);
-
-        if ($result['failedEnrollments']) {
-            $redirect->with('class_list_import_error', $this->classListImportFailureMessage());
-        }
-
-        return $redirect;
-    }
-
     public function importAdvisoryClassList(Request $request, Section $section): RedirectResponse
     {
         $this->authorizeAdvisorySection($request, $section);
@@ -1306,33 +1177,46 @@ class TeacherSectionController extends Controller
             'class_list' => ['required', 'file', 'max:15360', 'mimes:csv,txt,xlsx,pdf'],
         ]);
 
-        $section->load(['gradeLevel', 'academicYear']);
+        $staffId = (int) $request->user()->staff_id;
+        $runningImport = AdvisoryClassListImport::query()
+            ->where('section_ID', $section->section_ID)
+            ->where('requested_by', $staffId)
+            ->whereIn('status', ['queued', 'processing'])
+            ->exists();
 
-        try {
-            $records = $this->classListRecords(ClassListSpreadsheet::rowsFromUpload($validated['class_list']));
-        } catch (\Throwable $exception) {
-            return back()->withErrors(['class_list' => $exception->getMessage()]);
+        if ($runningImport) {
+            return back()->withErrors(['class_list' => 'An import is already in progress for this advisory class. Wait for it to finish before uploading another file.']);
         }
 
-        if ($records === []) {
-            return back()->withErrors(['class_list' => 'No valid learner rows were found. The file must include each learner\'s 12-digit LRN and name.']);
-        }
+        $file = $validated['class_list'];
+        $import = AdvisoryClassListImport::query()->create([
+            'section_ID' => $section->section_ID,
+            'requested_by' => $staffId,
+            'original_filename' => $file->getClientOriginalName(),
+            // The worker is a separate service in production, so keep this
+            // temporary payload in the shared database rather than local disk.
+            'file_contents' => base64_encode($file->get()),
+            'status' => 'queued',
+        ]);
 
-        $result = $this->importRecordsIntoSection($records, $section, $request);
-        $message = "Student import complete. Students created: {$result['createdStudents']}. Students updated: {$result['updatedStudents']}. Enrollments added: {$result['createdEnrollments']}. Already enrolled here: {$result['existingEnrollments']}.";
+        ProcessAdvisoryClassListImport::dispatch($import->id);
 
-        $redirect = back()->with('status', $message);
-
-        if ($result['failedEnrollments']) {
-            $redirect->with('class_list_import_error', $this->classListImportFailureMessage());
-        }
-
-        return $redirect;
+        return back()->with('status', 'Student import queued. You can keep using the system; this page will show the result when it finishes.');
     }
 
-    private function importRecordsIntoSection(array $records, Section $section, Request $request): array
+    public function importAdvisoryClassListRecords(array $records, Section $section, int $activatedBy): array
     {
-        return DB::transaction(function () use ($records, $section, $request): array {
+        return $this->importRecordsIntoSection($records, $section, $activatedBy);
+    }
+
+    public function advisoryClassListRecords(array $rows): array
+    {
+        return $this->classListRecords($rows);
+    }
+
+    private function importRecordsIntoSection(array $records, Section $section, int $activatedBy): array
+    {
+        return DB::transaction(function () use ($records, $section, $activatedBy): array {
             $enrollmentYear = (int) ($section->academicYear?->start_date?->year ?? now()->year);
             $createdStudents = 0;
             $updatedStudents = 0;
@@ -1365,7 +1249,7 @@ class TeacherSectionController extends Controller
                         'birthdate' => $record['birthdate'],
                         'mother_tongue' => $record['mother_tongue'],
                         'status' => 'approved',
-                        'activated_by' => $request->user()?->staff_id,
+                        'activated_by' => $activatedBy,
                         'activated_at' => now(),
                     ]);
                     $createdStudents++;
@@ -1436,11 +1320,6 @@ class TeacherSectionController extends Controller
 
             return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments');
         });
-    }
-
-    private function classListImportFailureMessage(): string
-    {
-        return 'Failed to enroll or upload one or more students. They may already be enrolled in a different class, the class may be full, or the uploaded file may contain invalid data.';
     }
 
     public function submitGrades(Request $request, TeacherSubjectAssignment $assignment)

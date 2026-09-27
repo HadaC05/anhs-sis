@@ -7,6 +7,7 @@
     <title>@yield('title', 'Dashboard') | Agusan National High School</title>
     <script src="https://cdn.tailwindcss.com"></script>
     @include('users.partials.sidebar-behavior')
+    @include('users.principal.partials.responsive')
     <style>
         .sidebar-link {
             display: flex;
@@ -64,24 +65,25 @@
     </style>
 </head>
 
-<body class="min-h-screen flex flex-col bg-gray-100">
+<body class="principal-layout min-h-screen flex flex-col bg-gray-100">
     <header class="fixed top-0 left-0 right-0 w-full backdrop-blur-sm shadow-sm border-b border-white/20 z-50" style="background-color: #296374;">
-        <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center pl-6">
-                <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+        <div class="mx-auto flex h-20 w-full items-center justify-between gap-3 px-4 sm:px-6">
+            <div class="flex min-w-0 items-center">
+                <button type="button" id="sidebar-toggle" class="sidebar-toggle shrink-0" aria-controls="principal-sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-12 w-auto">
+                <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-auto max-h-12 min-w-0 max-w-[calc(100%-3.25rem)] object-contain">
             </div>
 
-            <nav class="flex items-center flex-wrap justify-center gap-4 sm:gap-6 pr-6">
+            <nav class="flex shrink-0 items-center">
                 @include('users.partials.staff-profile-menu')
             </nav>
         </div>
     </header>
 
     <div class="min-h-screen flex relative pt-20" style="background-image: url('{{ asset('images/student-dash-image.png') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;">
-        <aside class="app-sidebar fixed left-0 top-20 bottom-0 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
+        <button type="button" id="sidebar-backdrop" class="fixed inset-x-0 bottom-0 top-20 z-30 bg-slate-900/50" aria-label="Close navigation menu" tabindex="-1"></button>
+        <aside id="principal-sidebar" class="app-sidebar fixed left-0 top-20 bottom-0 bg-white/98 backdrop-blur-md shadow-2xl border-r border-gray-200/50 z-40 overflow-y-auto">
             <div class="p-6 border-b border-gray-200/50 bg-gradient-to-r from-[#296374]/5 to-transparent">
                 <div class="flex items-center gap-3 mb-1">
                     <div class="sidebar-user-icon h-10 w-10 rounded-lg flex items-center justify-center shadow-md" style="background-color: #296374;">
@@ -135,8 +137,8 @@
             </div>
         </aside>
 
-        <main class="app-main flex-1 relative z-10">
-            <div class="max-w-7xl mx-auto py-12 px-4 md:px-8">
+        <main class="app-main min-w-0 flex-1 relative z-10">
+            <div class="principal-content max-w-7xl mx-auto py-6 px-4 sm:py-8 lg:py-10 lg:px-8">
                 @yield('content')
             </div>
         </main>

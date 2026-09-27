@@ -5,9 +5,6 @@
 @section('content')
 @php
 $proficiencyOptions = collect($levels)->pluck('label')->all();
-$selectedYearLabel = $selectedAcademicYear === 'all'
-? 'All school years'
-: (($academicYears ?? collect())->firstWhere('SY_ID', (int) ($selectedAcademicYear ?: $activeYear?->SY_ID))?->school_year ?? 'Current year');
 $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator ? $sections->getCollection() : $sections;
 $proficiencyChartData = collect($levels)
 ->map(fn ($level) => [
@@ -28,28 +25,22 @@ $proficiencyChartPayload = [
 @endphp
 
 <div class="mb-8">
-    <div class="flex items-center gap-3 mb-2">
-        <div class="h-12 w-12 rounded-xl flex items-center justify-center shadow-lg" style="background: linear-gradient(135deg, #296374 0%, #1e4d5c 100%);">
-            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-        </div>
-        <div>
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Student Proficiency Levels</h1>
-            @if (!isset($activeYear) || !$activeYear)
-            <p class="mt-1 text-sm font-medium text-amber-600">No active school year set. Choose a school year filter to review subject proficiency.</p>
-            @elseif ($selectedSubject)
-            <p class="mt-1 text-sm text-gray-500">{{ $selectedSubject->code }} — {{ $selectedSubject->title }} · {{ $selectedYearLabel }}</p>
-            @else
-            <p class="mt-1 text-sm text-gray-500">Select a subject to view section proficiency by learner.</p>
-            @endif
-        </div>
-    </div>
+    <h1 class="text-xl font-bold text-gray-800 tracking-tight">Student Proficiency Levels</h1>
 </div>
 
-<form method="GET" action="{{ route('principal.proficiency-levels') }}" class="mb-6">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
-        <select name="subject_id" class="h-10 min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+<p id="proficiency-filter-help" class="mb-3 text-sm text-gray-600">Set the filters and click Apply to view proficiency levels by subject.</p>
+
+<form aria-describedby="proficiency-filter-help" method="GET" action="{{ route('principal.proficiency-levels') }}" class="mb-6">
+    <div class="principal-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+        <div class="relative min-w-[180px] flex-1">
+            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
+            </svg>
+            <input type="search" name="search" id="search" aria-label="Search students by name or LRN" value="{{ $search }}" placeholder="Search name or LRN"
+                class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
+        </div>
+
+        <select aria-label="Subject" name="subject_id" class="h-10 min-w-[220px] flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             <option value="">Select subject</option>
             @foreach($subjects as $subject)
             <option value="{{ $subject->subject_ID }}" {{ (string) $selectedSubjectId === (string) $subject->subject_ID ? 'selected' : '' }}>
@@ -58,7 +49,7 @@ $proficiencyChartPayload = [
             @endforeach
         </select>
 
-        <select name="academic_year_id" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+        <select aria-label="School year" name="academic_year_id" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             <option value="">Current year</option>
             <option value="all" {{ $selectedAcademicYear === 'all' ? 'selected' : '' }}>All years</option>
             @foreach($academicYears ?? [] as $academicYear)
@@ -68,7 +59,7 @@ $proficiencyChartPayload = [
             @endforeach
         </select>
 
-        <select name="grade_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+        <select aria-label="Grade level" name="grade_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             <option value="">All grades</option>
             @foreach($gradeLevels as $gradeLevel)
             <option value="{{ $gradeLevel->grade_ID }}" {{ (string) $selectedGradeLevel === (string) $gradeLevel->grade_ID ? 'selected' : '' }}>
@@ -77,21 +68,13 @@ $proficiencyChartPayload = [
             @endforeach
         </select>
 
-        <select name="proficiency_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+        <select aria-label="Proficiency level" name="proficiency_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             <option value="">All proficiency levels</option>
             @foreach($proficiencyOptions as $proficiency)
             <option value="{{ $proficiency }}" {{ $selectedProficiencyLevel === $proficiency ? 'selected' : '' }}>{{ $proficiency }}</option>
             @endforeach
             <option value="pending" {{ $selectedProficiencyLevel === 'pending' ? 'selected' : '' }}>Pending Grades</option>
         </select>
-
-        <div class="relative min-w-[180px] flex-1">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
-            </svg>
-            <input type="search" name="search" id="search" value="{{ $search }}" placeholder="Search name or LRN"
-                class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
-        </div>
 
         <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -104,7 +87,7 @@ $proficiencyChartPayload = [
 </form>
 
 @if ($selectedSubject)
-<div class="mb-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
+<div class="proficiency-summary mb-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3">
     @foreach($levels as $level)
     @php
     $cardClasses = match ($level['label']) {
@@ -137,132 +120,104 @@ $proficiencyChartPayload = [
 <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white/90 px-4 py-3 shadow-sm">
     <p class="text-sm font-semibold text-gray-700">{{ $sections->total() }} {{ Str::plural('section', $sections->total()) }} · {{ $totalStudents }} {{ Str::plural('student', $totalStudents) }}</p>
     <p class="text-xs text-gray-500">Subject averages use the DepEd proficiency scale.</p>
+    @if ($totalStudents > 0)
+    <a href="{{ route('principal.proficiency-levels', ['subject_id' => $selectedSubjectId, 'academic_year_id' => $selectedAcademicYear, 'grade_level' => $selectedGradeLevel, 'proficiency_level' => $selectedProficiencyLevel, 'search' => $search, 'download' => 'csv']) }}" class="inline-flex items-center rounded-lg bg-[#296374] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e4d5c]">Download filtered details (CSV)</a>
+    @endif
 </div>
 
 @if ($sectionList->isNotEmpty())
-<div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-    <div>
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            @foreach ($sectionList as $row)
-            @php
-            $section = $row['section'];
-            $students = $row['students'];
-            $cap = $row['capacity'];
-            $count = $row['student_count'];
-            $pct = $row['capacity_percent'];
-            $barColor = $pct >= 100 ? 'bg-red-500' : ($pct >= 80 ? 'bg-amber-500' : 'bg-[#296374]');
-            $badgeColor = $pct >= 100 ? 'bg-red-500' : ($pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500');
-            $statusLabel = $pct >= 100 ? 'full' : ($pct >= 80 ? 'near full' : 'open');
-            $gradeLabel = $section->gradeLevel?->grade_label ?? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level));
-            $gradeInitial = strtoupper(str_replace(['Grade ', 'grade_'], ['G', 'G'], $section->gradeLevel?->grade_label ?? $section->grade_level));
-            $schoolYear = $section->academicYear?->school_year ?? 'N/A';
-            @endphp
+<div class="proficiency-results grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div class="min-w-0">
+        <div tabindex="0" role="region" aria-label="Sections" class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table class="min-w-[640px] w-full text-left text-sm">
+                <caption class="sr-only">Sections teaching {{ $selectedSubject->title }}</caption>
+                <thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                    <tr>
+                        <th scope="col" class="px-4 py-3">Section</th>
+                        <th scope="col" class="px-4 py-3">Grade level</th>
+                        <th scope="col" class="px-4 py-3">School year</th>
+                        <th scope="col" class="px-4 py-3">Teacher</th>
+                        <th scope="col" class="px-4 py-3 text-center">Students</th>
+                        <th scope="col" class="px-4 py-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach ($sectionList as $row)
+                    @php
+                    $section = $row['section'];
+                    $gradeLabel = $section->gradeLevel?->grade_label ?? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level));
+                    @endphp
+                    <tr class="hover:bg-gray-50">
+                        <th scope="row" class="px-4 py-4 font-semibold text-gray-800">{{ $section->name }}</th>
+                        <td class="px-4 py-4 text-gray-600">{{ $gradeLabel }}</td>
+                        <td class="whitespace-nowrap px-4 py-4 text-gray-600">{{ $section->academicYear?->school_year ?? 'N/A' }}</td>
+                        <td class="px-4 py-4 text-gray-600">{{ $row['teacher_name'] }}</td>
+                        <td class="px-4 py-4 text-center text-gray-600">{{ $row['student_count'] }}</td>
+                        <td class="px-4 py-4 text-right">
+                            <button type="button" data-section-dialog="section-details-{{ $section->section_ID }}" aria-haspopup="dialog" aria-controls="section-details-{{ $section->section_ID }}" aria-label="View details for {{ $section->name }}" class="whitespace-nowrap rounded-lg border border-[#296374]/20 bg-[#296374]/5 px-3 py-2 text-xs font-semibold text-[#296374] transition hover:bg-[#296374]/10">View details</button>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
 
-            <div class="relative flex min-h-[190px] flex-col rounded-lg border border-gray-200/80 bg-white p-5 shadow-md shadow-slate-200/70">
-                <span class="absolute right-0 top-4 rounded-l-sm {{ $badgeColor }} px-3 py-1 text-[11px] font-bold lowercase text-white shadow-sm">{{ $statusLabel }}</span>
-
-                <div class="flex items-start gap-4 pr-16">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-md" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);">
-                        {{ $gradeInitial }}
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="truncate text-base font-bold text-gray-800">{{ $section->name }}</h2>
-                        <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $gradeLabel }}</p>
-                    </div>
+        @foreach ($sectionList as $row)
+        @php
+        $section = $row['section'];
+        $gradeLabel = $section->gradeLevel?->grade_label ?? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level));
+        @endphp
+        <dialog id="section-details-{{ $section->section_ID }}" aria-labelledby="section-title-{{ $section->section_ID }}" class="section-details-dialog m-auto max-h-[85vh] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto rounded-xl bg-white p-0 text-gray-800 shadow-xl backdrop:bg-slate-900/50">
+            <div class="sticky top-0 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-5 py-4">
+                <div>
+                    <h2 id="section-title-{{ $section->section_ID }}" class="text-lg font-semibold">{{ $section->name }} &middot; Section details</h2>
+                    <p class="mt-1 text-sm text-gray-500">{{ $gradeLabel }} &middot; {{ $section->academicYear?->school_year ?? 'N/A' }} &middot; {{ $selectedSubject->code }} &middot; {{ $selectedSubject->title }}</p>
+                    <p class="mt-1 text-xs text-gray-500">Teacher: {{ $row['teacher_name'] }} &middot; {{ $row['student_count'] }} students matching the current filters</p>
                 </div>
-
-                <div class="mt-5 space-y-2 text-sm text-gray-600">
-                    <div class="flex items-center gap-2">
-                        <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <span class="truncate">{{ $schoolYear }}</span>
-                    </div>
-                    @if ($section->cluster?->name)
-                    <div class="flex items-center gap-2">
-                        <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
-                        </svg>
-                        <span class="truncate">{{ $section->cluster->name }}</span>
-                    </div>
-                    @endif
-                    @if ($section->room)
-                    <div class="flex items-center gap-2">
-                        <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"></path>
-                        </svg>
-                        <span class="truncate font-mono">{{ $section->room }}</span>
-                    </div>
-                    @endif
-                    <div class="flex items-center gap-2">
-                        <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
-                        <span class="truncate">{{ $row['teacher_name'] }}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-5a4 4 0 11-8 0 4 4 0 018 0zm8 0a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                        <span class="font-semibold text-gray-700">{{ $count }}</span>
-                        <span>of {{ $cap ?: 'unlimited' }} students</span>
-                    </div>
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    <button type="button" data-download-section data-section="{{ $section->name }}" data-grade="{{ $gradeLabel }}" data-year="{{ $section->academicYear?->school_year ?? 'N/A' }}" data-subject="{{ $selectedSubject->code }} - {{ $selectedSubject->title }}" data-teacher="{{ $row['teacher_name'] }}" class="rounded-lg bg-[#296374] px-3 py-2 text-sm font-semibold text-white hover:bg-[#1e4d5c]">Download CSV</button>
+                    <form method="dialog">
+                    <button autofocus type="submit" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50">Close</button>
+                    </form>
                 </div>
-
-                <div class="mt-4">
-                    <div class="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-gray-500">
-                        <span>Capacity</span>
-                        <span>{{ $pct }}%</span>
-                    </div>
-                    <div class="h-2 rounded-full bg-gray-200">
-                        <div class="h-full rounded-full {{ $barColor }} transition-all" style="width: {{ $pct }}%;"></div>
-                    </div>
-                </div>
-
-                <details class="group mt-5 border-t border-gray-100 pt-4">
-                    <summary class="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 [&::-webkit-details-marker]:hidden">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                            Students
-                            <span class="ml-1 normal-case tracking-normal text-gray-500">({{ $students->count() }})</span>
-                        </span>
-                        <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </summary>
-
-                    <div class="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                        @forelse ($students as $student)
+            </div>
+            <div class="overflow-x-auto p-5" tabindex="0" role="region" aria-label="Student proficiency details">
+                <table class="min-w-[640px] w-full text-left text-sm">
+                    <caption class="sr-only">Student grades and proficiency levels for {{ $section->name }}</caption>
+                    <thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Student</th>
+                            <th scope="col" class="px-4 py-3">LRN</th>
+                            <th scope="col" class="px-4 py-3 text-center">Subject average</th>
+                            <th scope="col" class="px-4 py-3">Proficiency level</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @forelse ($row['students'] as $student)
                         @php
                         $badgeClasses = match ($student['proficiency']['label'] ?? null) {
-                        'Advanced' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-                        'Proficient' => 'bg-[#296374]/10 text-[#296374] ring-[#296374]/20',
-                        'Approaching Proficiency' => 'bg-blue-50 text-blue-700 ring-blue-200',
-                        'Developing' => 'bg-amber-50 text-amber-700 ring-amber-200',
-                        'Beginning' => 'bg-red-50 text-red-700 ring-red-200',
-                        default => 'bg-gray-100 text-gray-700 ring-gray-200',
+                            'Advanced' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                            'Proficient' => 'bg-[#296374]/10 text-[#296374] ring-[#296374]/20',
+                            'Approaching Proficiency' => 'bg-blue-50 text-blue-700 ring-blue-200',
+                            'Developing' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                            'Beginning' => 'bg-red-50 text-red-700 ring-red-200',
+                            default => 'bg-gray-100 text-gray-700 ring-gray-200',
                         };
                         @endphp
-                        <div class="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2">
-                            <div class="min-w-0">
-                                <p class="truncate text-xs font-semibold text-gray-800">{{ $student['name'] }}</p>
-                                <p class="text-[10px] text-gray-500">
-                                    LRN {{ $student['lrn'] }}
-                                    ·
-                                    {{ $student['subject_average'] !== null ? number_format($student['subject_average'], 0) : '—' }}
-                                </p>
-                            </div>
-                            <span class="inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[10px] font-bold ring-1 {{ $badgeClasses }}">
-                                {{ $student['proficiency']['label'] ?? 'Pending Grades' }}
-                            </span>
-                        </div>
+                        <tr data-student-row>
+                            <th scope="row" class="px-4 py-3 font-medium">{{ $student['name'] }}</th>
+                            <td class="px-4 py-3 text-gray-600">{{ $student['lrn'] }}</td>
+                            <td class="px-4 py-3 text-center font-semibold">{{ $student['subject_average'] !== null ? number_format($student['subject_average'], 0) : '—' }}</td>
+                            <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $badgeClasses }}">{{ $student['proficiency']['label'] ?? 'Pending Grades' }}</span></td>
+                        </tr>
                         @empty
-                        <p class="text-xs text-gray-500">No students match the current filters.</p>
+                        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No students match the current filters.</td></tr>
                         @endforelse
-                    </div>
-                </details>
+                    </tbody>
+                </table>
             </div>
-            @endforeach
-        </div>
+        </dialog>
+        @endforeach
 
         @if ($sections instanceof \Illuminate\Pagination\LengthAwarePaginator && $sections->hasPages())
         <div class="mt-6 rounded-lg border border-gray-200/80 bg-white/90 px-6 py-4 shadow-sm">
@@ -272,7 +227,7 @@ $proficiencyChartPayload = [
     </div>
 
     <aside class="rounded-xl border border-gray-200 bg-white p-5 shadow-lg shadow-gray-200/70 h-fit">
-        <div class="mb-4 flex items-start justify-between gap-3">
+        <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h2 class="text-sm font-bold uppercase tracking-widest text-gray-600">Distribution Chart</h2>
                 <p class="mt-1 text-xs text-gray-500">Learners in {{ $selectedSubject->title }} by proficiency level.</p>
@@ -318,6 +273,67 @@ $proficiencyChartPayload = [
 @endif
 
 @if ($selectedSubject && $sectionList->isNotEmpty())
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-download-section]').forEach(function (downloadButton) {
+            downloadButton.addEventListener('click', function () {
+                var dialog = downloadButton.closest('dialog');
+                var details = downloadButton.dataset;
+                var rows = [
+                    ['Section', details.section],
+                    ['Grade level', details.grade],
+                    ['School year', details.year],
+                    ['Subject', details.subject],
+                    ['Teacher', details.teacher],
+                    ['Scope', 'Students matching the current filters'],
+                    [],
+                    ['Student', 'LRN', 'Subject average', 'Proficiency level']
+                ];
+                dialog.querySelectorAll('[data-student-row]').forEach(function (row) {
+                    rows.push(Array.from(row.cells, function (cell) {
+                        return cell.textContent.trim();
+                    }));
+                });
+                var csv = rows.map(function (row) {
+                    return row.map(function (value) {
+                        var text = String(value ?? '');
+                        // Keep spreadsheet applications from evaluating user-provided text.
+                        if (/^[\s]*[=+@-]/.test(text)) {
+                            text = "'" + text;
+                        }
+                        return '"' + text.replace(/"/g, '""') + '"';
+                    }).join(',');
+                }).join('\r\n');
+                var url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' }));
+                var link = document.createElement('a');
+                link.href = url;
+                link.download = ('proficiency-' + details.section + '-' + details.subject + '-' + details.year)
+                    .replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() + '.csv';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            });
+        });
+        document.querySelectorAll('[data-section-dialog]').forEach(function (button) {
+            var dialog = document.getElementById(button.dataset.sectionDialog);
+            button.addEventListener('click', function () {
+                dialog.showModal();
+                document.body.style.overflow = 'hidden';
+            });
+            dialog.addEventListener('close', function () {
+                document.body.style.overflow = '';
+                button.focus();
+            });
+            dialog.addEventListener('click', function (event) {
+                var bounds = dialog.getBoundingClientRect();
+                if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) {
+                    dialog.close();
+                }
+            });
+        });
+    });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>

@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PrincipalDashboardController extends Controller
 {
@@ -41,6 +42,7 @@ class PrincipalDashboardController extends Controller
             'grade_level' => ['nullable', 'integer', 'exists:grade_level,grade_ID'],
             'term_id' => ['nullable', 'integer', 'exists:grading_terms,term_ID'],
             'semester' => ['nullable', 'in:first,second'],
+            'status' => ['nullable', 'in:approved,released,all'],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -48,13 +50,17 @@ class PrincipalDashboardController extends Controller
         $selectedGradeLevel = isset($validated['grade_level']) ? (int) $validated['grade_level'] : null;
         $selectedGrade = $selectedGradeLevel ? $gradeLevels->firstWhere('grade_ID', $selectedGradeLevel) : null;
         $showSemesterFilter = in_array($selectedGrade?->grade_label, ['Grade 11', 'Grade 12'], true);
+        $selectedAcademicYearId = $request->has('academic_year_id')
+            ? (isset($validated['academic_year_id']) ? (int) $validated['academic_year_id'] : null)
+            : AcademicYear::query()->where('status', true)->value('SY_ID');
         $filters = [
             'subject_id' => isset($validated['subject_id']) ? (int) $validated['subject_id'] : null,
-            'academic_year_id' => isset($validated['academic_year_id']) ? (int) $validated['academic_year_id'] : null,
+            'academic_year_id' => $selectedAcademicYearId,
             'grade_level' => $selectedGradeLevel,
             'term_id' => isset($validated['term_id']) ? (int) $validated['term_id'] : null,
             'semester' => $showSemesterFilter ? ($validated['semester'] ?? null) : null,
             'search' => trim($validated['search'] ?? ''),
+            'status' => $validated['status'] ?? 'all',
         ];
 
         return view('users.principal.grade-releases', [
@@ -62,13 +68,24 @@ class PrincipalDashboardController extends Controller
             'subjects' => Subject::query()->where('status', 'active')->orderBy('code')->orderBy('title')->get(),
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->orderByDesc('SY_ID')->get(),
             'gradeLevels' => $gradeLevels,
-            'terms' => GradingTerm::query()->orderBy('sort_order')->orderBy('term_ID')->get(),
+            'terms' => GradingTerm::query()
+                ->where(function ($query) use ($selectedGrade, $showSemesterFilter): void {
+                    if ($showSemesterFilter) {
+                        $query->seniorHighActive();
+                    } elseif ($selectedGrade) {
+                        $query->juniorHighActive();
+                    } else {
+                        $query->where(fn ($terms) => $terms->juniorHighActive())
+                            ->orWhere(fn ($terms) => $terms->seniorHighActive());
+                    }
+                })
+                ->orderBy('sort_order')->orderBy('term_ID')->get(),
             'filters' => $filters,
             'showSemesterFilter' => $showSemesterFilter,
         ]);
     }
 
-    public function proficiencyLevels(Request $request): View
+    public function proficiencyLevels(Request $request): View|StreamedResponse
     {
         $validated = $request->validate([
             'subject_id' => ['nullable', 'integer', 'exists:subjects,subject_ID'],
@@ -222,6 +239,12 @@ class PrincipalDashboardController extends Controller
                 ->values();
         }
 
+        if ($request->query('download') === 'csv') {
+            abort_unless($selectedSubject, 422, 'Select a subject before downloading.');
+
+            return $this->downloadProficiencyDetails($sections, $selectedSubject);
+        }
+
         $allStudents = $sections->flatMap(fn (array $row): Collection => $row['students']);
         $summary = collect($levels)
             ->mapWithKeys(fn (array $level): array => [
@@ -258,6 +281,45 @@ class PrincipalDashboardController extends Controller
             'summary' => $summary,
             'incompleteCount' => $incompleteCount,
             'totalStudents' => $allStudents->count(),
+        ]);
+    }
+
+    private function downloadProficiencyDetails(Collection $sections, Subject $subject): StreamedResponse
+    {
+        return response()->streamDownload(function () use ($sections, $subject): void {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            $writeRow = static function (array $values) use ($output): void {
+                $values = array_map(static function ($value): string {
+                    $text = (string) $value;
+
+                    return preg_match('/^\s*[=+@-]/u', $text) ? "'".$text : $text;
+                }, $values);
+                fputcsv($output, $values, ',', '"', '');
+            };
+            $writeRow(['Section', 'Grade level', 'School year', 'Subject', 'Teacher', 'Student', 'LRN', 'Subject average', 'Proficiency level']);
+
+            foreach ($sections as $row) {
+                $section = $row['section'];
+                foreach ($row['students'] as $student) {
+                    $writeRow([
+                        $section->name,
+                        $section->gradeLevel?->grade_label ?? $section->grade_level,
+                        $section->academicYear?->school_year ?? 'N/A',
+                        $subject->code.' - '.$subject->title,
+                        $row['teacher_name'],
+                        $student['name'],
+                        $student['lrn'],
+                        $student['subject_average'] !== null ? number_format($student['subject_average'], 0) : '',
+                        $student['proficiency']['label'] ?? 'Pending Grades',
+                    ]);
+                }
+            }
+
+            fclose($output);
+        }, 'student-proficiency-'.now()->format('Y-m-d').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 
@@ -348,6 +410,7 @@ class PrincipalDashboardController extends Controller
         return view('users.guidance.reports.age-for-grade', [
             'layout' => 'users.principal.layout',
             'reportRoute' => 'principal.reports.age-for-grade',
+            'recommendationsDownloadRoute' => 'principal.reports.placement-test-recommendations.download',
             'showEnrollmentAction' => false,
             'activeYear' => $activeYear,
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),
@@ -402,14 +465,16 @@ class PrincipalDashboardController extends Controller
                     $periodValues[$period['key']] = $value !== null ? number_format((float) $value, 2) : '-';
                 }
 
+                $average = count($values) ? round(array_sum($values) / count($values), 2) : null;
+
                 return [
                     'name' => $application
                         ? trim($application->last_name.', '.$application->first_name.' '.$application->middle_name)
                         : ($student?->name ?? 'N/A'),
                     'lrn' => $student?->lrn ?? 'N/A',
                     'period_values' => $periodValues,
-                    'average' => count($values) ? round(array_sum($values) / count($values), 2) : null,
-                    'remarks' => $grades->pluck('remarks')->filter()->unique()->implode(', '),
+                    'average' => $average,
+                    'remarks' => $average === null ? '' : ($average >= 75 ? 'Passed' : 'Failed'),
                 ];
             })
             ->sortBy('name')
@@ -493,7 +558,7 @@ class PrincipalDashboardController extends Controller
     }
 
     /**
-     * @param  array{subject_id: ?int, academic_year_id: ?int, grade_level: ?int, term_id: ?int, semester: ?string, search: string}  $filters
+     * @param  array{subject_id: ?int, academic_year_id: ?int, grade_level: ?int, term_id: ?int, semester: ?string, search: string, status: string}  $filters
      */
     private function gradeReleaseAssignments(array $filters): Collection
     {
@@ -505,13 +570,13 @@ class PrincipalDashboardController extends Controller
                 'curriculumSubject.curriculumGradeLevel.gradingSemester',
                 'staff',
                 'grades' => function ($query) use ($filters): void {
-                    $query->whereStatus([GradeStatus::APPROVED, GradeStatus::RELEASED])
+                    $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
                         ->when($filters['term_id'], fn ($gradeQuery) => $gradeQuery->where('term_ID', $filters['term_id']))
                         ->with(['gradeStatus', 'term']);
                 },
             ])
             ->whereHas('grades', function ($query) use ($filters): void {
-                $query->whereStatus([GradeStatus::APPROVED, GradeStatus::RELEASED])
+                $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
                     ->when($filters['term_id'], fn ($gradeQuery) => $gradeQuery->where('term_ID', $filters['term_id']));
             })
             ->when($filters['subject_id'], fn ($query) => $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $filters['subject_id'])))
