@@ -14,10 +14,14 @@
         aria-label="Profile menu"
         data-test="staff-profile-menu"
     >
-        <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+        <span class="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white/15">
+            @if ($profileUser?->photoUrl())
+                <img src="{{ $profileUser->photoUrl() }}" alt="Profile photo" class="h-full w-full object-cover" data-test="staff-profile-photo">
+            @else
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
+            @endif
         </span>
     </summary>
 
@@ -27,6 +31,13 @@
             <p class="mt-0.5 text-xs text-gray-500">{{ $profileUser?->employee_no ? 'Employee No. '.$profileUser->employee_no : $profileUser?->username }}</p>
         </div>
         <div class="p-2">
+            <a href="{{ route('staff.account') }}" role="menuitem" class="inline-flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#296374] transition hover:bg-gray-50" data-test="staff-account-link">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0H5z" />
+                </svg>
+                View / Edit Profile
+            </a>
+
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
                 <button type="submit" class="inline-flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50" data-test="staff-logout-button">

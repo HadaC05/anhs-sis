@@ -45,6 +45,7 @@ class Staff extends Authenticatable
         'birthdate',
         'email',
         'mobile_no',
+        'photo_path',
         'employee_no',
         'plantilla_item_no',
         'appointment_status',
@@ -93,6 +94,11 @@ class Staff extends Authenticatable
     public function initials(): string
     {
         return strtoupper(substr($this->first_name ?: $this->username ?: 'U', 0, 1));
+    }
+
+    public function photoUrl(): ?string
+    {
+        return $this->photo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->photo_path) : null;
     }
 
     public function getStaffAttribute(): self

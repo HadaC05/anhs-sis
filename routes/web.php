@@ -18,6 +18,7 @@ use App\Http\Controllers\Guidance\GuidanceDashboardController;
 use App\Http\Controllers\Guidance\GuidanceEnrollmentController;
 use App\Http\Controllers\Principal\PrincipalDashboardController;
 use App\Http\Controllers\Registrar\RegistrarDashboardController;
+use App\Http\Controllers\StaffAccountController;
 use App\Http\Controllers\Student\StudentAccountController;
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
@@ -47,6 +48,10 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
+    Route::get('/staff/account', [StaffAccountController::class, 'edit'])->name('staff.account');
+    Route::put('/staff/account', [StaffAccountController::class, 'update'])->name('staff.account.update');
+    Route::put('/staff/account/password', [StaffAccountController::class, 'updatePassword'])->name('staff.account.password');
+
     Route::get('dashboard', function () {
         $user = Auth::user();
 

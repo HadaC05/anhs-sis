@@ -50,7 +50,9 @@ return new class extends Migration
             ->first(fn (array $foreignKey): bool => in_array($column, $foreignKey['columns'], true));
 
         if ($foreignKey) {
-            Schema::table('student_subject_grades', fn (Blueprint $table) => $table->dropForeign($foreignKey['name']));
+            Schema::table('student_subject_grades', fn (Blueprint $table) => $table->dropForeign(
+                DB::getDriverName() === 'sqlite' ? $foreignKey['columns'] : $foreignKey['name']
+            ));
         }
     }
 };

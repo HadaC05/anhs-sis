@@ -292,6 +292,9 @@
                 Enrollment Submitted Successfully
             </h2>
             <p class="mt-3 text-sm leading-6 text-gray-600 md:text-base">
+                An email has been sent to the email address you provided.
+            </p>
+            <p class="mt-3 text-sm leading-6 text-gray-600 md:text-base">
                 {{ session('status', 'Use Check Enrollment Status for updates on your application.') }}
             </p>
 

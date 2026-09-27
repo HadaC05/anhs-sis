@@ -20,7 +20,7 @@
             @php $student = $enrollment->student; $name = $student?->application ? trim($student->application->last_name.', '.$student->application->first_name) : ($student?->name ?? 'Learner'); @endphp
             <tr>
                 <td class="px-5 py-4 font-semibold text-gray-800">{{ $name }}<div class="mt-1 text-xs font-normal text-gray-500">{{ $student?->lrn }}</div></td>
-                <td class="px-5 py-4 text-gray-600">{{ $enrollment->gradeLevel?->grade_label }} · {{ $enrollment->academicYear?->school_year }}</td>
+                <td class="px-5 py-4 text-gray-600">{{ $enrollment->getRelation('gradeLevel')?->grade_label }} · {{ $enrollment->academicYear?->school_year }}</td>
                 <td class="px-5 py-4"><form method="POST" action="{{ route('guidance.promotions.confirm', $enrollment) }}" class="flex gap-2">@csrf<select name="SY_ID" required class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"> <option value="">Next school year</option>@foreach($academicYears as $year)<option value="{{ $year->SY_ID }}">{{ $year->school_year }}</option>@endforeach</select><button class="rounded-lg bg-[#296374] px-3 py-1.5 text-xs font-bold text-white">Confirm</button></form></td>
             </tr>
         @empty
