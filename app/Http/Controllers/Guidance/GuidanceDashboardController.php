@@ -28,7 +28,7 @@ use App\Notifications\DocumentStatusUpdated;
 use App\Support\EnrollmentDashboardData;
 use App\Support\EnrollmentDocumentCompletion;
 use App\Support\PlacementAssessmentAdvisor;
-use App\Support\PromotionEligibility;
+use App\Support\PromotionRegistrar;
 use App\Support\StudentAccountProvisioner;
 use App\Support\StudentEnrollmentNotifier;
 use App\Support\StudentPlacementTestNotifier;
@@ -45,52 +45,77 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GuidanceDashboardController extends Controller
 {
-    public function promotions(): View
+    public function promotions(Request $request): View
     {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:200'],
+            'grade_level' => ['nullable', 'integer', Rule::exists(GradeLevel::class, 'grade_ID')],
+            'eligibility' => ['nullable', Rule::in(['all', PromotionStatus::ELIGIBLE, PromotionStatus::PENDING, PromotionStatus::RETAINED])],
+            'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
+        ]);
+        $eligibility = $filters['eligibility'] ?? PromotionStatus::ELIGIBLE;
+        $query = Enrollment::query()
+            ->with(['student.application', 'gradeLevel', 'academicYear', 'promotionStatus'])
+            ->when($eligibility !== 'all', fn ($query) => $query->where('promotion_status_ID', PromotionStatus::idFor($eligibility)))
+            ->when($filters['grade_level'] ?? null, fn ($query, $grade) => $query->whereHas('curriculumGradeLevel', fn ($query) => $query->where('grade_ID', $grade)))
+            ->when($filters['academic_year_id'] ?? null, fn ($query, $year) => $query->where('SY_ID', $year));
+
+        foreach (preg_split('/[\s,]+/', trim($filters['search'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $term) {
+            $query->whereHas('student', function ($query) use ($term): void {
+                $query->where(function ($query) use ($term): void {
+                    $like = '%'.$term.'%';
+                    $query->where('lrn', 'like', $like)
+                        ->orWhere('first_name', 'like', $like)
+                        ->orWhere('middle_name', 'like', $like)
+                        ->orWhere('last_name', 'like', $like)
+                        ->orWhereHas('application', fn ($query) => $query
+                            ->where('first_name', 'like', $like)
+                            ->orWhere('middle_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like));
+                });
+            });
+        }
+
         return view('users.guidance.promotions.index', [
-            'enrollments' => Enrollment::query()
-                ->with(['student.application', 'gradeLevel', 'academicYear', 'promotionStatus'])
-                ->where('promotion_status_ID', PromotionStatus::idFor(PromotionStatus::ELIGIBLE))
-                ->latest('SY_ID')
-                ->get(),
-            'academicYears' => AcademicYear::query()->orderBy('start_date')->get(),
+            'enrollments' => $query->latest('SY_ID')->orderBy('enrollment_ID')->paginate(15)->withQueryString(),
+            'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
+            'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),
+            'eligibility' => $eligibility,
         ]);
     }
 
-    public function confirmPromotion(Request $request, Enrollment $enrollment): RedirectResponse
+    public function bulkPromote(Request $request): RedirectResponse
     {
-        $validated = $request->validate(['SY_ID' => ['required', 'integer', 'exists:academic_years,SY_ID']]);
-        $enrollment->loadMissing('academicYear');
-        $evaluation = PromotionEligibility::evaluate($enrollment);
-        $enrollment->update(['promotion_status' => $evaluation['status']]);
+        $validated = $request->validate([
+            'enrollment_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'enrollment_ids.*' => ['required', 'integer', 'distinct', 'exists:enrollments,enrollment_ID'],
+        ]);
+        $enrollments = Enrollment::query()->whereIn('enrollment_ID', $validated['enrollment_ids'])->get();
 
-        if ($evaluation['status'] !== PromotionStatus::ELIGIBLE) {
-            return back()->withErrors(['promotion' => 'This learner is no longer eligible: '.$evaluation['reason']]);
-        }
+        DB::transaction(function () use ($enrollments): void {
+            foreach ($enrollments as $enrollment) {
+                try {
+                    PromotionRegistrar::promote($enrollment, requireActiveYear: true);
+                } catch (ValidationException $exception) {
+                    throw ValidationException::withMessages([
+                        'promotion' => 'No learners were promoted. '.($exception->errors()['promotion'][0] ?? 'A selected learner could not be promoted.').' Review your selection and try again.',
+                    ]);
+                }
+            }
+        });
 
-        $targetYear = AcademicYear::query()->findOrFail($validated['SY_ID']);
-        if ($targetYear->start_date->lessThanOrEqualTo($enrollment->academicYear?->start_date)) {
-            return back()->withErrors(['promotion' => 'Select a school year after the learner’s current enrollment.']);
-        }
+        return back()->with('status', $enrollments->count().' selected learner(s) promoted to the next active school year.');
+    }
 
-        $nextGrade = GradeLevel::query()->where('grade_ID', '>', $enrollment->grade_ID)->orderBy('grade_ID')->first();
-        if (! $nextGrade) {
-            return back()->withErrors(['promotion' => 'Grade 12 completers cannot be promoted to another grade level.']);
-        }
-
-        $nextEnrollment = DB::transaction(fn (): Enrollment => Enrollment::query()->firstOrCreate(
-            ['student_ID' => $enrollment->student_ID, 'SY_ID' => $targetYear->SY_ID],
-            [
-                'grade_ID' => $nextGrade->grade_ID,
-                'semester' => null,
-                'learner_type' => LearnerType::REGULAR,
-                'enrollment_status' => EnrollmentStatus::PENDING,
-                'promotion_status' => PromotionStatus::PENDING,
-            ],
-        ));
+    public function confirmPromotion(Enrollment $enrollment): RedirectResponse
+    {
+        $nextEnrollment = DB::transaction(
+            fn (): Enrollment => PromotionRegistrar::promote($enrollment, requireActiveYear: true),
+        );
+        $nextGradeLabel = $nextEnrollment->gradeLevel()->value('grade_label') ?? 'next-grade';
 
         return redirect()->route('guidance.enrollments.show', $nextEnrollment)
-            ->with('status', 'Promotion confirmed. A pending enrollment for '.$nextGrade->grade_label.' was created; assign the learner to a section to finish enrollment.');
+            ->with('status', "Promotion confirmed. A pending {$nextGradeLabel} enrollment was created for {$nextEnrollment->academicYear?->school_year}; assign the learner to a section to finish enrollment.");
     }
 
     public function index(Request $request): View

@@ -251,6 +251,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/guidance/promotions', [GuidanceDashboardController::class, 'promotions'])
         ->middleware('guidance')
         ->name('guidance.promotions.index');
+    Route::post('/guidance/promotions/bulk', [GuidanceDashboardController::class, 'bulkPromote'])
+        ->middleware('guidance')
+        ->name('guidance.promotions.bulk');
     Route::post('/guidance/promotions/{enrollment}/confirm', [GuidanceDashboardController::class, 'confirmPromotion'])
         ->middleware('guidance')
         ->name('guidance.promotions.confirm');

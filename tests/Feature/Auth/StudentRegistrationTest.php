@@ -63,6 +63,35 @@ function studentRegistrationPayload(array $overrides = []): array
     ], $overrides);
 }
 
+test('registration preserves manually entered postal codes for separate addresses', function () {
+    ['gradeLevel' => $gradeLevel] = createStudentRegistrationFixtures();
+    $activeStatus = \App\Models\DataStatus::query()->where('key', 'active')->value('data_status_ID');
+    $curricula = \App\Models\Curricula::query()->create(['name' => 'Junior High School', 'data_status_ID' => $activeStatus]);
+    \App\Models\Curriculum::query()->create([
+        'name' => 'Grade 7',
+        'data_status_ID' => $activeStatus,
+        'curricula_ID' => $curricula->curricula_ID,
+        'grade_ID' => $gradeLevel->grade_ID,
+        'semester_ID' => \App\Models\GradingSemester::query()->where('key', 'full_year')->value('semester_ID'),
+    ]);
+
+    $response = $this->post(route('register.store'), studentRegistrationPayload([
+        'same_address' => '0',
+        'curr_municipality_city' => 'Carmen',
+        'curr_barangay' => 'Poblacion',
+        'curr_zip_code' => '8603',
+        'perm_municipality_city' => 'Carmen',
+        'perm_province' => 'Cebu',
+        'perm_barangay' => 'Poblacion',
+        'perm_zip_code' => '6005',
+    ]));
+
+    $response->assertSessionHasNoErrors();
+    $student = Student::query()->where('lrn', '123456789012')->firstOrFail();
+    $this->assertDatabaseHas('student_addresses', ['student_ID' => $student->id, 'address_type' => 'current', 'zip_code' => '8603']);
+    $this->assertDatabaseHas('student_addresses', ['student_ID' => $student->id, 'address_type' => 'permanent', 'zip_code' => '6005']);
+});
+
 test('registration form uses educational background for last school attended', function () {
     createStudentRegistrationFixtures();
 

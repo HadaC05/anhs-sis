@@ -218,6 +218,26 @@ test('student can update profile details except name', function () {
     expect($father?->suffix)->toBe('Jr.');
 });
 
+test('profile saves a manually corrected postal code and copies it to the permanent address', function () {
+    $student = createStudentProfileUser();
+    $this->actingAs($student)->put(route('student.profile.update'), studentProfilePayload([
+        'curr_municipality_city' => 'Carmen',
+        'curr_barangay' => 'Poblacion',
+        'curr_zip_code' => '8603',
+        'perm_zip_code' => '6005',
+        'same_address' => '1',
+    ]))->assertSessionHasNoErrors();
+
+    foreach (['current', 'permanent'] as $type) {
+        $this->assertDatabaseHas('student_addresses', [
+            'student_ID' => $student->id,
+            'address_type' => $type,
+            'municipality' => 'Carmen',
+            'zip_code' => '8603',
+        ]);
+    }
+});
+
 test('student profile update rejects text that contains angle brackets', function () {
     $student = createStudentProfileUser();
 

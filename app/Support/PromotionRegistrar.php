@@ -18,7 +18,7 @@ class PromotionRegistrar
      * Create the learner's pending enrollment for the next grade and school year.
      * Existing future enrollments are returned unchanged, making promotion idempotent.
      */
-    public static function promote(Enrollment $enrollment): Enrollment
+    public static function promote(Enrollment $enrollment, bool $requireActiveYear = false): Enrollment
     {
         $enrollment->loadMissing(['academicYear', 'section.gradeLevel', 'curriculumGradeLevel']);
         $evaluation = PromotionEligibility::evaluate($enrollment);
@@ -39,12 +39,15 @@ class PromotionRegistrar
         }
 
         $targetYear = AcademicYear::query()
+            ->when($requireActiveYear, fn ($query) => $query->where('status', true))
             ->whereDate('start_date', '>', $enrollment->academicYear?->start_date)
             ->orderBy('start_date')
             ->first();
         if (! $targetYear) {
             throw ValidationException::withMessages([
-                'promotion' => 'Configure the next school year before promoting this learner.',
+                'promotion' => $requireActiveYear
+                    ? "Activate a school year after the learner's current school year before promoting this learner."
+                    : 'Configure the next school year before promoting this learner.',
             ]);
         }
 

@@ -17,14 +17,14 @@
 @endphp
 
 <div class="space-y-5">
-    @if ($errors->any())
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {{ $errors->first() }}
-        </div>
-    @endif
-
-    <div id="student-documents-client-error" hidden class="hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        <p id="student-documents-client-error-text"></p>
+    <div id="student-documents-client-error" role="alert" aria-live="assertive" aria-atomic="true" @if (! $errors->any()) hidden @endif class="{{ $errors->any() ? 'flex' : 'hidden' }} fixed right-4 top-24 z-[120] w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border border-red-200 bg-white p-4 text-sm font-semibold text-red-800 shadow-xl sm:right-5">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <p id="student-documents-client-error-text">{{ $errors->first() }}</p>
+        <button type="button" data-dismiss-documents-error class="ml-auto -mr-1 -mt-1 rounded p-1 text-red-700/70 transition hover:bg-red-50 hover:text-red-800" aria-label="Close notification">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
     </div>
 
     @include('users.student.partials.enrollment-summary', [
@@ -320,21 +320,32 @@
             documentLayoutMedia.addListener(syncActiveDocumentInputs);
         }
 
+        let errorToastTimer;
         const showError = (message) => {
             if (errorBox && errorText) {
+                dismissSuccessToast();
                 errorText.textContent = message;
                 errorBox.hidden = false;
                 errorBox.classList.remove('hidden');
-                errorBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                errorBox.classList.add('flex');
+                window.clearTimeout(errorToastTimer);
+                errorToastTimer = window.setTimeout(hideError, 6000);
             }
         };
 
         const hideError = () => {
+            window.clearTimeout(errorToastTimer);
             if (errorBox) {
+                errorBox.classList.remove('flex');
                 errorBox.classList.add('hidden');
                 errorBox.hidden = true;
             }
         };
+
+        errorBox?.querySelector('[data-dismiss-documents-error]')?.addEventListener('click', hideError);
+        if (errorBox && !errorBox.hidden) {
+            showError(errorText.textContent);
+        }
 
         const fileIsTooLarge = (file) => file && file.size > maxBytes;
 

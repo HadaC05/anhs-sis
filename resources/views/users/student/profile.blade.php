@@ -221,7 +221,8 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Zip Code {!! $requiredMark !!}</label>
-                                <input type="text" name="curr_zip_code" value="{{ old('curr_zip_code', $currentAddress?->zip_code) }}" placeholder="Auto-generated" readonly required class="{{ $fieldClass }}">
+                                <input type="text" name="curr_zip_code" value="{{ old('curr_zip_code', $currentAddress?->zip_code) }}" placeholder="Enter ZIP code" required class="{{ $fieldClass }}">
+                                <p class="mt-1 text-xs text-gray-500">Suggested when available. Verify or enter the ZIP code for your postal area.</p>
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">House No. {!! $optionalMark !!}</label>
@@ -260,7 +261,8 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Zip Code {!! $requiredMark !!}</label>
-                                <input type="text" name="perm_zip_code" value="{{ old('perm_zip_code', $permanentAddress?->zip_code) }}" placeholder="Auto-generated" readonly required class="{{ $fieldClass }}" data-perm-field>
+                                <input type="text" name="perm_zip_code" value="{{ old('perm_zip_code', $permanentAddress?->zip_code) }}" placeholder="Enter ZIP code" required class="{{ $fieldClass }}" data-perm-field>
+                                <p class="mt-1 text-xs text-gray-500">Suggested when available. Verify or enter the ZIP code for your postal area.</p>
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">House No. {!! $optionalMark !!}</label>
@@ -402,6 +404,7 @@
 </div>
 
 @if ($student)
+<script src="{{ asset('js/student-postal.js') }}"></script>
 <script>
     (function () {
         const successToast = document.getElementById('studentProfileSuccessToast');
@@ -492,7 +495,6 @@
             provinces: [],
             municipalities: [],
             barangays: [],
-            zipcodes: {},
             zipEntries: [],
         };
 
@@ -718,43 +720,12 @@
             return select.selectedOptions?.[0]?.textContent || '';
         }
 
-        function findZipCode(municipalityName, barangayName) {
-            const municipality = normalizeAddressText(municipalityName);
-            const barangay = normalizeAddressText(barangayName);
-
-            const municipalityMatch = addressData.zipEntries.find((entry) => {
-                return entry.places.some((place) => {
-                    const normalized = normalizeAddressText(place);
-
-                    return normalized === municipality || normalized.includes(municipality) || municipality.includes(normalized);
-                });
-            });
-
-            if (municipalityMatch) {
-                return municipalityMatch.zip;
-            }
-
-            if (!barangay) {
-                return '';
-            }
-
-            const barangayMatch = addressData.zipEntries.find((entry) => {
-                return entry.places.some((place) => normalizeAddressText(place).includes(barangay));
-            });
-
-            return barangayMatch?.zip || '';
-        }
-
-        function updateAddressZip(prefix) {
+        function updateAddressZip(prefix, preserveExisting = false) {
             const controls = addressControls[prefix];
-            if (!controls?.zipInput) {
-                return;
-            }
-
-            controls.zipInput.value = findZipCode(
-                controls.municipalityInput?.value,
-                controls.barangayInput?.value
-            ) || controls.zipInput.value;
+            if (!controls?.zipInput) return;
+            StudentPostal.updateZip(controls.zipInput, addressData.zipEntries,
+                controls.provinceInput?.value, controls.municipalityInput?.value,
+                controls.barangayInput?.value, preserveExisting);
         }
 
         function syncAddressValues(prefix) {
@@ -819,7 +790,7 @@
             controls.provinceSelect.value = province?.prov_code || '';
             fillMunicipalities(prefix, controls.municipalityInput?.value || '');
             fillBarangays(prefix, controls.barangayInput?.value || '');
-            updateAddressZip(prefix);
+            updateAddressZip(prefix, true);
         }
 
         function resetAddressBelow(prefix, role) {
@@ -854,7 +825,7 @@
             const isSameAddress = Boolean(sameAddress?.checked);
 
             if (!isSameAddress) {
-                [permanentFields.perm_house_no, permanentFields.perm_street_name].forEach((field) => {
+                [permanentFields.perm_house_no, permanentFields.perm_street_name, permanentFields.perm_zip_code].forEach((field) => {
                     field?.removeAttribute('readonly');
                 });
                 syncAddressSelectsFromValues('perm');
@@ -873,7 +844,7 @@
                 }
             });
 
-            [permanentFields.perm_house_no, permanentFields.perm_street_name].forEach((field) => {
+            [permanentFields.perm_house_no, permanentFields.perm_street_name, permanentFields.perm_zip_code].forEach((field) => {
                 field?.setAttribute('readonly', 'readonly');
             });
             syncAddressSelectsFromValues('perm');
@@ -894,17 +865,16 @@
                     fetch(`${addressDataBaseUrl}/provinces.json`).then((response) => response.json()),
                     fetch(`${addressDataBaseUrl}/city-mun.json`).then((response) => response.json()),
                     fetch(`${addressDataBaseUrl}/barangays.json`).then((response) => response.json()),
-                    fetch(`${addressDataBaseUrl}/zipcodes.json`).then((response) => response.json()),
+                    fetch(@json(asset('data/phlpost/zipcodes.json'))).then((response) => {
+                        if (!response.ok) throw new Error('Postal data unavailable');
+                        return response.json();
+                    }).catch(() => []),
                 ]);
 
                 addressData.provinces = provinces.sort((a, b) => a.name.localeCompare(b.name));
                 addressData.municipalities = municipalities;
                 addressData.barangays = barangays;
-                addressData.zipcodes = zipcodes;
-                addressData.zipEntries = Object.entries(zipcodes).map(([zip, places]) => ({
-                    zip,
-                    places: Array.isArray(places) ? places : [places],
-                }));
+                addressData.zipEntries = Array.isArray(zipcodes) ? zipcodes : [];
 
                 Object.values(addressControls).forEach((controls) => {
                     populateSelect(controls.provinceSelect, 'Select province', addressData.provinces, 'prov_code');
