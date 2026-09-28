@@ -148,6 +148,10 @@ test('advisory class list uploads are queued and then imported by the worker', f
         ->and(Student::query()->where('lrn', '987654321098')->exists())->toBeFalse();
     Queue::assertPushed(ProcessAdvisoryClassListImport::class, fn (ProcessAdvisoryClassListImport $job): bool => $job->importId === $import->id);
 
+    expect(\App\Models\AuditLog::sole()->action)->toBe('Queued');
+    $originalName = $teacher->name;
+    $teacher->update(['first_name' => 'Renamed']);
+
     (new ProcessAdvisoryClassListImport($import->id))->handle(app(\App\Http\Controllers\Teacher\TeacherSectionController::class));
 
     $import->refresh();
@@ -158,6 +162,13 @@ test('advisory class list uploads are queued and then imported by the worker', f
         ->and($import->result['createdEnrollments'])->toBe(1)
         ->and($import->file_contents)->toBeNull()
         ->and(Student::query()->where('lrn', '987654321098')->exists())->toBeTrue();
+    $audit = \App\Models\AuditLog::where('action', 'Imported')->sole();
+    expect($audit->user_name)->toBe($originalName)
+        ->and($audit->user_id)->toBe('staff:'.$teacher->staff_id)
+        ->and($audit->role)->toBe('teacher')
+        ->and($audit->status)->toBe('Success')
+        ->and($audit->reference)->toContain('AdvisoryClassListImport:'.$import->id)
+        ->and($audit->toJson())->not->toContain('987654321098', 'Sample Barangay');
     $student = Student::query()->where('lrn', '987654321098')->firstOrFail();
     expect($student->addresses()->exists())->toBeFalse()
         ->and($student->profile()->exists())->toBeFalse();
@@ -230,6 +241,8 @@ test('worker failure releases an import and preserves its progress', function ()
         'processed_students' => 3,
     ]);
     (new ProcessAdvisoryClassListImport($import->id))->failed(new RuntimeException('Worker timed out'));
+    (new ProcessAdvisoryClassListImport($import->id))->failed(new RuntimeException('Duplicate callback'));
+    expect(\App\Models\AuditLog::where('action', 'Imported')->sole()->status)->toBe('Failed');
     $import->refresh();
     expect($import->status)->toBe('failed')
         ->and($import->processed_students)->toBe(3)

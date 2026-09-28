@@ -499,6 +499,8 @@ class PrincipalDashboardController extends Controller
             ->whereStatus(GradeStatus::APPROVED)
             ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::RELEASED)]);
 
+        request()->attributes->set('audit_description', "Released {$released} approved grade record(s) to students.");
+
         if ($released === 0) {
             return back()->with('status', 'No approved grades were found for release.');
         }
@@ -531,6 +533,8 @@ class PrincipalDashboardController extends Controller
             ->whereIn('assignment_ID', $validated['assignment_ids'])
             ->whereStatus(GradeStatus::APPROVED)
             ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::RELEASED)]);
+
+        $request->attributes->set('audit_description', "Released {$released} approved grade record(s) to students in bulk.");
 
         if ($released > 0) {
             $assignments->each(function (TeacherSubjectAssignment $assignment) use ($studentsByAssignment): void {

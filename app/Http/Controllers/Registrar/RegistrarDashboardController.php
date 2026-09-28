@@ -371,6 +371,8 @@ class RegistrarDashboardController extends Controller
                 'reviewed_at' => now(),
             ]);
 
+        $request->attributes->set('audit_description', "Approved {$approved} submitted grade record(s).");
+
         if ($approved > 0) {
             TeacherGradeNotifier::approved($assignment);
         }
@@ -398,6 +400,8 @@ class RegistrarDashboardController extends Controller
                 'reviewed_at' => now(),
                 'grade_return_reason_ID' => $validated['grade_return_reason_ID'],
             ]);
+
+        $request->attributes->set('audit_description', "Returned {$returned} submitted grade record(s) to the teacher.");
 
         if (! $returned) {
             return redirect()

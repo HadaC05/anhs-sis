@@ -12,6 +12,7 @@ class AdvisoryClassListImport extends Model
     protected $fillable = [
         'section_ID',
         'requested_by',
+        'audit_actor',
         'original_filename',
         'file_contents',
         'status',
@@ -30,6 +31,7 @@ class AdvisoryClassListImport extends Model
     protected function casts(): array
     {
         return [
+            'audit_actor' => 'array',
             'total_students' => 'integer',
             'processed_students' => 'integer',
             'result' => 'array',

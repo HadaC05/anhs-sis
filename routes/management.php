@@ -13,6 +13,8 @@ use App\Http\Controllers\Admin\SubjectConfigurationController;
 use App\Http\Controllers\Admin\TeacherAssignmentController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/audit-trail', [\App\Http\Controllers\AuditTrailController::class, 'index'])->name('audit-trail.index');
+
 Route::get('/school-information', [\App\Http\Controllers\Admin\SchoolInformationController::class, 'edit'])->name('school-information.edit');
 Route::put('/school-information', [\App\Http\Controllers\Admin\SchoolInformationController::class, 'update'])->name('school-information.update');
 

@@ -5,12 +5,15 @@ namespace App\Jobs;
 use App\Http\Controllers\Teacher\TeacherSectionController;
 use App\Models\AdvisoryClassListImport;
 use App\Models\Section;
+use App\Models\Staff;
+use App\Support\AuditTrail;
 use App\Support\ClassListSpreadsheet;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
 
@@ -73,12 +76,26 @@ class ProcessAdvisoryClassListImport implements ShouldQueue
                 },
             );
 
-            $import->update([
-                'status' => 'completed',
-                'result' => $result,
-                'file_contents' => null,
-                'completed_at' => now(),
-            ]);
+            DB::transaction(function () use ($import, $result): void {
+                $import->update([
+                    'status' => 'completed',
+                    'result' => $result,
+                    'file_contents' => null,
+                    'completed_at' => now(),
+                ]);
+                $failed = (int) ($result['failedEnrollments'] ?? 0);
+                $skipped = (int) ($result['skippedStudents'] ?? 0);
+                AuditTrail::record(
+                    $import->audit_actor ?? AuditTrail::actor(Staff::find($import->requested_by)),
+                    'Imported', 'Imports',
+                    'Completed SF1/class list import. Created students: '.(int) ($result['createdStudents'] ?? 0).
+                    '. Updated students: '.(int) ($result['updatedStudents'] ?? 0).
+                    '. Created enrollments: '.(int) ($result['createdEnrollments'] ?? 0).
+                    '. Skipped students: '.$skipped.'. Failed enrollments: '.$failed.'.',
+                    'AdvisoryClassListImport:'.$import->id.'; section:'.$import->section_ID,
+                    $failed > 0 || $skipped > 0 ? 'Partial' : 'Success',
+                );
+            });
         } catch (Throwable $exception) {
             report($exception);
 
@@ -95,13 +112,25 @@ class ProcessAdvisoryClassListImport implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        AdvisoryClassListImport::query()->whereKey($this->importId)
-            ->whereIn('status', ['queued', 'processing'])
-            ->update([
-                'status' => 'failed',
-                'failure_message' => 'The import could not finish. Students already processed are saved. Please upload the file again to finish importing.',
-                'file_contents' => null,
-                'completed_at' => now(),
-            ]);
+        DB::transaction(function (): void {
+            $import = AdvisoryClassListImport::query()->find($this->importId);
+            $updated = AdvisoryClassListImport::query()->whereKey($this->importId)
+                ->whereIn('status', ['queued', 'processing'])
+                ->update([
+                    'status' => 'failed',
+                    'failure_message' => 'The import could not finish. Students already processed are saved. Please upload the file again to finish importing.',
+                    'file_contents' => null,
+                    'completed_at' => now(),
+                ]);
+            if ($updated && $import) {
+                AuditTrail::record(
+                    $import->audit_actor ?? AuditTrail::actor(Staff::find($import->requested_by)),
+                    'Imported', 'Imports',
+                    'SF1/class list import failed. Previously processed students remain saved.',
+                    'AdvisoryClassListImport:'.$import->id.'; section:'.$import->section_ID,
+                    'Failed',
+                );
+            }
+        });
     }
 }

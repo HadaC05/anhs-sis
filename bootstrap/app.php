@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             PreventBackHistory::class,
             EnsureAccountIsActive::class,
+            \App\Http\Middleware\RecordAuditTrail::class,
         ]);
 
         $middleware->alias([

@@ -53,6 +53,7 @@ class SectionStudentImport
         $import = AdvisoryClassListImport::query()->create([
             'section_ID' => $section->section_ID,
             'requested_by' => $staffId,
+            'audit_actor' => AuditTrail::actor($request->user()),
             'original_filename' => $file->getClientOriginalName(),
             // The worker is a separate service in production, so keep this
             // temporary payload in the shared database rather than local disk.

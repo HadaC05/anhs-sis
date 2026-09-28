@@ -31,6 +31,13 @@ class AppServiceProvider extends ServiceProvider
     {
         Auth::provider('merged_users', fn () => new MergedUserProvider);
 
+        foreach (['created', 'updated', 'deleted'] as $event) {
+            \Illuminate\Support\Facades\Event::listen('eloquent.'.$event.': *', [\App\Support\AuditTrail::class, 'captureReference']);
+        }
+        foreach ([\Illuminate\Database\Events\TransactionBeginning::class, \Illuminate\Database\Events\TransactionCommitted::class, \Illuminate\Database\Events\TransactionRolledBack::class] as $event) {
+            \Illuminate\Support\Facades\Event::listen($event, [\App\Support\AuditTrail::class, 'transactionChanged']);
+        }
+
         $this->configureHttps();
         $this->configureDefaults();
         $this->configureMail();
