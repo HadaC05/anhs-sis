@@ -20,11 +20,11 @@ test('principal management pages use principal navigation and actions', function
     $this->actingAs($this->principal)->get(route('principal.'.$page))
         ->assertOk()
         ->assertSee('id="principal-sidebar"', false)
-        ->assertSeeInOrder(['>Grades</p>', '>Manage</p>', '>Reports</p>'], false)
+        ->assertSeeInOrder(['>Academic Records</p>', '>Manage</p>', '>Reports</p>'], false)
         ->assertSee(route('principal.users'), false)
         ->assertDontSee('/admin/', false);
 })->with([
-    'users', 'academic-year-config.index', 'attendance-config.index',
+    'users', 'promotions.index', 'academic-year-config.index', 'attendance-config.index',
     'section-config.index', 'grading-term-config.index', 'movement-reason-config.index',
     'document-return-reason-config.index', 'curriculum-config.index',
     'subject-config.index', 'teacher-assignments.index',

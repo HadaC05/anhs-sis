@@ -7,11 +7,10 @@ use App\Http\Requests\Admin\StoreAcademicYearRequest;
 use App\Models\AcademicYear;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class AcademicYearConfigurationController extends Controller
 {
-    public function index(Request $request): View
+    public function pageData(Request $request): array
     {
         $perPage = (int) $request->integer('per_page', 10);
         if (! in_array($perPage, [5, 10, 15, 25, 50], true)) {
@@ -32,12 +31,13 @@ class AcademicYearConfigurationController extends Controller
             ->orderByDesc('start_date')
             ->orderByDesc('SY_ID')
             ->paginate($perPage)
+            ->withPath(route(($request->routeIs('principal.*') ? 'principal.' : 'admin.').'academic-year-config.index'))
             ->withQueryString();
 
         $totalYears = AcademicYear::query()->count();
         $activeCount = AcademicYear::query()->where('status', true)->count();
 
-        return view('users.admin.academic-year-config', [
+        return [
             'academicYears' => $academicYears,
             'perPage' => $perPage,
             'totalYears' => $totalYears,
@@ -48,7 +48,7 @@ class AcademicYearConfigurationController extends Controller
                 ->orderByDesc('start_date')
                 ->orderByDesc('SY_ID')
                 ->first(),
-        ]);
+        ];
     }
 
     public function store(StoreAcademicYearRequest $request): RedirectResponse

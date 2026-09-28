@@ -27,10 +27,17 @@ class PrincipalDashboardController extends Controller
     public function index(Request $request): View
     {
         $dashboardData = EnrollmentDashboardData::forRequest($request);
+        $seniorHighPeriod = GradingTerm::currentSeniorHighPeriod();
 
         return view('users.principal.dashboard', array_merge(
             $dashboardData,
-            $this->proficiencyDashboardData($request, $dashboardData['activeYear'] ?? null)
+            $this->proficiencyDashboardData($request, $dashboardData['activeYear'] ?? null),
+            ['openGradingPeriods' => [
+                'Junior High School' => GradingTerm::currentEditablePeriodLabel(),
+                'Senior High School' => ($seniorHighPeriod['is_open'] ?? false)
+                    ? $seniorHighPeriod['label']
+                    : null,
+            ]]
         ));
     }
 

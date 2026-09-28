@@ -223,7 +223,7 @@ class StudentSubjectGrade extends Model
         $period = $periodKey && str_starts_with($periodKey, 'shs_')
             ? GradingTerm::findSeniorHighPeriodByKey($periodKey)
             : null;
-        $termId = $period['term_ID'] ?? ($periodKey ? GradingTerm::query()->where('key', $periodKey)->value('term_ID') : null);
+        $termId = $period['term_ID'] ?? ($periodKey ? GradingTerm::query()->juniorHigh()->where('key', $periodKey)->value('term_ID') : null);
 
         return $termId ? (int) $termId : null;
     }

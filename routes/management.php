@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AcademicSetupController;
 use App\Http\Controllers\Admin\AcademicYearConfigurationController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AttendanceConfigurationController;
@@ -24,7 +25,7 @@ Route::put('/users/{user}', [AdminUserController::class, 'update'])
 Route::patch('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])
     ->name('users.toggle-status');
 
-Route::get('/academic-year-configuration', [AcademicYearConfigurationController::class, 'index'])
+Route::get('/academic-year-configuration', [AcademicSetupController::class, 'index'])
     ->name('academic-year-config.index');
 Route::post('/academic-year-configuration', [AcademicYearConfigurationController::class, 'store'])
     ->name('academic-year-config.store');
@@ -36,7 +37,7 @@ Route::get('/attendance-configuration', [AttendanceConfigurationController::clas
     ->name('attendance-config.index');
 Route::put('/attendance-configuration', [AttendanceConfigurationController::class, 'update'])
     ->name('attendance-config.update');
-Route::get('/grading-term-configuration', [GradingTermConfigurationController::class, 'index'])
+Route::get('/grading-term-configuration', [AcademicSetupController::class, 'index'])
     ->name('grading-term-config.index');
 Route::post('/grading-term-configuration', [GradingTermConfigurationController::class, 'store'])
     ->name('grading-term-config.store');
@@ -48,10 +49,16 @@ Route::put('/grading-term-configuration/junior-high/close-all', [GradingTermConf
     ->name('grading-term-config.junior-high.close-all');
 Route::put('/grading-term-configuration/senior-high', [GradingTermConfigurationController::class, 'updateSeniorHigh'])
     ->name('grading-term-config.senior-high.update');
+Route::post('/grading-term-configuration/senior-high/terms', [GradingTermConfigurationController::class, 'storeSeniorHigh'])
+    ->name('grading-term-config.senior-high.store');
+Route::put('/grading-term-configuration/senior-high/settings', [GradingTermConfigurationController::class, 'updateSeniorHighSettings'])
+    ->name('grading-term-config.senior-high.settings.update');
 Route::put('/grading-term-configuration/senior-high/semester', [GradingTermConfigurationController::class, 'updateSeniorHighSemester'])
     ->name('grading-term-config.senior-high.semester.update');
 Route::put('/grading-term-configuration/senior-high/semester/{semester}/close', [GradingTermConfigurationController::class, 'closeSeniorHighSemester'])
     ->name('grading-term-config.senior-high.semester.close');
+Route::put('/grading-term-configuration/senior-high/semester/{semester}/status', [GradingTermConfigurationController::class, 'updateSeniorHighSemesterStatus'])
+    ->name('grading-term-config.senior-high.semester.status');
 Route::put('/grading-term-configuration/senior-high/term', [GradingTermConfigurationController::class, 'updateSeniorHighTerm'])
     ->name('grading-term-config.senior-high.term.update');
 Route::put('/grading-term-configuration/{term}/junior-high-status', [GradingTermConfigurationController::class, 'updateJuniorHighStatus'])

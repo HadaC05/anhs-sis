@@ -41,7 +41,7 @@ test('admin can view the restyled academic year page', function () {
     $response->assertSee('2026-2027');
     $response->assertSee('2025-2026');
     $response->assertSee('Current school year');
-    $response->assertSee('>Academic Year</span>', false);
+    $response->assertSee('>Academic Setup</span>', false);
     $response->assertSee('min="'.AcademicYear::EARLIEST_DATE.'"', false);
     $response->assertSee('max="'.AcademicYear::LATEST_DATE.'"', false);
     $response->assertSee('id="academicYearModal"', false);

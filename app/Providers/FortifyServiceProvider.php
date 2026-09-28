@@ -53,8 +53,8 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureViews(): void
     {
         Fortify::loginView(function (Request $request) {
-            $first = random_int(1, 9);
-            $second = random_int(1, 9);
+            $first = random_int(1, 99);
+            $second = random_int(1, 100 - $first);
             $limiter = app(FortifyLoginRateLimiter::class);
 
             session(['login_captcha_answer' => $first + $second]);

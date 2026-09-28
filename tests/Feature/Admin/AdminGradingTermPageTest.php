@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\GradingSemester;
 use App\Models\GradingPeriodStatus;
+use App\Models\GradingSemester;
 use App\Models\GradingTerm;
 use App\Models\GradingTermSetting;
 use App\Models\Role;
@@ -241,17 +241,17 @@ test('admin can view the senior high school grading tab', function () {
     $response->assertSee('Senior High School');
     $response->assertSee('Current Semester');
     $response->assertSee('Current Term');
-    $response->assertSee('Current Period');
+    $response->assertDontSee('Current Period');
     $response->assertSee('First Semester');
     $response->assertSee('Second Semester');
     $response->assertSee('Term 1');
     $response->assertSee('Term 2');
     $response->assertSee('Term 3');
-    $response->assertSee('Active Semester');
+    $response->assertSee('>Semester</h2>', false);
     $response->assertSee('Term Status');
     $response->assertSee('Active semester');
     $response->assertSee('Active term');
-    $response->assertSee('Set Active');
+    $response->assertSee('Change status');
     $response->assertSee('Maximum Terms');
     $response->assertDontSee('Current Quarter');
     $response->assertDontSee('Quarter 1');
@@ -262,7 +262,7 @@ test('admin can view the senior high school grading tab', function () {
 test('admin can set senior high semester and term independently from their lookup tables', function () {
     $admin = createGradingTermAdmin('admin.grading.shs.separate');
     $secondSemester = GradingSemester::query()->where('key', 'second')->firstOrFail();
-    $secondTerm = GradingTerm::query()->where('key', 'term_2')->firstOrFail();
+    $secondTerm = GradingTerm::query()->seniorHigh()->where('key', 'term_2')->firstOrFail();
 
     $this->actingAs($admin)
         ->from(route('admin.grading-term-config.index', ['tab' => 'senior_high']))
@@ -357,4 +357,148 @@ test('setting an invalid senior high period is rejected', function () {
 
     expect(GradingTermSetting::current()->seniorHighSemester())->toBe('first')
         ->and(GradingTermSetting::current()->seniorHighTerm())->toBe(1);
+});
+
+test('senior high maximum is independent and extra periods keep semester order', function () {
+    $admin = createGradingTermAdmin('admin.shs.maximum');
+    $before = GradingTerm::query()->pluck('junior_high_grading_period_status_ID', 'term_ID')->all();
+    $this->actingAs($admin)->from(route('admin.grading-term-config.index'))
+        ->put(route('admin.grading-term-config.senior-high.settings.update'), ['senior_high_max_terms' => 4])
+        ->assertSessionHasNoErrors()->assertSessionHas('success');
+    expect(GradingTermSetting::current()->max_terms)->toBe(4)
+        ->and(GradingTermSetting::current()->senior_high_max_terms)->toBe(4)
+        ->and(GradingTerm::query()->pluck('junior_high_grading_period_status_ID', 'term_ID')->all())->toBe($before)
+        ->and(GradingTerm::seniorHighPeriodPosition('second', 1))->toBe(5)
+        ->and(GradingTerm::findSeniorHighPeriodByKey('shs_sem1_term_4')['term'])->toBe(4);
+    $term = GradingTerm::query()->seniorHigh()->where('key', 'term_4')->firstOrFail();
+    $this->put(route('admin.grading-term-config.senior-high-status.update', $term), ['status' => 'open'])->assertSessionHasNoErrors();
+    expect(GradingTerm::currentSeniorHighPeriodKey())->toBe('shs_sem1_term_4')
+        ->and(GradingTerm::lockedSeniorHighPeriodKeys())->toBe(['shs_sem1_term_1', 'shs_sem1_term_2', 'shs_sem1_term_3']);
+    $this->put(route('admin.grading-term-config.senior-high.settings.update'), ['senior_high_max_terms' => 3])
+        ->assertSessionHasErrors('senior_high_max_terms');
+    expect(GradingTermSetting::current()->senior_high_max_terms)->toBe(4);
+});
+
+test('adding a senior high term preserves junior high and starts archived', function () {
+    $admin = createGradingTermAdmin('admin.shs.add');
+    $before = GradingTerm::configuredPeriods();
+    $this->actingAs($admin)->from(route('admin.grading-term-config.index'))
+        ->post(route('admin.grading-term-config.senior-high.store'), ['label' => 'Term 5'])
+        ->assertSessionHasNoErrors()->assertSessionHas('success');
+    $term = GradingTerm::query()->where('label', 'Term 5')->firstOrFail();
+    expect($term->junior_high_grading_period_status_ID)->toBeNull()->and($term->isSeniorHighArchived())->toBeTrue()
+        ->and(GradingTerm::configuredPeriods())->toBe($before);
+    $this->put(route('admin.grading-term-config.senior-high-status.update', $term), ['status' => 'open'])
+        ->assertSessionHasErrors('status');
+    $this->put(route('admin.grading-term-config.senior-high.settings.update'), ['senior_high_max_terms' => 5])
+        ->assertSessionHasNoErrors();
+    $this->put(route('admin.grading-term-config.senior-high-status.update', $term), ['status' => 'open'])
+        ->assertSessionHasNoErrors();
+    expect(GradingTerm::currentSeniorHighPeriodKey())->toBe('shs_sem1_term_5')
+        ->and(GradingTerm::configuredPeriods())->toBe($before);
+});
+
+test('senior high maximum rejects unavailable and out of range counts', function (int $maximum) {
+    $admin = createGradingTermAdmin('admin.shs.invalid.maximum');
+    $this->actingAs($admin)->put(route('admin.grading-term-config.senior-high.settings.update'), ['senior_high_max_terms' => $maximum])
+        ->assertSessionHasErrors('senior_high_max_terms');
+    expect(GradingTermSetting::current()->senior_high_max_terms)->toBe(3);
+})->with([1, 5, 13]);
+
+test('school levels keep independent labels keys and statuses', function () {
+    $admin = createGradingTermAdmin('admin.independent.terms');
+    $junior = GradingTerm::query()->juniorHigh()->where('key', 'term_1')->firstOrFail();
+    $senior = GradingTerm::query()->seniorHigh()->where('key', 'term_1')->firstOrFail();
+    expect($junior->term_ID)->not->toBe($senior->term_ID)
+        ->and($junior->senior_high_grading_period_status_ID)->toBeNull()
+        ->and($senior->junior_high_grading_period_status_ID)->toBeNull();
+    $this->actingAs($admin)->put(route('admin.grading-term-config.update', $junior), ['label' => 'Quarter 1', 'sort_order' => 1])
+        ->assertSessionHasNoErrors();
+    expect($senior->fresh()->label)->toBe('Term 1');
+    $this->put(route('admin.grading-term-config.update', $senior), ['label' => 'Quarter 1', 'sort_order' => 1])
+        ->assertSessionHasNoErrors();
+    expect($senior->fresh()->label)->toBe('Quarter 1');
+    $this->put(route('admin.grading-term-config.senior-high-status.update', $junior), ['status' => 'closed'])->assertNotFound();
+    $this->put(route('admin.grading-term-config.junior-high-status.update', $senior), ['status' => 'closed'])->assertNotFound();
+    expect($junior->fresh()->isJuniorHighOpen())->toBeTrue()->and($senior->fresh()->isSeniorHighOpen())->toBeTrue();
+});
+
+test('adding the same named term to each school level creates independent records', function () {
+    $admin = createGradingTermAdmin('admin.independent.add');
+    $this->actingAs($admin)->post(route('admin.grading-term-config.store'), ['label' => 'Term 5'])->assertSessionHasNoErrors();
+    $this->post(route('admin.grading-term-config.senior-high.store'), ['label' => 'Term 5'])->assertSessionHasNoErrors();
+    expect(GradingTerm::query()->where('key', 'term_5')->count())->toBe(2)
+        ->and(GradingTerm::query()->juniorHigh()->where('key', 'term_5')->first()->senior_high_grading_period_status_ID)->toBeNull()
+        ->and(GradingTerm::query()->seniorHigh()->where('key', 'term_5')->first()->junior_high_grading_period_status_ID)->toBeNull();
+});
+
+test('grading closures render modal confirmations and return a single success toast', function () {
+    $admin = createGradingTermAdmin('admin.close.modals');
+    $url = route('admin.grading-term-config.index');
+    $this->actingAs($admin)->get($url)->assertOk()
+        ->assertSee('id="closeGradingConfirmation"', false)
+        ->assertSee('data-confirm-title="Close all Junior High terms?"', false)
+        ->assertSee('data-confirm-title="Close First Semester?"', false)
+        ->assertDontSee("return confirm('Close", false);
+    $this->from($url)->put(route('admin.grading-term-config.junior-high.close-all'))->assertSessionHas('success');
+    $response = $this->get($url)->assertOk()->assertSee('data-test="academic-setup-status"', false);
+    expect(substr_count($response->getContent(), 'data-test="academic-setup-status"'))->toBe(1);
+    expect(GradingTerm::query()->seniorHigh()->where('key', 'term_1')->first()->isSeniorHighOpen())->toBeTrue();
+});
+
+test('opening junior high restores included terms and keeps only the selected term open', function () {
+    $admin = createGradingTermAdmin('admin.jhs.reopen');
+    GradingTermSetting::current()->update(['max_terms' => 3]);
+    GradingTerm::syncActiveStatus();
+    GradingTerm::closeAllJuniorHighTerms();
+    $beforeSenior = GradingTerm::query()->seniorHigh()->pluck('senior_high_grading_period_status_ID', 'term_ID')->all();
+    $term = GradingTerm::query()->juniorHigh()->where('key', 'term_2')->firstOrFail();
+    foreach ([1, 2] as $attempt) {
+        $this->actingAs($admin)->put(route('admin.grading-term-config.junior-high-status.update', $term), ['status' => 'open'])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        expect(GradingTerm::query()->juniorHigh()->orderBy('sort_order')->get()->map(fn ($row) => $row->juniorHighStatus->slug)->all())
+            ->toBe(['active', 'open', 'active', 'archived']);
+    }
+    expect(GradingTerm::query()->seniorHigh()->pluck('senior_high_grading_period_status_ID', 'term_ID')->all())->toBe($beforeSenior);
+});
+
+test('management can reopen a semester and restore its configured terms', function (string $role) {
+    $staff = createGradingTermAdmin('management.shs.reopen');
+    $staff->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    GradingTermSetting::current()->update(['senior_high_max_terms' => 2]);
+    $semester = GradingSemester::query()->where('key', 'first')->firstOrFail();
+    $juniorBefore = GradingTerm::query()->juniorHigh()->pluck('junior_high_grading_period_status_ID', 'term_ID')->all();
+    $url = route($role.'.grading-term-config.senior-high.semester.status', $semester);
+    $this->actingAs($staff)->from(route($role.'.grading-term-config.index'));
+    $this->put($url, ['status' => 'closed'])->assertSessionHas('success');
+    expect(GradingTerm::isCurrentSeniorHighPeriodOpen())->toBeFalse();
+    $this->put($url, ['status' => 'open'])->assertSessionHasNoErrors()->assertSessionHas('success');
+    expect($semester->fresh()->status->slug)->toBe('open')
+        ->and($semester->fresh()->isActive())->toBeTrue()
+        ->and(GradingTerm::isCurrentSeniorHighPeriodOpen())->toBeTrue()
+        ->and(GradingTerm::query()->seniorHigh()->orderBy('sort_order')->get()->map(fn ($term) => $term->seniorHighStatus->slug)->all())
+        ->toBe(['open', 'active', 'archived', 'archived'])
+        ->and(GradingTerm::query()->juniorHigh()->pluck('junior_high_grading_period_status_ID', 'term_ID')->all())->toBe($juniorBefore);
+    $this->get(route($role.'.grading-term-config.index'))->assertOk()->assertSee('data-test="academic-setup-status"', false);
+    $this->put($url, ['status' => 'archived'])->assertSessionHasNoErrors();
+    expect(GradingTerm::isCurrentSeniorHighPeriodOpen())->toBeFalse();
+    $this->put($url, ['status' => 'open'])->assertSessionHasNoErrors();
+    expect(GradingTerm::isCurrentSeniorHighPeriodOpen())->toBeTrue();
+})->with(['admin', 'principal']);
+
+test('closing another semester does not close the current semesters terms', function () {
+    $admin = createGradingTermAdmin('admin.shs.other.close');
+    $second = GradingSemester::query()->where('key', 'second')->firstOrFail();
+    $this->actingAs($admin)->put(route('admin.grading-term-config.senior-high.semester.status', $second), ['status' => 'closed'])
+        ->assertSessionHasNoErrors();
+    expect(GradingTerm::isCurrentSeniorHighPeriodOpen())->toBeTrue()
+        ->and(GradingTermSetting::current()->seniorHighSemester())->toBe('first');
+    $this->put(route('admin.grading-term-config.senior-high.semester.status', $second), ['status' => 'open'])
+        ->assertSessionHasNoErrors();
+    expect(GradingTermSetting::current()->seniorHighSemester())->toBe('second')
+        ->and(GradingTerm::isCurrentSeniorHighPeriodOpen())->toBeTrue();
+    $this->put(route('admin.grading-term-config.senior-high.semester.status', $second), ['status' => 'invalid'])
+        ->assertSessionHasErrors('status');
+    $fullYear = GradingSemester::query()->where('key', 'full_year')->firstOrFail();
+    $this->put(route('admin.grading-term-config.senior-high.semester.status', $fullYear), ['status' => 'open'])->assertNotFound();
 });

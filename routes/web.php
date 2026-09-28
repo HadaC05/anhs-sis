@@ -229,6 +229,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/principal/proficiency-levels', [PrincipalDashboardController::class, 'proficiencyLevels'])
         ->middleware('principal')
         ->name('principal.proficiency-levels');
+    Route::get('/principal/promotions', [GuidanceDashboardController::class, 'promotions'])
+        ->middleware('principal')
+        ->name('principal.promotions.index');
     Route::get('/principal/reports/age-for-grade', [PrincipalDashboardController::class, 'ageForGradeReport'])
         ->middleware('principal')
         ->name('principal.reports.age-for-grade');

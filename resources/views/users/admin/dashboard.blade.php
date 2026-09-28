@@ -23,7 +23,7 @@
         <a href="{{ route('admin.users') }}" class="text-sm font-semibold text-[#296374] transition hover:underline">Manage all users</a>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-5">
         <a href="{{ route('admin.users') }}" class="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#296374]/30 hover:shadow-md">
             <div class="flex items-start justify-between gap-3">
                 <div>

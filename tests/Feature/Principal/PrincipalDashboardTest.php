@@ -6,6 +6,10 @@ use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
+use App\Models\GradingPeriodStatus;
+use App\Models\GradingSemester;
+use App\Models\GradingTerm;
+use App\Models\GradingTermSetting;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
@@ -52,6 +56,57 @@ test('principal can view the enrollment dashboard', function () {
     $response->assertDontSee('marked for placement test');
     $response->assertSee('Open full report');
 });
+
+test('principal dashboard shows only open grading periods', function (bool $termsOpen, bool $semesterActive) {
+    $principal = Staff::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'principal'])->id,
+        'username' => 'principal.grading-periods',
+        'password' => Hash::make('password'),
+        'first_name' => 'School',
+        'last_name' => 'Principal',
+        'status' => 'active',
+    ]);
+    foreach (['junior_high', 'senior_high'] as $level) {
+        GradingTerm::query()->where('school_level', $level)->update([
+            $level.'_grading_period_status_ID' => GradingPeriodStatus::activeId(),
+        ]);
+        $term = GradingTerm::query()->where('school_level', $level)->where('key', 'term_2')->firstOrFail();
+        $term->update([
+            'label' => 'Second Term',
+            $level.'_grading_period_status_ID' => GradingPeriodStatus::idFor($termsOpen ? 'open' : 'closed'),
+        ]);
+    }
+    $semester = GradingSemester::query()->updateOrCreate(['key' => 'second'], [
+        'label' => 'Second Semester',
+        'sort_order' => 2,
+        'grading_period_status_ID' => GradingPeriodStatus::idFor($semesterActive ? 'active' : 'closed'),
+    ]);
+    GradingTermSetting::current()->update([
+        'max_terms' => 4,
+        'semester_ID' => $semester->semester_ID,
+        'term_ID' => $term->term_ID,
+    ]);
+
+    $response = $this->actingAs($principal)->get(route('principal.dashboard'));
+
+    $response->assertOk()
+        ->assertSee('Open Grading Periods')
+        ->assertSee('Junior High School')
+        ->assertSee('Senior High School')
+        ->assertSee(route('principal.grading-term-config.index'), false)
+        ->assertViewHas('openGradingPeriods', [
+            'Junior High School' => $termsOpen ? 'Second Term' : null,
+            'Senior High School' => $termsOpen && $semesterActive ? 'Second Semester · Second Term' : null,
+        ]);
+
+    if (! $termsOpen || ! $semesterActive) {
+        $response->assertSee('No open grading period');
+    }
+})->with([
+    'open terms and semester' => [true, true],
+    'closed terms' => [false, true],
+    'closed senior high semester' => [true, false],
+]);
 
 test('principal can view the age alignment report', function () {
     $role = Role::query()->create(['role_name' => 'principal']);

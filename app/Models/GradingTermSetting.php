@@ -15,6 +15,7 @@ class GradingTermSetting extends Model
 
     protected $fillable = [
         'max_terms',
+        'senior_high_max_terms',
         'open_terms_count',
         'semester_ID',
         'term_ID',
@@ -24,6 +25,7 @@ class GradingTermSetting extends Model
     {
         return [
             'max_terms' => 'integer',
+            'senior_high_max_terms' => 'integer',
             'open_terms_count' => 'integer',
         ];
     }
@@ -35,12 +37,13 @@ class GradingTermSetting extends Model
 
         $defaults = array_filter([
             'max_terms' => 4,
+            'senior_high_max_terms' => 3,
             'open_terms_count' => 1,
             'semester_ID' => $hasSemesterColumn && Schema::hasTable('grading_semesters')
                 ? GradingSemester::idFor(GradingSemester::FIRST)
                 : null,
             'term_ID' => $hasTermColumn && Schema::hasTable('grading_terms')
-                ? GradingTerm::query()->orderBy('sort_order')->orderBy('term_ID')->value('term_ID')
+                ? GradingTerm::query()->seniorHigh()->orderBy('sort_order')->orderBy('term_ID')->value('term_ID')
                 : null,
         ], fn (mixed $value, string $key): bool => $value !== null && Schema::hasColumn('grading_term_settings', $key), ARRAY_FILTER_USE_BOTH);
 

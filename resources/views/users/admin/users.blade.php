@@ -239,14 +239,18 @@ $roleCardStyles = [
     @endif
 </div>
 
+@endsection
+
+{{-- Render dialogs outside the page content's stacking context. --}}
+@push('modals')
 @php
 $addStaffModalOpen = $errors->any() && old('_form') === 'add_staff';
 $addFieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
 $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
 @endphp
 <div id="addModal" role="dialog" aria-modal="true" aria-labelledby="addStaffTitle" data-open="{{ $addStaffModalOpen ? 'true' : 'false' }}"
-    class="fixed inset-0 z-[100] {{ $addStaffModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
-    <div class="mx-auto flex max-h-[calc(100vh-8rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
+    class="fixed inset-0 z-[100] {{ $addStaffModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4">
+    <div class="mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div class="shrink-0 border-b border-gray-300 bg-[#296374] px-6 py-4">
             <div class="flex items-start justify-between gap-4">
                 <div>
@@ -407,10 +411,10 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
     </div>
 </div>
 
-<div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto overflow-hidden rounded-2xl bg-white shadow-2xl">
+<div id="editModal" role="dialog" aria-modal="true" aria-labelledby="editStaffTitle" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div class="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div class="border-b border-gray-200 px-6 py-5">
-            <h3 class="text-xl font-bold text-gray-800">Edit Staff User</h3>
+            <h3 id="editStaffTitle" class="text-xl font-bold text-gray-800">Edit Staff User</h3>
         </div>
         <form id="editForm" method="POST" class="space-y-4 p-6">
             @csrf
@@ -462,10 +466,10 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
     </div>
 </div>
 
-<div id="editStudentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto overflow-hidden rounded-2xl bg-white shadow-2xl">
+<div id="editStudentModal" role="dialog" aria-modal="true" aria-labelledby="editStudentTitle" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div class="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div class="border-b border-gray-200 px-6 py-5">
-            <h3 class="text-xl font-bold text-gray-800">Edit Student Account</h3>
+            <h3 id="editStudentTitle" class="text-xl font-bold text-gray-800">Edit Student Account</h3>
         </div>
         <form id="editStudentForm" method="POST" class="space-y-4 p-6">
             @csrf
@@ -614,4 +618,4 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
         if (e.target === this) closeEditStudentModal();
     });
 </script>
-@endsection
+@endpush

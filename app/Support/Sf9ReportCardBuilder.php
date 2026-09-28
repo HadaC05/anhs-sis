@@ -73,14 +73,10 @@ class Sf9ReportCardBuilder
      */
     public static function seniorHighObservedPeriods(): array
     {
-        return [
-            ['key' => 't1', 'label' => '1'],
-            ['key' => 't2', 'label' => '2'],
-            ['key' => 't3', 'label' => '3'],
-            ['key' => 't4', 'label' => '4'],
-            ['key' => 't5', 'label' => '5'],
-            ['key' => 't6', 'label' => '6'],
-        ];
+        return array_map(
+            fn (int $number): array => ['key' => 't'.$number, 'label' => (string) $number],
+            range(1, count(GradingTerm::seniorHighTerms()) * 2),
+        );
     }
 
     /**
@@ -88,7 +84,7 @@ class Sf9ReportCardBuilder
      */
     public static function seniorHighSignatureLabels(): array
     {
-        return ['Term 1', 'Term 2', 'Term 3'];
+        return array_column(GradingTerm::seniorHighTerms(), 'label');
     }
 
     /**
@@ -197,6 +193,7 @@ class Sf9ReportCardBuilder
                 ? self::seniorHighAttendanceMonthKeys()
                 : Sf9AttendanceSummary::monthKeys(),
             'observed_periods' => $observedPeriods,
+            'senior_high_terms' => $isSeniorHigh ? GradingTerm::seniorHighTerms() : [],
             'signature_labels' => $isSeniorHigh
                 ? self::seniorHighSignatureLabels()
                 : array_map(
@@ -357,7 +354,7 @@ class Sf9ReportCardBuilder
      */
     private static function seniorHighSubjects(Collection $assignments, Collection $gradesByAssignment, bool $isTechPro): array
     {
-        $emptyTerms = ['term_1' => null, 'term_2' => null, 'term_3' => null];
+        $emptyTerms = array_fill_keys(array_column(GradingTerm::seniorHighTerms(), 'key'), null);
         $slotted = [];
         $electives = [];
 
@@ -508,7 +505,7 @@ class Sf9ReportCardBuilder
             'term_1' => ['shs_sem'.$semesterNumber.'_term_1', 'shs_sem'.$semesterNumber.'_q1', 'term_1'],
             'term_2' => ['shs_sem'.$semesterNumber.'_term_2', 'shs_sem'.$semesterNumber.'_q2', 'term_2'],
             'term_3' => ['shs_sem'.$semesterNumber.'_term_3', 'term_3'],
-            default => [],
+            default => ['shs_sem'.$semesterNumber.'_'.$termKey, $termKey],
         };
     }
 
@@ -565,7 +562,7 @@ class Sf9ReportCardBuilder
             return null;
         }
 
-        $terms = ['term_1' => null, 'term_2' => null, 'term_3' => null];
+        $terms = array_fill_keys(array_column(GradingTerm::seniorHighTerms(), 'key'), null);
 
         foreach (array_keys($terms) as $termKey) {
             $values = collect($children)
@@ -614,14 +611,17 @@ class Sf9ReportCardBuilder
      */
     private static function seniorHighObservedMarkings(Collection $statementValues): array
     {
-        $sources = [
-            't1' => ['shs_sem1_term_1', 'shs_sem1_q1', 'term_1'],
-            't2' => ['shs_sem1_term_2', 'shs_sem1_q2', 'term_2'],
-            't3' => ['shs_sem1_term_3', 'term_3'],
-            't4' => ['shs_sem2_term_1', 'shs_sem2_q1'],
-            't5' => ['shs_sem2_term_2', 'shs_sem2_q2'],
-            't6' => ['shs_sem2_term_3'],
-        ];
+        $sources = [];
+        $number = 0;
+        foreach (['first', 'second'] as $semester) {
+            foreach (GradingTerm::seniorHighTerms() as $term) {
+                $keys = self::seniorHighGradeSourceKeys($term['key'], $semester);
+                // Unprefixed legacy markings belong to the first semester only.
+                $sources['t'.(++$number)] = $semester === 'first'
+                    ? $keys
+                    : array_values(array_filter($keys, fn ($key) => str_starts_with($key, 'shs_')));
+            }
+        }
 
         $periods = [];
 

@@ -26,7 +26,7 @@ class UpdateGradingTermRequest extends FormRequest
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('grading_terms', 'label')->ignore(
+                Rule::unique('grading_terms', 'label')->where('school_level', $term?->school_level ?? 'junior_high')->ignore(
                     $term instanceof GradingTerm ? $term->term_ID : null,
                     'term_ID',
                 ),

@@ -23,8 +23,9 @@ use App\Models\User;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
 
-test('guidance counselor can open the promotions page', function (bool $hasEligibleLearner) {
-    $role = Role::query()->create(['role_name' => 'guidance counselor']);
+test('guidance and principal can open their promotions page', function (bool $hasEligibleLearner, string $roleName) {
+    $isPrincipal = $roleName === 'principal';
+    $role = Role::query()->create(['role_name' => $roleName]);
     $user = User::query()->create([
         'role_id' => $role->id,
         'username' => 'guidance.promotions',
@@ -67,21 +68,66 @@ test('guidance counselor can open the promotions page', function (bool $hasEligi
         ]);
     }
 
-    $response = $this->actingAs($user)->get(route('guidance.promotions.index'))
+    $response = $this->actingAs($user)->get(route($isPrincipal ? 'principal.promotions.index' : 'guidance.promotions.index'))
         ->assertOk()
-        ->assertSee('Promotion Confirmation');
+        ->assertSee($isPrincipal ? 'Academic Records' : 'Promotion Confirmation');
+
+    if ($isPrincipal) {
+        $response->assertViewHas('eligibility', 'all')
+            ->assertDontSee('/guidance/', false)
+            ->assertDontSee('bulkPromotionForm', false)
+            ->assertDontSee('data-promotion-checkbox', false);
+    }
 
     if ($hasEligibleLearner) {
         $response->assertSee('Reyes, Maria')
             ->assertSee('Grade 7')
             ->assertSee('2026-2027')
             ->assertSee('Promote')
-            ->assertDontSee('name="SY_ID"', false)
-            ->assertSee(route('guidance.promotions.confirm', Enrollment::query()->firstOrFail()), false);
+            ->assertDontSee('name="SY_ID"', false);
+        if (! $isPrincipal) {
+            $response->assertSee(route('guidance.promotions.confirm', Enrollment::query()->firstOrFail()), false);
+        }
     } else {
-        $response->assertSee('No learners are currently eligible for promotion.');
+        $response->assertSee($isPrincipal ? 'No learners match the selected filters.' : 'No learners are currently eligible for promotion.');
     }
-})->with([false, true]);
+})->with([false, true])->with(['guidance counselor', 'principal']);
+
+test('principal can review and filter all promotion statuses without promotion permissions', function () {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    $user->update(['role_id' => Role::query()->firstOrCreate(['role_name' => 'principal'])->id]);
+    $user->unsetRelation('role');
+
+    $pendingStudent = Student::query()->create([
+        'lrn' => '999999999999', 'first_name' => 'Pending', 'last_name' => 'Learner', 'status' => 'pending',
+    ]);
+    $pending = Enrollment::query()->create([
+        'student_ID' => $pendingStudent->id,
+        'curriculum_grade_level_ID' => $enrollment->curriculum_grade_level_ID,
+        'SY_ID' => $enrollment->SY_ID,
+        'enrollment_status' => 'pending',
+        'promotion_status' => PromotionStatus::PENDING,
+    ]);
+
+    $this->actingAs($user)->get(route('principal.promotions.index'))
+        ->assertOk()
+        ->assertSee('Reyes, Ana')
+        ->assertSee('Learner, Pending')
+        ->assertViewHas('enrollments', fn ($rows) => $rows->total() === 2);
+
+    $this->get(route('principal.promotions.index', [
+        'search' => $pendingStudent->lrn,
+        'eligibility' => 'pending',
+        'grade_level' => $enrollment->gradeLevel()->value('grade_level.grade_ID'),
+        'academic_year_id' => $pending->SY_ID,
+    ]))->assertOk()
+        ->assertSee('Learner, Pending')
+        ->assertDontSee('Reyes, Ana')
+        ->assertViewHas('enrollments', fn ($rows) => $rows->total() === 1);
+
+    $this->post(route('guidance.promotions.confirm', $enrollment))->assertForbidden();
+    $this->post(route('guidance.promotions.bulk'), ['enrollment_ids' => [$enrollment->enrollment_ID]])->assertForbidden();
+});
 
 function guidancePromotionFixtures(): array
 {

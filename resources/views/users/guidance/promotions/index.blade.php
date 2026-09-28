@@ -1,10 +1,14 @@
-@extends('users.guidance.layout')
+@extends($isPrincipal ? 'users.principal.layout' : 'users.guidance.layout')
+
+@php
+    $promotionsRoute = $isPrincipal ? 'principal.promotions.index' : 'guidance.promotions.index';
+@endphp
 
 @section('title', 'Promotions')
 
 @section('content')
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Promotion Confirmation</h1>
+    <h1 class="text-2xl font-bold text-gray-900">{{ $isPrincipal ? 'Promotions' : 'Promotion Confirmation' }}</h1>
 </div>
 
 @if (session('status'))
@@ -14,7 +18,7 @@
     <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ $errors->first() }}</div>
 @endif
 
-<form method="GET" action="{{ route('guidance.promotions.index') }}" class="mb-5">
+<form method="GET" action="{{ route($promotionsRoute) }}" class="mb-5">
     <div class="guidance-filters flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <div class="min-w-0 flex-1 sm:min-w-[200px]">
             <label for="promotion-search" class="mb-1 block text-xs font-semibold text-gray-600">Search learner</label>
@@ -47,35 +51,43 @@
             </select>
         </div>
         <button type="submit" class="inline-flex h-10 items-center rounded-lg bg-[#296374] px-4 text-sm font-bold text-white hover:bg-[#1f4e5c]">Apply</button>
-        <a href="{{ route('guidance.promotions.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-50">Reset</a>
+        <a href="{{ route($promotionsRoute) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-50">Reset</a>
     </div>
 </form>
 
+@if (! $isPrincipal)
 <form id="bulkPromotionForm" method="POST" action="{{ route('guidance.promotions.bulk') }}">
     @csrf
 </form>
+@endif
 
 <div class="overflow-hidden rounded-xl border border-[#296374]/35 bg-[#eef5f7] shadow-md shadow-[#296374]/10">
     <div class="flex flex-col gap-3 border-b border-gray-100 bg-gray-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
         <h2 class="font-bold text-gray-800">Promotion</h2>
         <p class="mt-1 text-sm text-gray-500">Eligible learners have passed every released subject. Promoting creates their enrollment in the next active school year without assigning a section.</p>
-        <p class="mt-2 text-xs text-gray-500">Select all selects eligible learners on this page. Eligibility is rechecked when promoting.</p>
+        @if (! $isPrincipal)
+            <p class="mt-2 text-xs text-gray-500">Select all selects eligible learners on this page. Eligibility is rechecked when promoting.</p>
+        @endif
         <p class="mt-2 text-xs text-gray-500">One or two failing released grades are tagged Conditionally Promoted. This status does not allow advancement to the next grade.</p>
         </div>
-        <button id="promote-selected" form="bulkPromotionForm" type="submit" hidden disabled class="shrink-0 rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Promote selected (<span id="promotion-selected-count" aria-live="polite">0</span>)</button>
+        @if (! $isPrincipal)
+            <button id="promote-selected" form="bulkPromotionForm" type="submit" hidden disabled class="shrink-0 rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Promote selected (<span id="promotion-selected-count" aria-live="polite">0</span>)</button>
+        @endif
     </div>
 
     <div class="overflow-x-auto">
         <table class="w-full min-w-[860px] divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
                 <tr>
-                    <th scope="col" class="w-12 px-5 py-3 text-center"><input type="checkbox" id="promotion-select-all" aria-label="Select all eligible learners on this page" class="h-4 w-4 rounded border-gray-300 text-[#296374]"></th>
+                    @if (! $isPrincipal)
+                        <th scope="col" class="w-12 px-5 py-3 text-center"><input type="checkbox" id="promotion-select-all" aria-label="Select all eligible learners on this page" class="h-4 w-4 rounded border-gray-300 text-[#296374]"></th>
+                    @endif
                     <th scope="col" class="px-5 py-3">Learner</th>
                     <th scope="col" class="px-5 py-3">LRN</th>
                     <th scope="col" class="px-5 py-3">Completed enrollment</th>
                     <th scope="col" class="px-5 py-3">Eligibility</th>
-                    <th scope="col" class="px-5 py-3">Action</th>
+                    <th scope="col" class="px-5 py-3">{{ $isPrincipal ? 'Remarks' : 'Action' }}</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -103,11 +115,13 @@
                         $canPromote = $status === 'eligible' && ! $isCompleter;
                     @endphp
                     <tr class="hover:bg-gray-50">
+                        @if (! $isPrincipal)
                         <td class="px-5 py-4 text-center">
                             @if ($canPromote)
                                 <input form="bulkPromotionForm" type="checkbox" name="enrollment_ids[]" value="{{ $enrollment->enrollment_ID }}" data-promotion-checkbox aria-label="Select {{ $name }}" class="h-4 w-4 rounded border-gray-300 text-[#296374]">
                             @endif
                         </td>
+                        @endif
                         <td class="px-5 py-4 font-semibold text-gray-800">{{ $name }}</td>
                         <td class="whitespace-nowrap px-5 py-4 text-gray-600">{{ $student?->lrn ?? '—' }}</td>
                         <td class="px-5 py-4 text-gray-600">
@@ -118,18 +132,18 @@
                             <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold {{ $badge }}">{{ $label }}</span>
                         </td>
                         <td class="px-5 py-4">
-                            @if ($canPromote)
+                            @if ($canPromote && ! $isPrincipal)
                             <form method="POST" action="{{ route('guidance.promotions.confirm', $enrollment) }}" class="flex flex-wrap items-center gap-2">
                                 @csrf
                                 <button type="submit" class="rounded-lg bg-[#296374] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f4e5c]">Promote</button>
                             </form>
                             @else
-                                <span class="text-xs text-gray-500">{{ match (true) { $status === 'promoted' => 'Already promoted.', $status === 'conditionally_promoted' => 'Conditional promotion does not permit advancement to the next grade.', $isCompleter && $status === 'eligible' => 'Grade 12 completed', default => 'Promotion requirements are not yet complete.' } }}</span>
+                                <span class="text-xs text-gray-500">{{ match (true) { $status === 'promoted' => 'Already promoted.', $status === 'conditionally_promoted' => 'Conditional promotion does not permit advancement to the next grade.', $isCompleter && $status === 'eligible' => 'Grade 12 completed', $canPromote => 'Eligible for promotion.', default => 'Promotion requirements are not yet complete.' } }}</span>
                             @endif
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-5 py-12 text-center text-gray-500">{{ $eligibility === 'eligible' && ! request()->filled('search') && ! request()->filled('grade_level') && ! request()->filled('academic_year_id') ? 'No learners are currently eligible for promotion.' : 'No learners match the selected filters.' }}</td></tr>
+                    <tr><td colspan="{{ $isPrincipal ? 5 : 6 }}" class="px-5 py-12 text-center text-gray-500">{{ $eligibility === 'eligible' && ! request()->filled('search') && ! request()->filled('grade_level') && ! request()->filled('academic_year_id') ? 'No learners are currently eligible for promotion.' : 'No learners match the selected filters.' }}</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -139,6 +153,7 @@
     </div>
 </div>
 
+@if (! $isPrincipal)
 <script>
 (() => {
     const selectAll = document.getElementById('promotion-select-all');
@@ -163,4 +178,5 @@
     update();
 })();
 </script>
+@endif
 @endsection

@@ -109,7 +109,7 @@
                     </a>
 
                     <div class="space-y-1">
-                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grades</p>
+                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Academic Records</p>
                         <a href="{{ route('principal.grade-releases') }}" class="sidebar-link {{ request()->routeIs('principal.grade-releases*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path>
@@ -121,6 +121,12 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15zM8 7h8M8 11h8M8 15h5"></path>
                             </svg>
                             <span class="font-semibold">Proficiency Levels</span>
+                        </a>
+                        <a href="{{ route('principal.promotions.index') }}" class="sidebar-link {{ request()->routeIs('principal.promotions.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l9 5-9 5-9-5 9-5zM5 10v6c4 3 10 3 14 0v-6M21 8v8"></path>
+                            </svg>
+                            <span class="font-semibold">Promotions</span>
                         </a>
                     </div>
 
@@ -136,41 +142,11 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h1m4 0h1M9 12h1m4 0h1"></path></svg>
                             <span class="font-semibold">School Information</span>
                         </a>
-                        <a href="{{ route('principal.academic-year-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.academic-year-config.*') ? 'active' : '' }}">
+                        <a href="{{ route('principal.academic-year-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.academic-year-config.*', 'principal.grading-term-config.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z"></path>
                             </svg>
-                            <span class="font-semibold">Academic Year</span>
-                        </a>
-                        <a href="{{ route('principal.attendance-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.attendance-config.*') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                            </svg>
-                            <span class="font-semibold">Attendance Configuration</span>
-                        </a>
-                        <a href="{{ route('principal.section-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.section-config.*') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-                            </svg>
-                            <span class="font-semibold">Sections</span>
-                        </a>
-                        <a href="{{ route('principal.grading-term-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.grading-term-config.*') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8M8 12h8M8 17h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
-                            </svg>
-                            <span class="font-semibold">Grading Terms</span>
-                        </a>
-                        <a href="{{ route('principal.movement-reason-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.movement-reason-config.*') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            <span class="font-semibold">Movement Reasons</span>
-                        </a>
-                        <a href="{{ route('principal.document-return-reason-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.document-return-reason-config.*') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0117 8.414V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            <span class="font-semibold">Document Return Reasons</span>
+                            <span class="font-semibold">Academic Setup</span>
                         </a>
                         <a href="{{ route('principal.curriculum-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.curriculum-config.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -189,6 +165,30 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"></path>
                             </svg>
                             <span class="font-semibold">Teacher Assignments</span>
+                        </a>
+                        <a href="{{ route('principal.attendance-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.attendance-config.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                            <span class="font-semibold">Attendance Configuration</span>
+                        </a>
+                        <a href="{{ route('principal.section-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.section-config.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                            </svg>
+                            <span class="font-semibold">Sections</span>
+                        </a>
+                        <a href="{{ route('principal.movement-reason-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.movement-reason-config.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="font-semibold">Movement Reasons</span>
+                        </a>
+                        <a href="{{ route('principal.document-return-reason-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.document-return-reason-config.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0117 8.414V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="font-semibold">Document Return Reasons</span>
                         </a>
                     </div>
 
@@ -212,6 +212,8 @@
         </main>
     </div>
 
+    @include('users.partials.archive-confirmation')
+    @stack('modals')
     @stack('toasts')
     <x-idle-session-timeout />
 </body>

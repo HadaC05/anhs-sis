@@ -19,6 +19,7 @@ class GradingTerm extends Model
     protected $primaryKey = 'term_ID';
 
     protected $fillable = [
+        'school_level',
         'key',
         'label',
         'sort_order',
@@ -36,6 +37,18 @@ class GradingTerm extends Model
     public function subjectGrades(): HasMany
     {
         return $this->hasMany(StudentSubjectGrade::class, 'term_ID', 'term_ID');
+    }
+
+    public function scopeJuniorHigh($query)
+    {
+        return Schema::hasColumn('grading_terms', 'school_level')
+            ? $query->where('school_level', 'junior_high') : $query;
+    }
+
+    public function scopeSeniorHigh($query)
+    {
+        return Schema::hasColumn('grading_terms', 'school_level')
+            ? $query->where('school_level', 'senior_high') : $query;
     }
 
     public function juniorHighStatus(): BelongsTo
@@ -56,12 +69,12 @@ class GradingTerm extends Model
 
     public function isJuniorHighActive(): bool
     {
-        return ! $this->isJuniorHighArchived();
+        return $this->junior_high_grading_period_status_ID !== null && ! $this->isJuniorHighArchived();
     }
 
     public function isSeniorHighActive(): bool
     {
-        return ! $this->isSeniorHighArchived();
+        return $this->senior_high_grading_period_status_ID !== null && ! $this->isSeniorHighArchived();
     }
 
     public function isJuniorHighOpen(): bool
@@ -92,7 +105,7 @@ class GradingTerm extends Model
      */
     public function isActive(): bool
     {
-        return ! $this->isJuniorHighArchived();
+        return $this->junior_high_grading_period_status_ID !== null && ! $this->isJuniorHighArchived();
     }
 
     public function scopeJuniorHighActive($query)
@@ -107,7 +120,7 @@ class GradingTerm extends Model
 
     public function scopeJuniorHighAvailable($query)
     {
-        return $query->whereIn('junior_high_grading_period_status_ID', array_filter([
+        return $query->juniorHigh()->whereIn('junior_high_grading_period_status_ID', array_filter([
             GradingPeriodStatus::activeId(),
             GradingPeriodStatus::closedId(),
             GradingPeriodStatus::openId(),
@@ -116,7 +129,7 @@ class GradingTerm extends Model
 
     public function scopeSeniorHighAvailable($query)
     {
-        return $query->whereIn('senior_high_grading_period_status_ID', array_filter([
+        return $query->seniorHigh()->whereIn('senior_high_grading_period_status_ID', array_filter([
             GradingPeriodStatus::activeId(),
             GradingPeriodStatus::closedId(),
             GradingPeriodStatus::openId(),
@@ -164,7 +177,7 @@ class GradingTerm extends Model
             return array_slice(self::fallbackPeriods(), 0, GradingTermSetting::current()->max_terms);
         }
 
-        $terms = self::query()
+        $terms = self::query()->juniorHigh()
             ->orderBy('sort_order')
             ->orderBy('term_ID')
             ->limit(GradingTermSetting::current()->max_terms)
@@ -208,7 +221,7 @@ class GradingTerm extends Model
     {
         $configuredKeys = array_column(self::configuredPeriods(), 'key');
 
-        return self::query()
+        return self::query()->juniorHigh()
             ->juniorHighAvailable()
             ->whereIn('key', $configuredKeys)
             ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::openId())
@@ -229,7 +242,7 @@ class GradingTerm extends Model
             return false;
         }
 
-        return self::query()
+        return self::query()->juniorHigh()
             ->where('key', $periodKey)
             ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::openId())
             ->exists();
@@ -249,7 +262,7 @@ class GradingTerm extends Model
             return false;
         }
 
-        return self::query()
+        return self::query()->juniorHigh()
             ->whereIn('key', $periodKeys)
             ->where('junior_high_grading_period_status_ID', GradingPeriodStatus::closedId())
             ->count() === count($periodKeys);
@@ -264,7 +277,7 @@ class GradingTerm extends Model
             return 0;
         }
 
-        return self::query()
+        return self::query()->juniorHigh()
             ->whereIn('key', $periodKeys)
             ->update(['junior_high_grading_period_status_ID' => GradingPeriodStatus::closedId()]);
     }
@@ -357,10 +370,10 @@ class GradingTerm extends Model
      */
     public static function seniorHighTerms(): array
     {
-        $limit = self::SENIOR_HIGH_TERMS_PER_SEMESTER;
+        $limit = GradingTermSetting::current()->senior_high_max_terms ?? self::SENIOR_HIGH_TERMS_PER_SEMESTER;
 
         if (Schema::hasTable('grading_terms')) {
-            $terms = self::query()
+            $terms = self::query()->seniorHigh()
                 ->orderBy('sort_order')
                 ->orderBy('term_ID')
                 ->limit($limit)
@@ -583,9 +596,10 @@ class GradingTerm extends Model
 
     public static function seniorHighPeriodPosition(string $semester, int $term): int
     {
-        $offset = $semester === GradingSemester::SECOND ? self::SENIOR_HIGH_TERMS_PER_SEMESTER : 0;
+        $limit = GradingTermSetting::current()->senior_high_max_terms ?? self::SENIOR_HIGH_TERMS_PER_SEMESTER;
+        $offset = $semester === GradingSemester::SECOND ? $limit : 0;
 
-        return $offset + max(1, min($term, self::SENIOR_HIGH_TERMS_PER_SEMESTER));
+        return $offset + max(1, min($term, $limit));
     }
 
     public static function syncActiveStatus(?int $maxTerms = null): void
@@ -598,7 +612,7 @@ class GradingTerm extends Model
             return;
         }
 
-        $terms = self::query()
+        $terms = self::query()->juniorHigh()
             ->orderBy('sort_order')
             ->orderBy('term_ID')
             ->get();

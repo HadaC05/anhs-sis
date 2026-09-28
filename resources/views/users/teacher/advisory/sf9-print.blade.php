@@ -501,14 +501,14 @@
                             <thead>
                                 <tr>
                                     <th rowspan="2" class="learning-area">Learning Areas</th>
-                                    <th colspan="3">TERM</th>
+                                    <th colspan="{{ count($card['senior_high_terms']) }}">TERM</th>
                                     <th rowspan="2">Final Grade</th>
                                     <th rowspan="2">Remarks</th>
                                 </tr>
                                 <tr>
-                                    <th>1</th>
-                                    <th>2</th>
-                                    <th>3</th>
+                                    @foreach ($card['senior_high_terms'] as $term)
+                                        <th>{{ $loop->iteration }}</th>
+                                    @endforeach
                                 </tr>
                             </thead>
                             <tbody>
@@ -516,25 +516,25 @@
                                     @if ($row['category'] ?? false)
                                         <tr class="shs-category">
                                             <td>{{ $row['label'] }}</td>
-                                            <td></td>
-                                            <td></td>
-                                            <td></td>
+                                            @foreach ($card['senior_high_terms'] as $term)
+                                                <td></td>
+                                            @endforeach
                                             <td></td>
                                             <td></td>
                                         </tr>
                                     @else
                                         <tr class="{{ ($row['child'] ?? false) ? 'shs-child' : '' }}">
                                             <td>{{ $row['label'] !== '' ? $row['label'] : ' ' }}</td>
-                                            <td class="center">{{ $row['terms']['term_1'] ?? '' }}</td>
-                                            <td class="center">{{ $row['terms']['term_2'] ?? '' }}</td>
-                                            <td class="center">{{ $row['terms']['term_3'] ?? '' }}</td>
+                                            @foreach ($card['senior_high_terms'] as $term)
+                                                <td class="center">{{ $row['terms'][$term['key']] ?? '' }}</td>
+                                            @endforeach
                                             <td class="center bold">{{ $row['final'] ?? '' }}</td>
                                             <td class="center">{{ $row['remarks'] ?? '' }}</td>
                                         </tr>
                                     @endif
                                 @endforeach
                                 <tr>
-                                    <td colspan="4" class="bold center">General Average</td>
+                                    <td colspan="{{ count($card['senior_high_terms']) + 1 }}" class="bold center">General Average</td>
                                     <td class="center bold">{{ $card['general_average'] ?? '' }}</td>
                                     <td class="center">{{ $card['general_remarks'] ?? '' }}</td>
                                 </tr>

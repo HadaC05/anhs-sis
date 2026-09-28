@@ -1,39 +1,16 @@
-@extends(request()->routeIs('principal.*') ? 'users.principal.layout' : 'users.admin.layout')
-
 @php
-    $managementRoutePrefix = request()->routeIs('principal.*') ? 'principal.' : 'admin.';
-@endphp
-
-@section('title', 'Academic Year')
-
-@section('content')
-@php
-    $modalOpen = $errors->any();
+    $modalOpen = $errors->any() && $setupTab === 'academic-year-config';
     $fieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
 @endphp
 
 <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Academic Year</h1>
+        <h2 class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl">Academic Years</h2>
     </div>
     <button type="button" onclick="openAcademicYearModal()" class="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style="background-color: #296374;">
         Add Academic Year
     </button>
 </div>
-
-@if (session('success'))
-    <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-        {{ session('success') }}
-    </div>
-@endif
-
-@if ($errors->any())
-    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        @foreach ($errors->all() as $error)
-            <p>{{ $error }}</p>
-        @endforeach
-    </div>
-@endif
 
 <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -139,7 +116,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                 </button>
-                                <form action="{{ route($managementRoutePrefix.'academic-year-config.toggle-status', $year) }}" method="POST" class="inline" onsubmit="return confirm('{{ $year->status ? 'Archive this academic year?' : ($currentYear ? 'Activate this academic year? '.$currentYear->school_year.' will be archived.' : 'Activate this academic year?') }}');">
+                                <form action="{{ route($managementRoutePrefix.'academic-year-config.toggle-status', $year) }}" method="POST" class="inline" data-confirm-action="{{ $year->status ? 'Archive' : 'Activate' }}" data-confirm-message="{{ $year->status ? 'Archive this academic year?' : ($currentYear ? 'Activate this academic year? '.$currentYear->school_year.' will be archived.' : 'Activate this academic year?') }}">
                                     @csrf
                                     @method('PATCH')
                                     <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 transition {{ $year->status ? 'text-amber-700 ring-amber-200 hover:bg-amber-50' : 'text-emerald-700 ring-emerald-200 hover:bg-emerald-50' }}">
@@ -375,4 +352,3 @@
     document.getElementById('end_date').addEventListener('input', syncCoverageDateLimits);
     syncCoverageDateLimits();
 </script>
-@endsection

@@ -246,3 +246,92 @@ function createSf9BuilderFixtures(bool $isSeniorHigh = true): array
 
     return compact('teacher', 'section', 'enrollment', 'firstAssignment', 'secondAssignment');
 }
+
+it('includes additional senior high terms in report averages columns and observations', function () {
+    $fixtures = createSf9BuilderFixtures();
+    \App\Models\GradingTermSetting::current()->update(['senior_high_max_terms' => 4]);
+    $assignment = $fixtures['firstAssignment'];
+    $grades = collect([$assignment->assignment_ID => collect([
+        'shs_sem1_term_1' => (object) ['numeric_grade' => 80],
+        'shs_sem1_term_4' => (object) ['numeric_grade' => 100],
+    ])]);
+    $card = Sf9ReportCardBuilder::buildCard(
+        $fixtures['enrollment']->load(['student', 'cluster', 'preferredCourse']),
+        $fixtures['section']->load(['academicYear', 'cluster', 'gradeLevel', 'adviser', 'curriculum']),
+        collect([$assignment->load('curriculumSubject.subject')]),
+        $grades, collect(), \App\Models\GradingTerm::seniorHighPeriods(),
+    );
+    $row = collect($card['subjects'])->firstWhere('slot', 'effective_communication');
+    expect($row['terms']['term_4'])->toBe(100)->and($row['final'])->toBe(90)
+        ->and(count($card['senior_high_terms']))->toBe(4)
+        ->and(count($card['observed_periods']))->toBe(8)
+        ->and($card['signature_labels'])->toBe(['Term 1', 'Term 2', 'Term 3', 'Term 4']);
+    $html = view('users.teacher.advisory.sf9-print', [
+        'cards' => [$card], 'section' => $fixtures['section'], 'periods' => \App\Models\GradingTerm::seniorHighPeriods(),
+    ])->render();
+    expect($html)->toContain('colspan="4">TERM')->toContain('100');
+});
+
+it('rejects reducing senior high maximum when an excluded term has saved grades', function () {
+    $fixtures = createSf9BuilderFixtures();
+    $settings = \App\Models\GradingTermSetting::current();
+    $settings->update(['senior_high_max_terms' => 4]);
+    $assignment = $fixtures['firstAssignment'];
+    $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
+        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
+    $grade = StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $studentSubject->student_subject_ID,
+        'assignment_ID' => $assignment->assignment_ID,
+        'term_ID' => \App\Models\GradingTerm::query()->seniorHigh()->where('key', 'term_4')->value('term_ID'),
+        'numeric_grade' => 91,
+        'posted_by' => $fixtures['teacher']->staff_id,
+    ]);
+    $admin = Staff::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'admin'])->id,
+        'username' => 'admin.shs.records', 'password' => 'password',
+        'first_name' => 'Admin', 'last_name' => 'School', 'status' => 'active',
+    ]);
+    $this->actingAs($admin)->put(route('admin.grading-term-config.senior-high.settings.update'), ['senior_high_max_terms' => 3])
+        ->assertSessionHasErrors('senior_high_max_terms');
+    expect($settings->fresh()->senior_high_max_terms)->toBe(4)
+        ->and((int) $grade->fresh()->numeric_grade)->toBe(91);
+});
+
+it('separates existing senior high grade references without changing saved grades or period keys', function () {
+    $fixtures = createSf9BuilderFixtures();
+    $assignment = $fixtures['firstAssignment'];
+    $juniorTerm = \App\Models\GradingTerm::query()->juniorHigh()->where('key', 'term_1')->firstOrFail();
+    $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
+        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
+    $grade = StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $studentSubject->student_subject_ID,
+        'assignment_ID' => $assignment->assignment_ID, 'term_ID' => $juniorTerm->term_ID,
+        'numeric_grade' => 93, 'posted_by' => $fixtures['teacher']->staff_id,
+    ]);
+    // Reconstruct the old shared catalog to exercise the upgrade with real grade data.
+    \App\Models\GradingTermSetting::current()->update(['term_ID' => $juniorTerm->term_ID]);
+    \App\Models\GradingTerm::query()->seniorHigh()->delete();
+    \Illuminate\Support\Facades\DB::table('grading_terms')->update([
+        'senior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::activeId(),
+    ]);
+    \Illuminate\Support\Facades\Schema::table('grading_terms', function ($table) {
+        $table->dropUnique(['school_level', 'key']);
+        $table->dropColumn('school_level');
+        $table->unique('key');
+    });
+    $before = $grade->fresh()->getAttributes();
+    $migration = require database_path('migrations/2026_09_28_000003_separate_school_level_grading_terms.php');
+    $migration->up();
+    $seniorTerm = \App\Models\GradingTerm::query()->seniorHigh()->where('key', 'term_1')->firstOrFail();
+    expect($grade->fresh()->term_ID)->toBe($seniorTerm->term_ID)
+        ->and($grade->fresh()->getAttributes())->toBe(array_replace($before, ['term_ID' => $seniorTerm->term_ID]))
+        ->and(\App\Models\GradingTermSetting::current()->term_ID)->toBe($seniorTerm->term_ID)
+        ->and($juniorTerm->fresh()->senior_high_grading_period_status_ID)->toBeNull()
+        ->and($seniorTerm->junior_high_grading_period_status_ID)->toBeNull()
+        ->and(StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_1'))->toBe($seniorTerm->term_ID)
+        ->and(StudentSubjectGrade::termIdForPeriodKey('term_1'))->toBe($juniorTerm->term_ID);
+});

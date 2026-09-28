@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasGradingPeriodStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -41,6 +42,18 @@ class GradingSemester extends Model
         return [
             'sort_order' => 'integer',
         ];
+    }
+
+    public function isActive(): bool
+    {
+        return in_array((int) $this->grading_period_status_ID, [GradingPeriodStatus::activeId(), GradingPeriodStatus::openId()], true);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereIn($this->getTable().'.grading_period_status_ID', array_filter([
+            GradingPeriodStatus::activeId(), GradingPeriodStatus::openId(),
+        ]));
     }
 
     /**

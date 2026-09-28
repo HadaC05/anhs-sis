@@ -27,7 +27,7 @@ it('keeps only one junior high term open at a time', function () {
 });
 
 it('includes active, open, and closed junior high terms while excluding archived terms', function () {
-    $terms = GradingTerm::query()->orderBy('sort_order')->get();
+    $terms = GradingTerm::query()->juniorHigh()->orderBy('sort_order')->get();
 
     $terms[0]->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::activeId()]);
     $terms[1]->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);

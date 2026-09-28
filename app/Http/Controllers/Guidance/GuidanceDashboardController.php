@@ -54,7 +54,8 @@ class GuidanceDashboardController extends Controller
             'eligibility' => ['nullable', Rule::in(['all', ...array_column(PromotionStatus::definitions(), 'slug')])],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
         ]);
-        $eligibility = $filters['eligibility'] ?? PromotionStatus::ELIGIBLE;
+        $isPrincipal = $request->routeIs('principal.*');
+        $eligibility = $filters['eligibility'] ?? ($isPrincipal ? 'all' : PromotionStatus::ELIGIBLE);
         Enrollment::query()
             ->whereNotNull('section_ID')
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
@@ -85,6 +86,7 @@ class GuidanceDashboardController extends Controller
         }
 
         return view('users.guidance.promotions.index', [
+            'isPrincipal' => $isPrincipal,
             'enrollments' => $query->latest('SY_ID')->orderBy('enrollment_ID')->paginate(15)->withQueryString(),
             'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),

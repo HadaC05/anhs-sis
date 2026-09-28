@@ -8,9 +8,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('reads senior high periods from semesters and shared junior high terms', function () {
+it('reads senior high periods from semesters and independent senior high terms', function () {
     $periods = GradingTerm::seniorHighPeriods();
-    $termOne = GradingTerm::query()->where('key', 'term_1')->firstOrFail();
+    $termOne = GradingTerm::query()->seniorHigh()->where('key', 'term_1')->firstOrFail();
 
     expect($periods)->toHaveCount(6)
         ->and($periods[0]['key'])->toBe('shs_sem1_term_1')

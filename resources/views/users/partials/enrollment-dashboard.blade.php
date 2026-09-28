@@ -152,6 +152,10 @@
 </div>
 @endif
 
+@if ($isPrincipal)
+    @include('users.principal.partials.open-grading-periods')
+@endif
+
 <div class="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
     <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
