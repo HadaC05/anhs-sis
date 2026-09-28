@@ -53,7 +53,9 @@ class TeacherSectionController extends Controller
         $gradeLevel = $request->string('grade_level')->toString();
         $gradeId = GradeLevel::idForValue($gradeLevel);
         $clusterId = $request->string('cluster_ID')->toString();
-        $schoolYearId = $request->string('SY_ID')->toString();
+        $schoolYearId = $request->has('SY_ID')
+            ? $request->string('SY_ID')->toString()
+            : (string) AcademicYear::query()->where('status', true)->value('SY_ID');
         $perPage = (int) $request->input('per_page', 10);
         if (! in_array($perPage, [10, 20, 50], true)) {
             $perPage = 10;
@@ -155,6 +157,9 @@ class TeacherSectionController extends Controller
     public function advisoryIndex(Request $request): View
     {
         $staffId = $request->user()?->staff_id;
+        $schoolYearId = $request->has('SY_ID')
+            ? $request->string('SY_ID')->toString()
+            : (string) AcademicYear::query()->where('status', true)->value('SY_ID');
 
         $sections = Section::query()
             ->with(['academicYear', 'cluster', 'gradeLevel'])
@@ -162,6 +167,9 @@ class TeacherSectionController extends Controller
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
             }])
             ->where('staff_ID', $staffId)
+            ->when($schoolYearId !== '', function ($query) use ($schoolYearId): void {
+                $query->where('SY_ID', $schoolYearId);
+            })
             ->orderByDesc('SY_ID')
             ->orderBy('grade_ID')
             ->orderBy('name')
@@ -169,6 +177,8 @@ class TeacherSectionController extends Controller
 
         return view('users.teacher.advisory.index', [
             'sections' => $sections,
+            'academicYears' => AcademicYear::query()->orderByDesc('school_year')->get(['SY_ID', 'school_year']),
+            'schoolYearId' => $schoolYearId,
         ]);
     }
 

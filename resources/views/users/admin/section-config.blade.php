@@ -6,6 +6,10 @@
 
 @section('title', 'Sections')
 
+@push('toasts')
+    <x-password-reset-toasts :include-errors="false" test-prefix="sections" />
+@endpush
+
 @section('content')
 @php
     $modalOpen = $errors->any();
@@ -16,16 +20,15 @@
     <div>
         <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Sections</h1>
     </div>
+    <div class="flex flex-wrap gap-2">
+    <button id="copySectionsTrigger" type="button" onclick="openCopySectionsModal()" class="inline-flex items-center justify-center rounded-lg border border-[#296374] bg-white px-4 py-2.5 text-sm font-bold text-[#296374] shadow-sm transition hover:bg-gray-50">Copy Sections</button>
     <button type="button" onclick="openSectionModal()" class="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style="background-color: #296374;">
         Add Section
     </button>
+    </div>
 </div>
 
-@if (session('success'))
-    <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-        {{ session('success') }}
-    </div>
-@endif
+@include('users.admin.partials.copy-sections-modal')
 
 @if ($errors->any())
     <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -3,7 +3,18 @@
 @section('title', 'Advisory Sections')
 
 @section('content')
-<div class="mb-8 border-b-2 border-[#296374] pb-3"><h1 class="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Advisory</h1></div>
+<div class="mb-8 flex items-end justify-between gap-4 border-b-2 border-[#296374] pb-3">
+    <h1 class="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Advisory</h1>
+    <form method="GET" action="{{ route('teacher.advisory.index') }}" class="shrink-0">
+        <label for="SY_ID" class="mb-1 block text-xs font-semibold text-gray-600">School Year</label>
+        <select name="SY_ID" id="SY_ID" onchange="this.form.submit()" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <option value="">All school years</option>
+            @foreach ($academicYears as $year)
+                <option value="{{ $year->SY_ID }}" @selected($schoolYearId == $year->SY_ID)>{{ $year->school_year }}</option>
+            @endforeach
+        </select>
+    </form>
+</div>
 
 @if (session('status'))
     <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{{ session('status') }}</div>
@@ -52,6 +63,6 @@
         @endforeach
     </div>
 @else
-    <div class="rounded-md border border-slate-300 bg-white px-6 py-16 text-center shadow-sm"><p class="font-medium text-gray-600">No advisory section assigned yet</p><p class="mt-1 text-sm text-gray-500">Advisory classes will appear here once you are assigned as a class adviser.</p></div>
+    <div class="rounded-md border border-slate-300 bg-white px-6 py-16 text-center shadow-sm"><p class="font-medium text-gray-600">No advisory sections found</p><p class="mt-1 text-sm text-gray-500">No advisory classes are assigned to you for the selected school year filter.</p></div>
 @endif
 @endsection

@@ -17,6 +17,7 @@ use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -158,7 +159,7 @@ class TeacherAssignmentController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        $academicYears = AcademicYear::query()->orderByDesc('school_year')->get(['SY_ID', 'school_year']);
+        $academicYears = AcademicYear::query()->orderByDesc('school_year')->get(['SY_ID', 'school_year', 'status']);
         $clusters = Cluster::query()->orderBy('name')->get(['cluster_ID', 'name']);
 
         return view('users.admin.teacher-assignments', [
@@ -181,6 +182,92 @@ class TeacherAssignmentController extends Controller
             'advisorySchoolYearId' => $advisorySchoolYearId,
             'advisorySearch' => $advisorySearch,
         ]);
+    }
+
+    public function copy(Request $request)
+    {
+        $data = $request->validateWithBag('copyAssignments', [
+            'source_SY_ID' => ['required', 'integer', 'exists:academic_years,SY_ID'],
+            'target_SY_ID' => ['required', 'integer', 'different:source_SY_ID', 'exists:academic_years,SY_ID'],
+            'copy_grade_level' => ['required', Rule::in(array_merge(['all'], array_column(GradeLevel::options(), 'value')))],
+        ], [], [
+            'source_SY_ID' => 'source school year',
+            'target_SY_ID' => 'destination school year',
+            'copy_grade_level' => 'grade level',
+        ]);
+
+        $counts = DB::transaction(function () use ($data): array {
+            AcademicYear::query()->whereKey($data['target_SY_ID'])->lockForUpdate()->firstOrFail();
+
+            $sources = TeacherSubjectAssignment::query()
+                ->with(['section', 'curriculumSubject.curriculumGradeLevel', 'staff.role'])
+                ->where('SY_ID', $data['source_SY_ID'])
+                ->whereHas('section', function ($query) use ($data): void {
+                    $query->where('SY_ID', $data['source_SY_ID'])
+                        ->when($data['copy_grade_level'] !== 'all', fn ($query) => $query
+                            ->where('grade_ID', GradeLevel::idForValue($data['copy_grade_level'])));
+                })
+                ->get();
+
+            if ($sources->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'source_SY_ID' => 'No subject teacher assignments found for the selected school year and grade level.',
+                ])->errorBag('copyAssignments');
+            }
+
+            $counts = ['copied' => 0, 'existing' => 0, 'section' => 0, 'teacher' => 0];
+            foreach ($sources as $source) {
+                $destination = Section::query()
+                    ->where('SY_ID', $data['target_SY_ID'])
+                    ->where('name', $source->section->name)
+                    ->where('grade_ID', $source->section->grade_ID)
+                    ->where('cluster_ID', $source->section->cluster_ID)
+                    ->where('curriculum_grade_level_ID', $source->section->curriculum_grade_level_ID)
+                    ->first();
+
+                if (! $destination || ! $source->curriculumSubject ||
+                    ! $this->curriculumSubjectMatchesSection($destination, $source->curriculumSubject)) {
+                    $counts['section']++;
+
+                    continue;
+                }
+
+                if (TeacherSubjectAssignment::query()->where('section_ID', $destination->section_ID)
+                    ->where('curr_subj_ID', $source->curr_subj_ID)->exists()) {
+                    $counts['existing']++;
+
+                    continue;
+                }
+
+                if ($source->staff?->role?->role_name !== 'teacher' || $source->staff->status !== 'active') {
+                    $counts['teacher']++;
+
+                    continue;
+                }
+
+                TeacherSubjectAssignment::query()->create([
+                    'section_ID' => $destination->section_ID,
+                    'curr_subj_ID' => $source->curr_subj_ID,
+                    'staff_ID' => $source->staff_ID,
+                    'SY_ID' => $data['target_SY_ID'],
+                ]);
+                $counts['copied']++;
+            }
+
+            return $counts;
+        });
+
+        $message = "Copied {$counts['copied']} subject teacher assignment(s).";
+        foreach (['existing' => 'already assigned', 'section' => 'missing or incompatible destination section/subject', 'teacher' => 'teacher unavailable or inactive'] as $key => $reason) {
+            if ($counts[$key] > 0) {
+                $message .= " Skipped {$counts[$key]}: {$reason}.";
+            }
+        }
+
+        $prefix = $request->routeIs('principal.*') ? 'principal.' : 'admin.';
+
+        return redirect()->route($prefix.'teacher-assignments.index', ['tab' => 'subjects', 'SY_ID' => $data['target_SY_ID']])
+            ->with($counts['copied'] > 0 ? 'status' : 'warning', $message);
     }
 
     public function store(Request $request)

@@ -55,6 +55,7 @@ function createSectionPageFixtures(string $username, array $sectionOverrides = [
 
     $cluster = Cluster::query()->create(['name' => 'General']);
     $gradeLevel = GradeLevel::query()->where('grade_label', 'Grade 7')->firstOrFail();
+    $curriculum->update(['grade_ID' => $gradeLevel->grade_ID, 'cluster_ID' => $cluster->cluster_ID]);
 
     $section = Section::query()->create(array_merge([
         'name' => 'Einstein',
@@ -215,4 +216,73 @@ test('updating a section also rejects capacity above 100', function () {
         ->assertSessionHasErrors('capacity');
 
     expect($section->fresh()->capacity)->toBe(40);
+});
+
+test('management can copy sections into a previous year with optional advisers', function (string $role, string $mode) {
+    ['admin' => $admin, 'section' => $source, 'academicYear' => $current] = createSectionPageFixtures('copy.'.$role.$mode);
+    $admin->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    $previous = AcademicYear::query()->create([
+        'school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false,
+    ]);
+    $source->update(['status' => false]);
+    $otherGrade = $source->replicate();
+    $otherGrade->fill(['name' => 'Newton', 'grade_ID' => GradeLevel::idForValue('grade_8')])->save();
+
+    $this->actingAs($admin)->get(route($role.'.section-config.index'))
+        ->assertOk()->assertSee('Copy Sections')->assertSee(route($role.'.section-config.copy'));
+
+    $payload = ['source_SY_ID' => $current->SY_ID, 'target_SY_ID' => $previous->SY_ID, 'copy_grade_level' => 'grade_7', 'adviser_mode' => $mode];
+    $this->post(route($role.'.section-config.copy'), $payload)
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route($role.'.section-config.index', ['SY_ID' => $previous->SY_ID]));
+
+    $copy = Section::query()->where('SY_ID', $previous->SY_ID)->sole();
+    foreach (['name', 'grade_ID', 'cluster_ID', 'curriculum_grade_level_ID', 'room', 'capacity'] as $field) {
+        expect($copy->$field)->toBe($source->$field);
+    }
+    expect($copy->staff_ID)->toBe($mode === 'keep' ? $source->staff_ID : null)
+        ->and($copy->status)->toBeTrue()
+        ->and($source->fresh()->status)->toBeFalse()
+        ->and($current->fresh()->status)->toBeTrue()
+        ->and($previous->fresh()->status)->toBeFalse();
+
+    $copy->update(['room' => 'Keep this room', 'status' => false]);
+    $this->post(route($role.'.section-config.copy'), array_merge($payload, ['copy_grade_level' => 'all']))
+        ->assertSessionHasNoErrors()->assertSessionHas('success', 'Copied 1 section(s). Skipped 1 section(s) already present in the destination school year.');
+    expect(Section::query()->where('SY_ID', $previous->SY_ID)->count())->toBe(2)
+        ->and($copy->fresh()->room)->toBe('Keep this room')
+        ->and($copy->fresh()->status)->toBeFalse();
+})->with(['admin', 'principal'])->with(['keep', 'empty']);
+
+test('copy sections rejects invalid selections and reopens only the copy modal', function () {
+    ['admin' => $admin, 'academicYear' => $year] = createSectionPageFixtures('copy.invalid');
+    $url = route('admin.section-config.index');
+    $this->actingAs($admin)->from($url)->post(route('admin.section-config.copy'), [
+        'source_SY_ID' => $year->SY_ID, 'target_SY_ID' => $year->SY_ID,
+        'copy_grade_level' => 'grade_13', 'adviser_mode' => 'invalid',
+    ])->assertSessionHasErrorsIn('copySections', ['target_SY_ID', 'copy_grade_level', 'adviser_mode']);
+    $this->get($url)->assertSee('id="copySectionsModal" role="dialog" aria-modal="true" aria-labelledby="copySectionsTitle" data-open="true"', false)
+        ->assertSee('id="sectionModal" role="dialog" aria-modal="true" aria-labelledby="sectionModalTitle" data-open="false"', false);
+    expect(Section::query()->count())->toBe(1);
+});
+
+test('copy sections reports an empty source selection and rejects missing years', function () {
+    ['admin' => $admin, 'academicYear' => $year] = createSectionPageFixtures('copy.empty');
+    $other = AcademicYear::query()->create([
+        'school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false,
+    ]);
+    $payload = ['source_SY_ID' => $year->SY_ID, 'target_SY_ID' => $other->SY_ID, 'copy_grade_level' => 'grade_12', 'adviser_mode' => 'empty'];
+    $this->actingAs($admin)->post(route('admin.section-config.copy'), $payload)
+        ->assertSessionHasErrorsIn('copySections', ['source_SY_ID']);
+    $this->post(route('admin.section-config.copy'), array_merge($payload, ['source_SY_ID' => 99999, 'target_SY_ID' => 99998]))
+        ->assertSessionHasErrorsIn('copySections', ['source_SY_ID', 'target_SY_ID']);
+    expect(Section::query()->count())->toBe(1);
+});
+
+test('teachers cannot copy sections through management routes', function () {
+    ['admin' => $teacher] = createSectionPageFixtures('copy.forbidden');
+    $teacher->update(['role_id' => Role::query()->firstOrCreate(['role_name' => 'teacher'])->id]);
+    foreach (['admin', 'principal'] as $role) {
+        $this->actingAs($teacher)->post(route($role.'.section-config.copy'), [])->assertForbidden();
+    }
 });

@@ -257,6 +257,87 @@ test('admin can create a subject assignment from the restyled page', function ()
     expect(TeacherSubjectAssignment::query()->where('section_ID', $unassignedSection->section_ID)->exists())->toBeTrue();
 });
 
+test('management can copy subject assignments to matching sections in a previous year', function (string $role, string $grade) {
+    ['admin' => $admin, 'teacher' => $teacher, 'section' => $source, 'assignment' => $original] = createTeacherAssignmentPageFixtures('copy.assignments.'.$role.$grade);
+    $admin->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    $year = AcademicYear::query()->create(['school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false]);
+    $destination = $source->replicate();
+    $destination->fill(['SY_ID' => $year->SY_ID, 'staff_ID' => null])->save();
+    $url = route($role.'.teacher-assignments.index', ['tab' => 'subjects', 'SY_ID' => $year->SY_ID]);
+    $this->actingAs($admin)->get($url)->assertOk()->assertSee('Copy Assignments')->assertSee(route($role.'.teacher-assignments.copy'));
+    $payload = ['source_SY_ID' => $source->SY_ID, 'target_SY_ID' => $year->SY_ID, 'copy_grade_level' => $grade];
+    $this->post(route($role.'.teacher-assignments.copy'), $payload)->assertRedirect($url)->assertSessionHasNoErrors();
+    $copy = TeacherSubjectAssignment::query()->where('section_ID', $destination->section_ID)->sole();
+    expect($copy->staff_ID)->toBe($teacher->staff_id)
+        ->and($copy->curr_subj_ID)->toBe($original->curr_subj_ID)
+        ->and($copy->SY_ID)->toBe($year->SY_ID)
+        ->and($copy->grades()->count())->toBe(0)
+        ->and($destination->fresh()->staff_ID)->toBeNull()
+        ->and($source->academicYear->status)->toBeTrue()
+        ->and($year->fresh()->status)->toBeFalse();
+    $this->get($url)->assertSee('data-test="teacher-assignments-status"', false)->assertSee('Copied 1 subject teacher assignment(s).');
+    $replacement = createTeacherAssignmentPageTeacher('replacement.'.$role.$grade, 'Other', 'Teacher');
+    $copy->update(['staff_ID' => $replacement->staff_id]);
+    $this->post(route($role.'.teacher-assignments.copy'), $payload)->assertSessionHas('warning', 'Copied 0 subject teacher assignment(s). Skipped 1: already assigned.');
+    expect($copy->fresh()->staff_ID)->toBe($replacement->staff_id)
+        ->and($original->fresh()->staff_ID)->toBe($teacher->staff_id)
+        ->and(TeacherSubjectAssignment::query()->count())->toBe(2);
+})->with(['admin', 'principal'])->with(['all', 'grade_11']);
+
+test('copy assignments skips missing or incompatible destination sections and inactive teachers', function (string $case) {
+    ['admin' => $admin, 'teacher' => $teacher, 'section' => $source] = createTeacherAssignmentPageFixtures('copy.skip.'.$case);
+    $year = AcademicYear::query()->create(['school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false]);
+    if ($case !== 'missing') {
+        $destination = $source->replicate();
+        $destination->SY_ID = $year->SY_ID;
+        if ($case === 'grade') {
+            $destination->grade_ID = GradeLevel::idForValue('grade_12');
+        }
+        if ($case === 'curriculum') {
+            $destination->curriculum_grade_level_ID = Curriculum::query()->create(['name' => 'Other', 'grade_ID' => $source->grade_ID])->curriculum_ID;
+        }
+        if ($case === 'cluster') {
+            $destination->cluster_ID = null;
+        }
+        $destination->save();
+    }
+    if ($case === 'teacher') {
+        $teacher->update(['status' => 'inactive']);
+    }
+    $this->actingAs($admin)->post(route('admin.teacher-assignments.copy'), [
+        'source_SY_ID' => $source->SY_ID, 'target_SY_ID' => $year->SY_ID, 'copy_grade_level' => 'all',
+    ])->assertSessionHasNoErrors()->assertSessionHas('warning');
+    expect(TeacherSubjectAssignment::query()->count())->toBe(1);
+})->with(['missing', 'grade', 'curriculum', 'cluster', 'teacher']);
+
+test('copy assignments validates years and grade selection and restores its modal', function () {
+    ['admin' => $admin, 'section' => $source] = createTeacherAssignmentPageFixtures('copy.validation');
+    $url = route('admin.teacher-assignments.index', ['tab' => 'subjects']);
+    $this->actingAs($admin)->from($url)->post(route('admin.teacher-assignments.copy'), [
+        'source_SY_ID' => $source->SY_ID, 'target_SY_ID' => $source->SY_ID, 'copy_grade_level' => 'grade_13',
+    ])->assertSessionHasErrorsIn('copyAssignments', ['target_SY_ID', 'copy_grade_level']);
+    $this->get($url)->assertOk()->assertSee('openCopyAssignmentsModal();', false)->assertSee('destination school year');
+    $this->post(route('admin.teacher-assignments.copy'), ['source_SY_ID' => 99999, 'target_SY_ID' => 99998, 'copy_grade_level' => 'all'])
+        ->assertSessionHasErrorsIn('copyAssignments', ['source_SY_ID', 'target_SY_ID']);
+    expect(TeacherSubjectAssignment::query()->count())->toBe(1);
+});
+
+test('copy assignments limits sources by grade and reports empty selections', function () {
+    ['admin' => $admin, 'section' => $source] = createTeacherAssignmentPageFixtures('copy.empty');
+    $year = AcademicYear::query()->create(['school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false]);
+    $this->actingAs($admin)->post(route('admin.teacher-assignments.copy'), [
+        'source_SY_ID' => $source->SY_ID, 'target_SY_ID' => $year->SY_ID, 'copy_grade_level' => 'grade_7',
+    ])->assertSessionHasErrorsIn('copyAssignments', ['source_SY_ID']);
+    expect(TeacherSubjectAssignment::query()->count())->toBe(1);
+});
+
+test('teachers cannot copy assignments through management routes', function () {
+    ['teacher' => $teacher] = createTeacherAssignmentPageFixtures('copy.denied');
+    foreach (['admin', 'principal'] as $role) {
+        $this->actingAs($teacher)->post(route($role.'.teacher-assignments.copy'), [])->assertForbidden();
+    }
+});
+
 test('admin can bulk assign a teacher to compatible section subjects', function () {
     ['admin' => $admin, 'teacher' => $teacher, 'unassignedSection' => $section, 'curriculumSubject' => $curriculumSubject] = createTeacherAssignmentPageFixtures('admin.assignments.bulk');
 

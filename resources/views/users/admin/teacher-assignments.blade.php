@@ -6,6 +6,10 @@
 
 @section('title', 'Teacher Assignments')
 
+@push('toasts')
+    <x-password-reset-toasts :include-errors="false" test-prefix="teacher-assignments" />
+@endpush
+
 @section('content')
 @php
     $fieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
@@ -14,7 +18,7 @@
     $assignmentModalOpen = old('_form') === 'assignment' && $errors->any();
     $bulkModalOpen = old('_form') === 'bulk' && $errors->any();
     $reassignModalOpen = old('_form') === 'reassign' && $errors->any();
-    $activeTab = $assignmentModalOpen || $bulkModalOpen || $reassignModalOpen || request('tab') === 'subjects'
+    $activeTab = $assignmentModalOpen || $bulkModalOpen || $reassignModalOpen || $errors->getBag('copyAssignments')->any() || request('tab') === 'subjects'
         ? 'subjects'
         : 'advisory';
     $advisoryTeacherYearIds = $sections->whereNotNull('staff_ID')
@@ -26,11 +30,7 @@
     <h1 class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl">Teacher Assignments</h1>
 </div>
 
-@if (session('status'))
-    <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-        {{ session('status') }}
-    </div>
-@endif
+@include('users.admin.partials.copy-assignments-modal')
 
 @if ($errors->any() && ! in_array(old('_form'), ['advisory', 'assignment', 'bulk', 'reassign'], true))
     <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -197,7 +197,8 @@
                 @if (request()->hasAny(['search', 'grade_level', 'cluster_ID', 'SY_ID', 'per_page']))
                     <a href="{{ route($managementRoutePrefix.'teacher-assignments.index', ['tab' => 'subjects']) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
                 @endif
-                <div class="ml-auto flex items-center gap-2">
+                <div class="ml-auto flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="openCopyAssignmentsModal()" class="inline-flex h-10 items-center rounded-lg border border-[#296374] bg-white px-4 text-sm font-bold text-[#296374]">Copy Assignments</button>
                     <button type="button" onclick="openBulkModal()" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 transition hover:border-[#296374]/30 hover:text-[#296374]">Bulk Assign</button>
                     <button type="button" onclick="openAssignmentModal()" class="inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style="background-color: #296374;">New Assignment</button>
                 </div>

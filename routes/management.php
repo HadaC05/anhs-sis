@@ -71,6 +71,8 @@ Route::get('/section-configuration', [SectionConfigurationController::class, 'in
     ->name('section-config.index');
 Route::post('/section-configuration', [SectionConfigurationController::class, 'store'])
     ->name('section-config.store');
+Route::post('/section-configuration/copy', [SectionConfigurationController::class, 'copy'])
+    ->name('section-config.copy');
 Route::put('/section-configuration/{section}', [SectionConfigurationController::class, 'update'])
     ->name('section-config.update');
 Route::patch('/section-configuration/{section}/toggle-status', [SectionConfigurationController::class, 'toggleStatus'])
@@ -134,6 +136,8 @@ Route::post('/teacher-assignments', [TeacherAssignmentController::class, 'store'
     ->name('teacher-assignments.store');
 Route::post('/teacher-assignments/bulk', [TeacherAssignmentController::class, 'bulkAssign'])
     ->name('teacher-assignments.bulk');
+Route::post('/teacher-assignments/copy', [TeacherAssignmentController::class, 'copy'])
+    ->name('teacher-assignments.copy');
 Route::post('/teacher-assignments/advisory', [TeacherAssignmentController::class, 'assignAdvisory'])
     ->name('teacher-assignments.advisory.assign');
 Route::put('/teacher-assignments/advisory/{section}', [TeacherAssignmentController::class, 'updateAdvisory'])
