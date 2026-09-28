@@ -28,7 +28,7 @@ class PasswordResetOtpController extends Controller
         if (RateLimiter::tooManyAttempts($rateLimitKey, self::MAX_VERIFICATION_ATTEMPTS)) {
             return back()->withInput()->withErrors([
                 'email' => 'Too many code requests. Please try again in 10 minutes.',
-            ]);
+            ])->with('password_reset_notice_type', 'warning');
         }
 
         $user = Password::broker()->getUser(['email' => $email]);
@@ -78,13 +78,13 @@ class PasswordResetOtpController extends Controller
 
             return back()->withInput(['email' => $email])->withErrors([
                 'otp' => 'This code has expired. Please request a new one.',
-            ]);
+            ])->with('password_reset_notice_type', 'warning');
         }
 
         if (RateLimiter::tooManyAttempts($rateLimitKey, self::MAX_VERIFICATION_ATTEMPTS)) {
             return back()->withInput(['email' => $email])->withErrors([
                 'otp' => 'Too many incorrect attempts. Please request a new code.',
-            ]);
+            ])->with('password_reset_notice_type', 'warning');
         }
 
         if (! Hash::check($validated['otp'], $state['hash'] ?? '')) {

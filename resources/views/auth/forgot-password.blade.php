@@ -13,15 +13,7 @@
 @endsection
 
 @section('content')
-    @if (session('status'))
-        <div class="mb-4 p-3 rounded bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-sm" data-test="password-reset-status">
-            {{ session('status') }}
-        </div>
-    @elseif ($errors->has('email') || $errors->has('otp'))
-        <div class="mb-4 p-3 rounded bg-red-50 border-l-4 border-red-500 text-red-700 text-sm" data-test="password-reset-error">
-            {{ $errors->first('email') ?: $errors->first('otp') }}
-        </div>
-    @endif
+    <x-password-reset-toasts />
 
     <form method="POST" action="{{ route('password.otp.verify') }}">
         @csrf

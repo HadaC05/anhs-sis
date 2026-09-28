@@ -40,17 +40,35 @@ class StoreStudentDocumentsRequest extends FormRequest
      */
     public function messages(): array
     {
-        $maxSizeMessage = 'Each document must be '.self::MAX_FILE_SIZE_MEGABYTES.'MB or smaller.';
+        $maxSizeMessage = 'The file is too large. Each document must be '.self::MAX_FILE_SIZE_MEGABYTES.'MB or smaller.';
+        $formatMessage = 'This file format is not accepted. Choose a PDF, JPG, JPEG, or PNG file.';
+        $uploadMessage = 'The file could not be uploaded completely. Please select it again and retry.';
 
-        return [
+        $messages = [
+            'document.uploaded' => $uploadMessage,
+        ];
+
+        $files = ['document' => $this->file('document')];
+        foreach ((array) $this->file('documents', []) as $type => $file) {
+            $files['documents.'.$type] = $file;
+        }
+
+        foreach ($files as $field => $file) {
+            if ($file instanceof UploadedFile && in_array($file->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                $messages[$field.'.uploaded'] = 'The file is too large for the server. Choose a smaller file and try again.';
+            }
+        }
+
+        return array_merge($messages, [
+            'documents.*.uploaded' => $uploadMessage,
             'doc_type.required_with' => 'Select a document type.',
             'doc_type.in' => 'The selected document type is invalid.',
             'document.required_with' => 'Choose a file to upload.',
-            'document.mimes' => 'Documents must be a PDF, JPG, or PNG file.',
+            'document.mimes' => $formatMessage,
             'document.max' => $maxSizeMessage,
-            'documents.*.mimes' => 'Documents must be a PDF, JPG, or PNG file.',
+            'documents.*.mimes' => $formatMessage,
             'documents.*.max' => $maxSizeMessage,
-        ];
+        ]);
     }
 
     public function withValidator(Validator $validator): void

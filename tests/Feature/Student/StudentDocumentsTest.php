@@ -10,15 +10,41 @@ use Illuminate\Support\Facades\Storage;
 
 function createDocumentsStudent(array $overrides = []): Student
 {
-    return Student::query()->create(array_merge([
+    $student = Student::query()->create(array_merge([
         'username' => 'student.documents',
         'password' => Hash::make('password'),
         'change_password' => false,
         'lrn' => '123456789099',
         'first_name' => 'Ana',
         'last_name' => 'Santos',
+        'contact_no' => '09123456789',
+        'sex' => 'female',
+        'birthdate' => '2012-05-01',
+        'birthplace' => 'Butuan City',
+        'religion' => 'Catholic',
+        'mother_tongue' => 'Cebuano',
         'status' => 'active',
     ], $overrides));
+
+    $student->profile()->create([]);
+    foreach (['current', 'permanent'] as $type) {
+        $student->addresses()->create([
+            'address_type' => $type,
+            'barangay' => 'Doongan',
+            'municipality' => 'Butuan City',
+            'province' => 'Agusan del Norte',
+            'zip_code' => '8600',
+        ]);
+    }
+    foreach (['father', 'mother'] as $relationship) {
+        $student->guardians()->create([
+            'relationship' => $relationship,
+            'first_name' => $relationship === 'father' ? 'Pedro' : 'Maria',
+            'last_name' => 'Santos',
+        ]);
+    }
+
+    return $student;
 }
 
 function createStudentDocument(Student $student, array $overrides = []): StudentDocument
@@ -48,7 +74,7 @@ test('student documents page uses the student profile and grades page design', f
     $response->assertSee('Documents');
     $response->assertSee('LRN');
     $response->assertSee('Student Name');
-    $response->assertSee('Upload your required documents for enrollment verification. Each file must be 15MB or smaller.');
+    $response->assertSee('Each file must be a PDF, JPG, or PNG and 15MB or smaller.');
     $response->assertSee('0/2 required documents uploaded');
     $response->assertSee('Submit All');
     $response->assertSee('Requirement');
@@ -74,8 +100,8 @@ test('student documents page hides replace and delete for verified documents', f
 
     $response->assertOk();
     $response->assertSee('This document is verified and cannot be replaced.');
-    $response->assertDontSee('title="Replace Document"', false);
-    $response->assertDontSee('title="Delete"', false);
+    $markup = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $response->getContent());
+    expect($markup)->not->toContain('title="Replace Document"', 'title="Delete"');
 });
 
 test('student documents page shows the return reason for returned documents', function () {
@@ -247,7 +273,7 @@ test('student cannot upload a document larger than 15mb', function () {
         ])
         ->assertRedirect(route('student.documents'))
         ->assertSessionHasErrors([
-            'documents.birth_certificate' => 'Each document must be 15MB or smaller.',
+            'documents.birth_certificate' => 'The file is too large. Each document must be 15MB or smaller.',
         ]);
 
     expect(StudentDocument::query()->where('student_ID', $student->id)->exists())->toBeFalse();
@@ -273,6 +299,43 @@ test('student can upload a document that is 15mb', function () {
 
     expect(StudentDocument::query()->where('student_ID', $student->id)->where('doc_type', 'birth_certificate')->exists())->toBeTrue();
 });
+
+test('student upload explains rejected file formats', function (bool $single) {
+    Storage::fake('public');
+    $student = createDocumentsStudent();
+    $file = UploadedFile::fake()->create('notes.txt', 10, 'text/plain');
+    $payload = $single
+        ? ['doc_type' => 'birth_certificate', 'document' => $file]
+        : ['documents' => ['birth_certificate' => $file]];
+    $field = $single ? 'document' : 'documents.birth_certificate';
+
+    $response = $this->actingAs($student)
+        ->postJson(route('student.documents.upload'), $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([$field]);
+
+    expect($response->json('errors')[$field][0])
+        ->toBe('This file format is not accepted. Choose a PDF, JPG, JPEG, or PNG file.');
+
+    expect(StudentDocument::query()->where('student_ID', $student->id)->exists())->toBeFalse();
+})->with([true, false]);
+
+test('student upload explains files rejected by the server size limit', function (bool $single) {
+    $student = createDocumentsStudent();
+    $file = new UploadedFile('', 'large.pdf', 'application/pdf', UPLOAD_ERR_INI_SIZE, true);
+    $payload = $single
+        ? ['doc_type' => 'birth_certificate', 'document' => $file]
+        : ['documents' => ['birth_certificate' => $file]];
+    $field = $single ? 'document' : 'documents.birth_certificate';
+
+    $response = $this->actingAs($student)
+        ->postJson(route('student.documents.upload'), $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([$field]);
+
+    expect($response->json('errors')[$field][0])
+        ->toBe('The file is too large for the server. Choose a smaller file and try again.');
+})->with([true, false]);
 
 test('student cannot submit documents without selecting a file', function () {
     $student = createDocumentsStudent();

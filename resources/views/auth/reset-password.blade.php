@@ -13,11 +13,7 @@
 @endsection
 
 @section('content')
-    @if ($errors->any())
-        <div class="mb-4 p-3 rounded bg-red-50 border-l-4 border-red-500 text-red-700 text-sm" data-test="password-reset-error">
-            <p>{{ $errors->first() }}</p>
-        </div>
-    @endif
+    <x-password-reset-toasts />
 
     <form method="POST" action="{{ route('password.update') }}">
         @csrf

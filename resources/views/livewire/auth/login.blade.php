@@ -66,7 +66,9 @@
 
                 <div class="w-full max-w-md justify-self-center">
                     <div class="rounded-lg bg-white px-5 pb-8 pt-6 shadow-xl sm:px-8 sm:pb-10 sm:pt-8">
-                        @if (session('status'))
+                        @if (session('status') === trans('passwords.reset'))
+                        <x-password-reset-toasts :include-errors="false" test-prefix="login" />
+                        @elseif (session('status'))
                         <div class="mb-4 p-3 rounded bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-sm" data-test="login-status">
                             {{ session('status') }}
                         </div>

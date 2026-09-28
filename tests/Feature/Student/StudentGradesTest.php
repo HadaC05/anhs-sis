@@ -15,6 +15,11 @@ use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use Illuminate\Support\Facades\Hash;
 
+beforeEach(function () {
+    // Profile completion is covered separately; these tests exercise grade access.
+    $this->withoutMiddleware(\App\Http\Middleware\EnsureStudent::class);
+});
+
 /**
  * @return array{
  *     student: Student,
@@ -63,6 +68,10 @@ function createStudentGradesFixtures(bool $withReleasedGrade = true): array
     ]);
 
     $gradeLevel = GradeLevel::query()->where('grade_label', 'Grade 11')->firstOrFail();
+    $curriculum->update([
+        'grade_ID' => $gradeLevel->getKey(),
+        'semester_ID' => \App\Models\GradingSemester::query()->where('key', 'first')->value('semester_ID'),
+    ]);
 
     $cluster = Cluster::query()->create(['name' => 'General '.$suffix]);
 
@@ -110,9 +119,9 @@ function createStudentGradesFixtures(bool $withReleasedGrade = true): array
 
     if ($withReleasedGrade) {
         StudentSubjectGrade::query()->create([
-            'enrollment_ID' => $enrollment->enrollment_ID,
+            'student_subject_ID' => $enrollment->studentSubjects()->firstOrFail()->getKey(),
             'assignment_ID' => $assignment->assignment_ID,
-            'grading_period' => 'shs_sem1_term_1',
+            'term_ID' => \App\Models\GradingTerm::query()->where('key', 'term_1')->value('term_ID'),
             'numeric_grade' => 90,
             'status' => 'released',
             'posted_by' => $teacher->staff_id,
@@ -144,6 +153,36 @@ test('student grades page shows session filter and released grades table', funct
     $response->assertSee('Subject Type');
     $response->assertSee('Final Grade');
     $response->assertSee('PASSED');
+});
+
+test('student grade report shows released grades and supports printing', function () {
+    $fixtures = createStudentGradesFixtures();
+    $url = route('student.grades', ['session' => $fixtures['enrollment']->getKey(), 'report' => 1]);
+    $this->actingAs($fixtures['student'])->get(route('student.grades'))
+        ->assertOk()->assertSee(e($url), false);
+    $this->get($url)->assertOk()
+        ->assertSee('Print / Save as PDF')
+        ->assertSee('window.print()', false)
+        ->assertSee('Mathematics 8')
+        ->assertSee('>90<', false)
+        ->assertSee('Pending');
+
+    $fixtures['assignment']->grades()->firstOrFail()->update(['status' => 'approved']);
+    $this->get($url)->assertOk()->assertDontSee('>90<', false);
+});
+
+test('student grade report rejects an enrollment belonging to another student', function () {
+    $fixtures = createStudentGradesFixtures();
+    $otherStudent = $fixtures['student']->replicate();
+    $otherStudent->username = 'other.grade.report';
+    $otherStudent->lrn = '999999999999';
+    $otherStudent->save();
+    $otherEnrollment = $fixtures['enrollment']->replicate();
+    $otherEnrollment->student_ID = $otherStudent->getKey();
+    $otherEnrollment->save();
+    $this->actingAs($fixtures['student'])
+        ->get(route('student.grades', ['session' => $otherEnrollment->getKey(), 'report' => 1]))
+        ->assertNotFound();
 });
 
 test('student grades page keeps collapsible subject rows when no grades are released', function () {

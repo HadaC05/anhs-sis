@@ -54,14 +54,18 @@
                         @endforelse
                     </select>
                 </div>
-                <button
-                    type="button"
-                    id="toggleGradeReport"
+                <a
+                    @if ($enrollment)
+                        href="{{ route('student.grades', ['session' => $enrollment->enrollment_ID, 'report' => 1]) }}"
+                        target="_blank"
+                        rel="noopener"
+                    @else
+                        aria-disabled="true"
+                    @endif
                     class="inline-flex w-full items-center justify-center rounded-md border border-[#296374] bg-white px-4 py-2.5 text-sm font-semibold text-[#296374] transition hover:bg-[#296374]/5 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                    @disabled(! $enrollment)
                 >
                     Grade Report
-                </button>
+                </a>
             </form>
         </div>
 
@@ -223,7 +227,7 @@
                 </table>
             </div>
 
-            <div id="gradeReportLegend" class="hidden border-t border-gray-200 px-6 py-5">
+            <div id="gradeReportLegend" class="border-t border-gray-200 px-6 py-5">
                 <div class="grid gap-6 text-sm text-gray-700 md:grid-cols-3">
                     <div>
                         <h5 class="mb-2 font-bold text-gray-800">Descriptors</h5>
@@ -289,14 +293,6 @@
             });
         });
 
-        const reportButton = document.getElementById('toggleGradeReport');
-        const legend = document.getElementById('gradeReportLegend');
-        reportButton?.addEventListener('click', () => {
-            if (!legend) {
-                return;
-            }
-            legend.classList.toggle('hidden');
-        });
     })();
 </script>
 @endsection

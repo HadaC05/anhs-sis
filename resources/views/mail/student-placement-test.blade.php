@@ -10,6 +10,7 @@
         <tr>
             <td align="center">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+                    @include('mail.partials.school-logo')
                     <tr>
                         <td style="background:#296374;color:#ffffff;padding:20px 24px;">
                             <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.8;">Agusan National High School</p>

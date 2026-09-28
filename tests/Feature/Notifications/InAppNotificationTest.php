@@ -215,6 +215,53 @@ test('students are notified when their approved grades are released', function (
     });
 });
 
+test('student grade notices wait for every subject and are sent once per period', function () {
+    ['principal' => $principal, 'student' => $student, 'assignment' => $assignment] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $firstGrade = $assignment->grades()->firstOrFail();
+    $enrollment = $firstGrade->studentSubject->enrollment;
+    $subject = Subject::query()->create(['code' => 'MATH-NOTIFY', 'title' => 'Math', 'type' => 'core', 'status' => 'active']);
+    $curriculumSubject = CurriculumSubject::query()->create([
+        'curriculum_grade_level_ID' => $enrollment->curriculum_grade_level_ID,
+        'subject_ID' => $subject->getKey(),
+    ]);
+    \App\Support\StudentSubjectRoster::sync($enrollment);
+    $second = TeacherSubjectAssignment::query()->create([
+        'section_ID' => $assignment->section_ID,
+        'curr_subj_ID' => $curriculumSubject->getKey(),
+        'staff_ID' => $assignment->staff_ID,
+        'SY_ID' => $assignment->SY_ID,
+    ]);
+
+    $this->actingAs($principal)->post(route('principal.grade-releases.release', $assignment))->assertRedirect();
+    expect($student->notifications()->count())->toBe(0);
+
+    $grade = StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $enrollment->studentSubjects()->where('curr_subj_ID', $curriculumSubject->getKey())->firstOrFail()->getKey(),
+        'assignment_ID' => $second->getKey(),
+        'term_ID' => $firstGrade->term_ID,
+        'numeric_grade' => 85,
+        'status' => GradeStatus::APPROVED,
+        'posted_by' => $assignment->staff_ID,
+    ]);
+    \App\Support\StudentGradeNotifier::released($assignment, collect([$student]));
+    expect($student->notifications()->count())->toBe(0);
+
+    $this->post(route('principal.grade-releases.bulk-release'), ['assignment_ids' => [$assignment->getKey(), $second->getKey()]])->assertRedirect();
+    \App\Support\StudentGradeNotifier::released($assignment, collect([$student]));
+    expect($student->notifications()->count())->toBe(1)
+        ->and($student->notifications()->first()->data['message'])->toContain('All your grades');
+
+    $nextTerm = \App\Models\GradingTerm::query()->where('term_ID', '!=', $firstGrade->term_ID)->firstOrFail();
+    foreach ([$firstGrade, $grade] as $record) {
+        $copy = $record->replicate();
+        $copy->term_ID = $nextTerm->getKey();
+        $copy->status = GradeStatus::APPROVED;
+        $copy->save();
+    }
+    $this->post(route('principal.grade-releases.bulk-release'), ['assignment_ids' => [$assignment->getKey(), $second->getKey()]])->assertRedirect();
+    expect($student->notifications()->count())->toBe(2);
+});
+
 test('grade releases default to all statuses and support status filters', function () {
     ['principal' => $principal, 'assignment' => $pending] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
     ['assignment' => $released] = createInAppNotificationGradeAssignment(GradeStatus::RELEASED);
@@ -504,9 +551,9 @@ function createInAppNotificationGradeAssignment(string $gradeStatus): array
     ]);
 
     StudentSubjectGrade::query()->create([
-        'enrollment_ID' => $enrollment->enrollment_ID,
+        'student_subject_ID' => $enrollment->studentSubjects()->firstOrFail()->getKey(),
         'assignment_ID' => $assignment->assignment_ID,
-        'grading_period' => 'term_1',
+        'term_ID' => \App\Models\GradingTerm::query()->where('key', 'term_1')->value('term_ID'),
         'numeric_grade' => 90,
         'status' => $gradeStatus,
         'posted_by' => $teacher->staff_id,

@@ -73,6 +73,30 @@ test('marking a single notification as read leaves other unread items', function
     expect($student->unreadNotifications()->count())->toBe(1);
 });
 
+test('opening notifications clears only the badge and new arrivals restore it', function () {
+    $student = createNotificationDropdownStudent();
+    $other = createNotificationDropdownStudent();
+    $enrollment = createNotificationDropdownEnrollment($student);
+    $notice = new EnrollmentStatusUpdated($enrollment, EnrollmentStatus::ENROLLED);
+    $student->notify($notice);
+    $student->notify($notice);
+    $other->notify($notice);
+
+    Livewire::actingAs($student)->test(NotificationDropdown::class)
+        ->assertViewHas('newCount', 2)
+        ->call('markAsSeen')
+        ->assertDontSee('data-test="notification-unread-count"', false)
+        ->assertViewHas('unreadCount', 2);
+
+    Livewire::test(NotificationDropdown::class)->assertViewHas('newCount', 0);
+    expect($other->notifications()->whereNull('seen_at')->count())->toBe(1);
+
+    $student->notify($notice);
+    Livewire::test(NotificationDropdown::class)
+        ->assertViewHas('newCount', 1)
+        ->assertViewHas('unreadCount', 3);
+});
+
 function createNotificationDropdownStudent(): Student
 {
     return Student::query()->create([
@@ -118,6 +142,11 @@ function createNotificationDropdownEnrollment(Student $student): Enrollment
 
     return Enrollment::query()->create([
         'student_ID' => $student->id,
+        'curriculum_grade_level_ID' => \App\Models\Curriculum::query()->create([
+            'name' => 'Notification test curriculum',
+            'grade_ID' => $gradeLevel->grade_ID,
+            'status' => true,
+        ])->getKey(),
         'SY_ID' => $academicYear->SY_ID,
         'grade_ID' => $gradeLevel->grade_ID,
         'learner_type' => 'regular',

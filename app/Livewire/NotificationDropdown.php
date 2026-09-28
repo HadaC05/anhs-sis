@@ -12,6 +12,11 @@ use Livewire\Component;
 
 class NotificationDropdown extends Component
 {
+    public function markAsSeen(): void
+    {
+        $this->notificationQuery()?->whereNull('seen_at')->update(['seen_at' => now()]);
+    }
+
     public function markAsRead(string $notificationId): void
     {
         $query = $this->notificationQuery();
@@ -41,6 +46,7 @@ class NotificationDropdown extends Component
         return view('livewire.notification-dropdown', [
             'notifications' => $user?->notifications()->with('notificationType')->latest()->limit(20)->get() ?? collect(),
             'unreadCount' => $user?->unreadNotifications()->count() ?? 0,
+            'newCount' => $user?->unreadNotifications()->whereNull('seen_at')->count() ?? 0,
         ]);
     }
 

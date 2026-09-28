@@ -361,7 +361,11 @@ class StudentDashboardController extends Controller
         $selectedEnrollment = $enrollments->firstWhere('enrollment_ID', $selectedEnrollmentId)
             ?? $enrollments->first();
 
-        return view('users.student.grades', [
+        if ($request->boolean('report')) {
+            abort_unless($selectedEnrollment && (int) $selectedEnrollment->enrollment_ID === $selectedEnrollmentId, 404);
+        }
+
+        return view($request->boolean('report') ? 'users.student.grade-report' : 'users.student.grades', [
             'student' => $student,
             'application' => $student?->application,
             'enrollments' => $enrollments,

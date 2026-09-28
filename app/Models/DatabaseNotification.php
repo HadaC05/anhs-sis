@@ -15,6 +15,7 @@ class DatabaseNotification extends LaravelDatabaseNotification
         return [
             'data' => 'array',
             'read_at' => 'datetime',
+            'seen_at' => 'datetime',
             'notification_type_ID' => 'integer',
         ];
     }

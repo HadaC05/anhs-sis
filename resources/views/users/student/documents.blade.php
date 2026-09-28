@@ -347,7 +347,19 @@
             showError(errorText.textContent);
         }
 
-        const fileIsTooLarge = (file) => file && file.size > maxBytes;
+        const fileValidationError = (file) => {
+            if (!file) return null;
+
+            const problems = [];
+            if (file.size > maxBytes) {
+                problems.push(`The file is too large. Choose a file ${maxMegabytes}MB or smaller.`);
+            }
+            if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) {
+                problems.push('This file format is not accepted. Choose a PDF, JPG, JPEG, or PNG file.');
+            }
+
+            return problems.length ? `“${file.name}”: ${problems.join(' ')}` : null;
+        };
 
         const updateDocumentDetails = (documentType, documentDetails) => {
             document.querySelectorAll(`[data-document-type="${documentType}"]`).forEach((container) => {
@@ -396,8 +408,9 @@
                 return;
             }
 
-            if (fileIsTooLarge(input.files[0])) {
-                showError('Each document must be ' + maxMegabytes + 'MB or smaller.');
+            const validationError = fileValidationError(input.files[0]);
+            if (validationError) {
+                showError(validationError);
                 return;
             }
 
@@ -417,10 +430,21 @@
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                 });
-                const result = await response.json();
+                if (response.status === 413) {
+                    showError('The upload is too large for the server. Choose a smaller file and try again.');
+                    return;
+                }
+
+                const result = await response.json().catch(() => null);
 
                 if (!response.ok) {
-                    showError(result.message || 'Unable to upload this document.');
+                    const validationMessages = Object.values(result?.errors || {}).flat();
+                    showError(validationMessages.join(' ') || result?.message || 'The server could not accept this upload. Please try again.');
+                    return;
+                }
+
+                if (!result) {
+                    showError('The server returned an unexpected response. Refresh the page and check whether the document was uploaded before trying again.');
                     return;
                 }
 
@@ -432,7 +456,7 @@
                 }
                 showSuccessToast(result.message || 'Document uploaded successfully.');
             } catch (error) {
-                showError('Unable to upload this document. Please try again.');
+                showError('The upload could not be completed. Check your connection and try again.');
             } finally {
                 submitter.disabled = false;
             }
@@ -442,9 +466,9 @@
             input.addEventListener('change', () => {
                 const file = input.files && input.files[0];
 
-                if (fileIsTooLarge(file)) {
-                    input.value = '';
-                    showError('Each document must be ' + maxMegabytes + 'MB or smaller.');
+                const validationError = fileValidationError(file);
+                if (validationError) {
+                    showError(validationError);
                     return;
                 }
 
@@ -462,12 +486,14 @@
                 return;
             }
 
-            const oversized = fileInputs
-                .some((input) => fileIsTooLarge(input.files && input.files[0]));
+            const validationErrors = fileInputs
+                .filter((input) => !input.disabled)
+                .map((input) => fileValidationError(input.files && input.files[0]))
+                .filter(Boolean);
 
-            if (oversized) {
+            if (validationErrors.length) {
                 event.preventDefault();
-                showError('Each document must be ' + maxMegabytes + 'MB or smaller.');
+                showError(validationErrors.join(' '));
             }
         });
     })();

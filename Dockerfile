@@ -51,6 +51,7 @@ RUN apk add --no-cache \
 COPY . .
 COPY --from=dependencies /app/vendor ./vendor
 COPY --from=assets /app/public/build ./public/build
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 COPY docker/nginx/default.conf.template /etc/nginx/http.d/default.conf.template
 COPY docker/start-container /usr/local/bin/start-container
 
