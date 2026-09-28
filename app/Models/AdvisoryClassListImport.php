@@ -15,6 +15,8 @@ class AdvisoryClassListImport extends Model
         'original_filename',
         'file_contents',
         'status',
+        'total_students',
+        'processed_students',
         'result',
         'failure_message',
         'started_at',
@@ -28,6 +30,8 @@ class AdvisoryClassListImport extends Model
     protected function casts(): array
     {
         return [
+            'total_students' => 'integer',
+            'processed_students' => 'integer',
             'result' => 'array',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',

@@ -147,6 +147,7 @@
     </div>
 
     @stack('modals')
+    @stack('toasts')
     <x-idle-session-timeout />
     @livewireScripts
 </body>

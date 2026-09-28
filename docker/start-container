@@ -26,8 +26,10 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# The official nginx image entrypoint expands ${PORT} in this template.
+# Expand the web port before Supervisor starts Nginx and PHP.
 envsubst '${PORT}' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf
 
-php-fpm -D
-exec nginx -g 'daemon off;'
+# Keep the database worker in the same container for free Render web services.
+# It starts only after migrations and caches are ready.
+export RUN_QUEUE_WORKER="${RUN_QUEUE_WORKER:-true}"
+exec /usr/bin/supervisord -c /etc/supervisord.conf

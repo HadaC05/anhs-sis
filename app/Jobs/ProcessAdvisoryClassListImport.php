@@ -22,22 +22,24 @@ class ProcessAdvisoryClassListImport implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public int $importId) {}
+    public bool $failOnTimeout = true;
+
+    public function __construct(public int $importId)
+    {
+        $this->timeout = (int) config('queue.class_list_import_timeout', 1200);
+    }
 
     public function handle(TeacherSectionController $controller): void
     {
         $import = AdvisoryClassListImport::query()->find($this->importId);
 
-        if (! $import || $import->status !== 'queued') {
+        if (! $import || ! AdvisoryClassListImport::query()->whereKey($this->importId)
+            ->where('status', 'queued')->update(['status' => 'processing', 'started_at' => now()])) {
             return;
         }
 
-        $import->update([
-            'status' => 'processing',
-            'started_at' => now(),
-        ]);
-
         $temporaryPath = null;
+        $readingFile = true;
 
         try {
             $contents = base64_decode((string) $import->file_contents, true);
@@ -61,8 +63,15 @@ class ProcessAdvisoryClassListImport implements ShouldQueue
                 throw new RuntimeException('No valid learner rows were found. The file must include each learner\'s 12-digit LRN and name.');
             }
 
+            $readingFile = false;
             $section = Section::query()->findOrFail($import->section_ID);
-            $result = $controller->importAdvisoryClassListRecords($records, $section, $import->requested_by);
+            $import->update(['total_students' => count($records)]);
+            $result = $controller->importAdvisoryClassListRecords(
+                $records, $section, $import->requested_by,
+                function (int $processed, array $result) use ($import): void {
+                    $import->update(['processed_students' => $processed, 'result' => $result]);
+                },
+            );
 
             $import->update([
                 'status' => 'completed',
@@ -73,16 +82,26 @@ class ProcessAdvisoryClassListImport implements ShouldQueue
         } catch (Throwable $exception) {
             report($exception);
 
-            $import->update([
-                'status' => 'failed',
-                'failure_message' => $exception->getMessage(),
-                'file_contents' => null,
-                'completed_at' => now(),
-            ]);
+            $this->failed($exception);
+            if ($readingFile && $exception instanceof RuntimeException) {
+                $import->update(['failure_message' => $exception->getMessage()]);
+            }
         } finally {
             if ($temporaryPath && file_exists($temporaryPath)) {
                 unlink($temporaryPath);
             }
         }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        AdvisoryClassListImport::query()->whereKey($this->importId)
+            ->whereIn('status', ['queued', 'processing'])
+            ->update([
+                'status' => 'failed',
+                'failure_message' => 'The import could not finish. Students already processed are saved. Please upload the file again to finish importing.',
+                'file_contents' => null,
+                'completed_at' => now(),
+            ]);
     }
 }

@@ -5,8 +5,14 @@
 @section('content')
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'class-list'])
 
-@if (session('status') || session('class_list_import_error') || $errors->has('class_list'))
-    <div id="class-list-import-toasts" class="fixed right-5 top-5 z-[120] flex w-full max-w-sm flex-col gap-3" aria-live="polite">
+@php
+    $importResult = $latestImport?->result ?? [];
+    $importFinished = $latestImport && in_array($latestImport->status, ['completed', 'failed'], true);
+@endphp
+
+@push('toasts')
+@if (session('status') || session('class_list_import_error') || $errors->has('class_list') || $importFinished)
+    <div id="class-list-import-toasts" class="flex flex-col gap-3" style="position: fixed; top: var(--import-toast-top, 6rem); right: 1rem; z-index: 1000; width: min(28rem, calc(100vw - 2rem)); max-height: calc(100dvh - var(--import-toast-top, 6rem) - 1rem); overflow-y: auto; overflow-wrap: anywhere;" aria-live="polite">
         @if (session('status'))
             <div class="flex items-start gap-3 rounded-lg border border-emerald-200 bg-white p-4 text-sm font-medium text-emerald-800 shadow-xl" role="status">
                 <span>{{ session('status') }}</span>
@@ -15,32 +21,40 @@
         @endif
         @if (session('class_list_import_error') || $errors->has('class_list'))
             <div class="flex items-start gap-3 rounded-lg border border-red-200 bg-white p-4 text-sm font-medium text-red-800 shadow-xl" role="alert">
-                <span>{{ session('class_list_import_error') ?? 'Failed to enroll or upload student(s). Please check the class capacity, enrollment status, and uploaded file.' }}</span>
+                <span>{{ session('class_list_import_error') ?? $errors->first('class_list') }}</span>
                 <button type="button" class="ml-auto text-red-700" data-dismiss-toast aria-label="Close notification">&times;</button>
+            </div>
+        @endif
+        @if ($importFinished)
+            <div data-import-result="{{ $latestImport->id }}-{{ $latestImport->status }}" class="hidden items-start gap-3 rounded-lg border bg-white p-4 text-sm font-medium shadow-xl {{ $latestImport->status === 'failed' ? 'border-red-200 text-red-800' : (($importResult['failedEnrollments'] ?? false) ? 'border-amber-200 text-amber-800' : 'border-emerald-200 text-emerald-800') }}" role="{{ $latestImport->status === 'failed' || ($importResult['failedEnrollments'] ?? false) ? 'alert' : 'status' }}">
+                <span>
+                    @if ($latestImport->status === 'failed')
+                        Import failed: {{ $latestImport->failure_message }}
+                    @else
+                        Student import complete. Students created: {{ $importResult['createdStudents'] ?? 0 }}. Students updated: {{ $importResult['updatedStudents'] ?? 0 }}. Enrollments added: {{ $importResult['createdEnrollments'] ?? 0 }}. Already enrolled here: {{ $importResult['existingEnrollments'] ?? 0 }}.
+                        @if ($importResult['failedEnrollments'] ?? false)
+                            Some learners could not be enrolled because they are assigned to another class or this class is full.
+                        @endif
+                    @endif
+                </span>
+                <button type="button" class="ml-auto" data-dismiss-toast aria-label="Close notification">&times;</button>
             </div>
         @endif
     </div>
 @endif
+@endpush
 
 @if ($latestImport)
-    @php
-        $importResult = $latestImport->result ?? [];
-    @endphp
     @if (in_array($latestImport->status, ['queued', 'processing'], true))
         <div class="mb-4 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="status">
             <svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-            <span>Student import {{ $latestImport->status }}. This page refreshes automatically when it is finished.</span>
-        </div>
-    @elseif ($latestImport->status === 'completed')
-        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
-            Student import complete. Students created: {{ $importResult['createdStudents'] ?? 0 }}. Students updated: {{ $importResult['updatedStudents'] ?? 0 }}. Enrollments added: {{ $importResult['createdEnrollments'] ?? 0 }}. Already enrolled here: {{ $importResult['existingEnrollments'] ?? 0 }}.
-            @if ($importResult['failedEnrollments'] ?? false)
-                Some learners could not be enrolled because they are assigned to another class or this class is full.
-            @endif
-        </div>
-    @elseif ($latestImport->status === 'failed')
-        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-            Import failed: {{ $latestImport->failure_message }}
+            <div class="w-full" id="import-progress" aria-live="polite">
+                <p id="import-progress-message">{{ $latestImport->status === 'queued' ? 'Waiting for the import worker to start.' : 'Importing students…' }}</p>
+                <p id="import-progress-count">{{ $latestImport->processed_students }} / {{ $latestImport->total_students ?? '—' }} students processed</p>
+                <progress id="import-progress-bar" class="mt-2 h-2 w-full" max="{{ max(1, $latestImport->total_students ?? 1) }}" value="{{ $latestImport->processed_students }}" aria-label="Students processed"></progress>
+                <p id="import-progress-details">{{ ($importResult['createdEnrollments'] ?? 0) + ($importResult['existingEnrollments'] ?? 0) }} enrolled · {{ $importResult['skippedStudents'] ?? 0 }} skipped</p>
+                <p id="import-progress-connection" class="mt-1"></p>
+            </div>
         </div>
     @endif
 @endif
@@ -201,12 +215,87 @@
         }
     })();
 
-    document.querySelectorAll('[data-dismiss-toast]').forEach(function (button) {
-        button.addEventListener('click', function () { button.parentElement.remove(); });
+    document.addEventListener('DOMContentLoaded', function () {
+        const container = document.getElementById('class-list-import-toasts');
+        if (!container) return;
+
+        function positionToasts() {
+            const header = document.querySelector('body > header');
+            const top = Math.max(16, (header?.getBoundingClientRect().bottom ?? 80) + 12);
+            container.style.setProperty('--import-toast-top', `${top}px`);
+        }
+        positionToasts();
+        window.addEventListener('resize', positionToasts);
+        if (window.ResizeObserver) {
+            const header = document.querySelector('body > header');
+            if (header) new ResizeObserver(positionToasts).observe(header);
+        }
+
+        container.querySelectorAll('[role="status"], [role="alert"]').forEach(function (toast) {
+            const key = toast.dataset.importResult
+                ? 'class-list-import-dismissed-' + toast.dataset.importResult : null;
+            try {
+                if (key && sessionStorage.getItem(key)) {
+                    toast.remove();
+                    return;
+                }
+            } catch (error) {
+                // Notifications still work when browser storage is unavailable.
+            }
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+
+            function dismiss() {
+                try {
+                    if (key) sessionStorage.setItem(key, 'dismissed');
+                } catch (error) {}
+                toast.remove();
+            }
+            toast.querySelector('[data-dismiss-toast]')?.addEventListener('click', dismiss);
+            if (toast.getAttribute('role') === 'status') {
+                let timer = setTimeout(dismiss, 12000);
+                toast.addEventListener('mouseenter', function () { clearTimeout(timer); });
+                toast.addEventListener('focusin', function () { clearTimeout(timer); });
+                toast.addEventListener('mouseleave', function () { timer = setTimeout(dismiss, 12000); });
+            }
+        });
     });
-    setTimeout(function () { document.getElementById('class-list-import-toasts')?.remove(); }, 6000);
     @if ($latestImport && in_array($latestImport->status, ['queued', 'processing'], true))
-        setTimeout(function () { window.location.reload(); }, 5000);
+        (function () {
+            const url = @json(route('teacher.advisory.class-list.import-status', [$section, $latestImport]));
+            const message = document.getElementById('import-progress-message');
+            const count = document.getElementById('import-progress-count');
+            const bar = document.getElementById('import-progress-bar');
+            const details = document.getElementById('import-progress-details');
+            const connection = document.getElementById('import-progress-connection');
+            async function pollImport() {
+                try {
+                    const response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+                    if (response.status === 401 || response.status === 403 || response.status === 404) {
+                        connection.textContent = 'Progress is unavailable. Refresh the page to check your access.';
+                        return;
+                    }
+                    if (!response.ok) throw new Error('Progress unavailable');
+                    const data = await response.json();
+                    connection.textContent = '';
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        window.location.reload();
+                        return;
+                    }
+                    message.textContent = data.status === 'queued'
+                        ? (data.waiting_for_worker ? 'The import has not started yet. Please ask the administrator to check the import worker.' : 'Waiting for the import worker to start.')
+                        : (data.total_students === null ? 'Reading the class list…' : 'Importing students…');
+                    count.textContent = `${data.processed_students} / ${data.total_students ?? '—'} students processed`;
+                    bar.max = Math.max(1, data.total_students ?? 1);
+                    bar.value = data.processed_students;
+                    details.textContent = `${data.enrolled_students} enrolled · ${data.skipped_students} skipped`;
+                } catch (error) {
+                    connection.textContent = 'Unable to refresh progress. Reconnecting…';
+                }
+                setTimeout(pollImport, 2000);
+            }
+            pollImport();
+        })();
     @endif
 </script>
 @endsection

@@ -15,6 +15,13 @@ return [
 
     'default' => env('QUEUE_CONNECTION', 'database'),
 
+    'class_list_import_timeout' => (int) env('CLASS_LIST_IMPORT_TIMEOUT', 1200),
+
+    'auto_start_local_import_worker' => env(
+        'AUTO_START_LOCAL_IMPORT_WORKER',
+        env('APP_ENV') === 'local' && PHP_OS_FAMILY === 'Windows',
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | Queue Connections
@@ -40,7 +47,7 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 1260),
             'after_commit' => false,
         ],
 

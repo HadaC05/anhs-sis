@@ -101,15 +101,16 @@ class ClassListSpreadsheet
         }
 
         $sheet = simplexml_load_string($xml);
-        if (! $sheet) {
+        if ($sheet === false) {
             throw new RuntimeException('The worksheet could not be read.');
         }
+        $sheet = self::spreadsheetElements($sheet);
 
         $rows = [];
         foreach ($sheet->sheetData->row as $row) {
             $values = [];
             foreach ($row->c as $cell) {
-                $reference = (string) $cell['r'];
+                $reference = (string) $cell->attributes()['r'];
                 $columnIndex = self::columnIndex($reference);
                 $values[$columnIndex] = self::cellValue($cell, $sharedStrings);
             }
@@ -137,6 +138,10 @@ class ClassListSpreadsheet
 
         $strings = [];
         $shared = simplexml_load_string($xml);
+        if ($shared === false) {
+            throw new RuntimeException('The worksheet text could not be read.');
+        }
+        $shared = self::spreadsheetElements($shared);
         foreach ($shared->si ?? [] as $item) {
             if (isset($item->t)) {
                 $strings[] = (string) $item->t;
@@ -165,14 +170,18 @@ class ClassListSpreadsheet
 
         $workbook = simplexml_load_string($workbookXml);
         $relations = simplexml_load_string($relationsXml);
-        $workbook->registerXPathNamespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+        if ($workbook === false || $relations === false) {
+            throw new RuntimeException('The workbook could not be read.');
+        }
+        $workbook = self::spreadsheetElements($workbook);
+        $relations = $relations->children('http://schemas.openxmlformats.org/package/2006/relationships');
 
         $firstSheet = $workbook->sheets->sheet[0] ?? null;
-        $relationId = $firstSheet ? (string) $firstSheet->attributes('r', true)->id : '';
+        $relationId = $firstSheet !== null ? (string) $firstSheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')->id : '';
 
         foreach ($relations->Relationship ?? [] as $relation) {
-            if ((string) $relation['Id'] === $relationId) {
-                $target = (string) $relation['Target'];
+            if ((string) $relation->attributes()['Id'] === $relationId) {
+                $target = (string) $relation->attributes()['Target'];
 
                 return str_starts_with($target, 'worksheets/')
                     ? 'xl/'.$target
@@ -185,7 +194,7 @@ class ClassListSpreadsheet
 
     private static function cellValue(\SimpleXMLElement $cell, array $sharedStrings): string
     {
-        $type = (string) $cell['t'];
+        $type = (string) $cell->attributes()['t'];
 
         if ($type === 'inlineStr') {
             return (string) ($cell->is->t ?? '');
@@ -197,6 +206,20 @@ class ClassListSpreadsheet
         }
 
         return $value;
+    }
+
+    private static function spreadsheetElements(\SimpleXMLElement $xml): \SimpleXMLElement
+    {
+        foreach ($xml->getDocNamespaces() as $namespace) {
+            if (in_array($namespace, [
+                'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+                'http://purl.oclc.org/ooxml/spreadsheetml/main',
+            ], true)) {
+                return $xml->children($namespace);
+            }
+        }
+
+        return $xml;
     }
 
     private static function columnIndex(string $reference): int

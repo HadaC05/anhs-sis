@@ -28,6 +28,7 @@ WORKDIR /var/www/html
 
 RUN apk add --no-cache \
         nginx \
+        supervisor \
         gettext \
         freetype \
         libjpeg-turbo \
@@ -44,7 +45,7 @@ RUN apk add --no-cache \
         oniguruma-dev \
         postgresql-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" bcmath gd mbstring pdo_mysql pdo_pgsql zip opcache \
+    && docker-php-ext-install -j"$(nproc)" bcmath gd mbstring pcntl pdo_mysql pdo_pgsql zip opcache \
     && apk del .build-deps \
     && mkdir -p /run/nginx
 
@@ -54,11 +55,13 @@ COPY --from=assets /app/public/build ./public/build
 COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 COPY docker/nginx/default.conf.template /etc/nginx/http.d/default.conf.template
 COPY docker/start-container /usr/local/bin/start-container
+COPY docker/supervisord.conf /etc/supervisord.conf
 
 RUN chmod +x /usr/local/bin/start-container \
     && chown -R www-data:www-data storage bootstrap/cache
 
 ENV PORT=10000
+ENV CLASS_LIST_IMPORT_TIMEOUT=240 DB_QUEUE_RETRY_AFTER=300 RUN_QUEUE_WORKER=true
 EXPOSE 10000
 
 CMD ["/usr/local/bin/start-container"]

@@ -149,6 +149,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/teacher/advisory/{section}/class-list/import', [TeacherSectionController::class, 'importAdvisoryClassList'])
         ->middleware('teacher')
         ->name('teacher.advisory.class-list.import');
+    Route::get('/teacher/advisory/{section}/class-list/import/{import}/status', [TeacherSectionController::class, 'advisoryClassListImportStatus'])
+        ->middleware('teacher')
+        ->name('teacher.advisory.class-list.import-status');
     Route::get('/teacher/advisory/{section}/students/{enrollment}/profile', [TeacherSectionController::class, 'advisoryStudentProfile'])
         ->middleware('teacher')
         ->name('teacher.advisory.students.profile');

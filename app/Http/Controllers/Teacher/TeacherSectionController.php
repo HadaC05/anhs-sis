@@ -19,15 +19,14 @@ use App\Models\Section;
 use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
 use App\Models\Student;
-use App\Models\StudentAddress;
 use App\Models\StudentGuardian;
 use App\Models\StudentObservedValue;
-use App\Models\StudentProfile;
 use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\LearnerPermanentRecordBuilder;
+use App\Support\LocalImportWorker;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
 use App\Support\Sf5ReportBuilder;
@@ -345,6 +344,9 @@ class TeacherSectionController extends Controller
                 'section_ID',
                 'requested_by',
                 'original_filename',
+                'total_students',
+                'processed_students',
+                'created_at',
                 'status',
                 'result',
                 'failure_message',
@@ -1209,6 +1211,29 @@ class TeacherSectionController extends Controller
         return back()->with('status', 'Grades saved and submitted successfully.');
     }
 
+    public function advisoryClassListImportStatus(Request $request, Section $section, int $import): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeAdvisorySection($request, $section);
+        $import = AdvisoryClassListImport::query()
+            ->select(['id', 'status', 'total_students', 'processed_students', 'result', 'created_at'])
+            ->where('section_ID', $section->section_ID)
+            ->where('requested_by', $request->user()->staff_id)
+            ->findOrFail($import);
+
+        if ($import->status === 'queued') {
+            app(LocalImportWorker::class)->start();
+        }
+
+        return response()->json([
+            'status' => $import->status,
+            'total_students' => $import->total_students,
+            'processed_students' => $import->processed_students,
+            'enrolled_students' => ($import->result['createdEnrollments'] ?? 0) + ($import->result['existingEnrollments'] ?? 0),
+            'skipped_students' => $import->result['skippedStudents'] ?? 0,
+            'waiting_for_worker' => $import->status === 'queued' && $import->created_at->lt(now()->subMinute()),
+        ])->header('Cache-Control', 'no-store');
+    }
+
     public function importAdvisoryClassList(Request $request, Section $section): RedirectResponse
     {
         $this->authorizeAdvisorySection($request, $section);
@@ -1240,13 +1265,14 @@ class TeacherSectionController extends Controller
         ]);
 
         ProcessAdvisoryClassListImport::dispatch($import->id);
+        app(LocalImportWorker::class)->start();
 
         return back()->with('status', 'Student import queued. You can keep using the system; this page will show the result when it finishes.');
     }
 
-    public function importAdvisoryClassListRecords(array $records, Section $section, int $activatedBy): array
+    public function importAdvisoryClassListRecords(array $records, Section $section, int $activatedBy, ?callable $progress = null): array
     {
-        return $this->importRecordsIntoSection($records, $section, $activatedBy);
+        return $this->importRecordsIntoSection($records, $section, $activatedBy, $progress);
     }
 
     public function advisoryClassListRecords(array $rows): array
@@ -1254,21 +1280,24 @@ class TeacherSectionController extends Controller
         return $this->classListRecords($rows);
     }
 
-    private function importRecordsIntoSection(array $records, Section $section, int $activatedBy): array
+    private function importRecordsIntoSection(array $records, Section $section, int $activatedBy, ?callable $progress = null): array
     {
-        return DB::transaction(function () use ($records, $section, $activatedBy): array {
-            $enrollmentYear = (int) ($section->academicYear?->start_date?->year ?? now()->year);
-            $createdStudents = 0;
-            $updatedStudents = 0;
-            $createdEnrollments = 0;
-            $existingEnrollments = 0;
-            $failedEnrollments = false;
-            $activeEnrollmentCount = Enrollment::query()
-                ->where('section_ID', $section->section_ID)
-                ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-                ->count();
+        $enrollmentYear = (int) ($section->academicYear?->start_date?->year ?? now()->year);
+        $createdStudents = 0;
+        $updatedStudents = 0;
+        $createdEnrollments = 0;
+        $existingEnrollments = 0;
+        $failedEnrollments = false;
+        $skippedStudents = 0;
+        $processed = 0;
+        $activeEnrollmentCount = Enrollment::query()
+            ->where('section_ID', $section->section_ID)
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+            ->count();
 
-            foreach ($records as $record) {
+        foreach ($records as $record) {
+            // Commit each learner before publishing progress so other requests can see it.
+            DB::transaction(function () use ($record, $section, $activatedBy, $enrollmentYear, &$createdStudents, &$updatedStudents, &$createdEnrollments, &$existingEnrollments, &$failedEnrollments, &$skippedStudents, &$activeEnrollmentCount): void {
                 $student = Student::query()->where('lrn', $record['lrn'])->first();
                 $defaultPassword = StudentCredentials::defaultPassword($record['first_name'], $record['last_name'], $enrollmentYear);
 
@@ -1321,8 +1350,9 @@ class TeacherSectionController extends Controller
                     ->first();
                 if ($conflictingEnrollment) {
                     $failedEnrollments = true;
+                    $skippedStudents++;
 
-                    continue;
+                    return;
                 }
 
                 $existingEnrollment = Enrollment::query()
@@ -1333,8 +1363,9 @@ class TeacherSectionController extends Controller
 
                 if (! $existingEnrollment && (int) $section->capacity > 0 && $activeEnrollmentCount >= (int) $section->capacity) {
                     $failedEnrollments = true;
+                    $skippedStudents++;
 
-                    continue;
+                    return;
                 }
 
                 $enrollment = Enrollment::query()->firstOrCreate(
@@ -1356,10 +1387,15 @@ class TeacherSectionController extends Controller
                 } else {
                     $existingEnrollments++;
                 }
+            });
+            $processed++;
+            $result = compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments', 'skippedStudents');
+            if ($progress) {
+                $progress($processed, $result);
             }
+        }
 
-            return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments');
-        });
+        return compact('createdStudents', 'updatedStudents', 'createdEnrollments', 'existingEnrollments', 'failedEnrollments', 'skippedStudents');
     }
 
     public function submitGrades(Request $request, TeacherSubjectAssignment $assignment)
@@ -1609,13 +1645,6 @@ class TeacherSectionController extends Controller
             'sex' => $this->sexValue($this->mappedValue($row, $map, 'sex')),
             'birthdate' => $this->dateValue($this->mappedValue($row, $map, 'birthdate')),
             'mother_tongue' => $this->nullableText($this->mappedValue($row, $map, 'mother_tongue')),
-            'ip_community' => $this->nullableText($this->mappedValue($row, $map, 'ip_community')),
-            'address' => [
-                'house_no' => $this->nullableText($this->mappedValue($row, $map, 'house_no')),
-                'barangay' => $this->nullableText($this->mappedValue($row, $map, 'barangay')),
-                'municipality' => $this->nullableText($this->mappedValue($row, $map, 'municipality')),
-                'province' => $this->nullableText($this->mappedValue($row, $map, 'province')),
-            ],
             'guardians' => [
                 'father' => $this->personNameParts($this->mappedValue($row, $map, 'father_name')),
                 'mother' => $this->personNameParts($this->mappedValue($row, $map, 'mother_name')),
@@ -1780,33 +1809,6 @@ class TeacherSectionController extends Controller
 
     private function importStudentSf1Details(Student $student, array $record): void
     {
-        if (filled($record['ip_community'])) {
-            $profile = StudentProfile::query()->firstOrNew(
-                ['student_ID' => $student->id],
-            );
-            if (! $profile->is_ip) {
-                $profile->is_ip = true;
-            }
-            if (! filled($profile->ip_community)) {
-                $profile->ip_community = $record['ip_community'];
-            }
-            $profile->save();
-        }
-
-        $address = array_filter($record['address'], fn ($value) => filled($value));
-        if ($address !== []) {
-            $currentAddress = StudentAddress::query()->firstOrNew([
-                'student_ID' => $student->id,
-                'address_type' => 'current',
-            ]);
-            foreach ($address as $field => $value) {
-                if (! filled($currentAddress->{$field})) {
-                    $currentAddress->{$field} = $value;
-                }
-            }
-            $currentAddress->save();
-        }
-
         foreach ($record['guardians'] as $relationship => $attributes) {
             if (! filled($attributes['first_name']) || ! filled($attributes['last_name'])) {
                 continue;

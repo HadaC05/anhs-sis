@@ -129,7 +129,7 @@ test('subject class lists no longer provide an import route', function () {
 test('advisory class list uploads are queued and then imported by the worker', function () {
     ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
     $section = $assignment->section;
-    $csv = "LRN,Name,Sex,Birth Date\n987654321098,\"Cruz, Juan\",M,2010-01-01\n";
+    $csv = "LRN,Name,Sex,Birth Date,Ethnic Group,Barangay,Municipality,Province\n987654321098,\"Cruz, Juan\",M,2010-01-01,Sample Group,Sample Barangay,Sample City,Sample Province\n";
 
     Queue::fake();
 
@@ -152,10 +152,104 @@ test('advisory class list uploads are queued and then imported by the worker', f
 
     $import->refresh();
     expect($import->status)->toBe('completed')
+        ->and($import->total_students)->toBe(1)
+        ->and($import->processed_students)->toBe(1)
         ->and($import->result['createdStudents'])->toBe(1)
         ->and($import->result['createdEnrollments'])->toBe(1)
         ->and($import->file_contents)->toBeNull()
         ->and(Student::query()->where('lrn', '987654321098')->exists())->toBeTrue();
+    $student = Student::query()->where('lrn', '987654321098')->firstOrFail();
+    expect($student->addresses()->exists())->toBeFalse()
+        ->and($student->profile()->exists())->toBeFalse();
+});
+
+test('import progress reports saved learners including skipped enrollments', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $section = $assignment->section;
+    $section->update(['capacity' => 2]);
+    $controller = app(\App\Http\Controllers\Teacher\TeacherSectionController::class);
+    $records = $controller->advisoryClassListRecords([
+        ['LRN', 'Name'],
+        ['987654321098', 'Cruz, Juan'],
+        ['987654321099', 'Reyes, Maria'],
+    ]);
+    $snapshots = [];
+    $level = \Illuminate\Support\Facades\DB::transactionLevel();
+    $controller->importAdvisoryClassListRecords($records, $section, $teacher->staff_id,
+        function (int $processed, array $result) use (&$snapshots, $level): void {
+            // Progress runs after the learner transaction, not inside it.
+            expect(\Illuminate\Support\Facades\DB::transactionLevel())->toBe($level);
+            $snapshots[] = [$processed, $result['createdEnrollments'], $result['skippedStudents']];
+        });
+
+    expect($snapshots)->toBe([[1, 1, 0], [2, 1, 1]]);
+});
+
+test('import status is private and reports when a worker has not started', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $section = $assignment->section;
+    $import = AdvisoryClassListImport::query()->create([
+        'section_ID' => $section->section_ID,
+        'requested_by' => $teacher->staff_id,
+        'original_filename' => 'students.csv',
+        'file_contents' => base64_encode('private file contents'),
+        'status' => 'queued',
+    ]);
+    $this->travel(2)->minutes();
+    $url = route('teacher.advisory.class-list.import-status', [$section, $import]);
+    $this->actingAs($teacher)->getJson($url)->assertOk()
+        ->assertJsonPath('processed_students', 0)
+        ->assertJsonPath('total_students', null)
+        ->assertJsonPath('waiting_for_worker', true)
+        ->assertJsonMissingPath('file_contents');
+
+    $import->update(['status' => 'processing', 'total_students' => 10, 'processed_students' => 3,
+        'result' => ['createdEnrollments' => 1, 'existingEnrollments' => 1, 'skippedStudents' => 1]]);
+    $this->getJson($url)->assertOk()->assertJsonPath('processed_students', 3)
+        ->assertJsonPath('enrolled_students', 2)->assertJsonPath('skipped_students', 1);
+    $this->get(route('teacher.advisory.class-list.index', $section))->assertOk()
+        ->assertSee('3 / 10 students processed')->assertSee('import-progress-bar');
+
+    $other = $teacher->replicate();
+    $other->username = 'other.teacher';
+    $other->save();
+    $this->actingAs($other)->getJson($url)->assertForbidden();
+    $import->update(['requested_by' => $other->staff_id]);
+    $this->actingAs($teacher)->getJson($url)->assertNotFound();
+});
+
+test('worker failure releases an import and preserves its progress', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $import = AdvisoryClassListImport::query()->create([
+        'section_ID' => $assignment->section_ID,
+        'requested_by' => $teacher->staff_id,
+        'original_filename' => 'students.csv',
+        'file_contents' => 'payload',
+        'status' => 'processing',
+        'total_students' => 10,
+        'processed_students' => 3,
+    ]);
+    (new ProcessAdvisoryClassListImport($import->id))->failed(new RuntimeException('Worker timed out'));
+    $import->refresh();
+    expect($import->status)->toBe('failed')
+        ->and($import->processed_students)->toBe(3)
+        ->and($import->file_contents)->toBeNull()
+        ->and($import->completed_at)->not->toBeNull();
+});
+
+test('unreadable imports fail without remaining stuck in processing', function () {
+    \Illuminate\Support\Facades\Exceptions::fake();
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $import = AdvisoryClassListImport::query()->create([
+        'section_ID' => $assignment->section_ID,
+        'requested_by' => $teacher->staff_id,
+        'original_filename' => 'students.csv',
+        'file_contents' => '!!!invalid base64!!!',
+        'status' => 'queued',
+    ]);
+    (new ProcessAdvisoryClassListImport($import->id))->handle(app(\App\Http\Controllers\Teacher\TeacherSectionController::class));
+    expect($import->refresh()->status)->toBe('failed')
+        ->and($import->file_contents)->toBeNull();
 });
 
 test('teacher subject list displays the configured grade status from its status ID', function () {

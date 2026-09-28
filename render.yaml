@@ -2,6 +2,8 @@ services:
   - type: web
     name: anhs-sis
     runtime: docker
+    plan: free
+    maxShutdownDelaySeconds: 300
     healthCheckPath: /up
     envVars:
       - key: APP_ENV
@@ -17,8 +19,16 @@ services:
         fromDatabase:
           name: anhs-sis-db
           property: connectionString
+      - key: RUN_QUEUE_WORKER
+        value: "true"
       - key: QUEUE_CONNECTION
         value: database
+      - key: AUTO_START_LOCAL_IMPORT_WORKER
+        value: "false"
+      - key: CLASS_LIST_IMPORT_TIMEOUT
+        value: "240"
+      - key: DB_QUEUE_RETRY_AFTER
+        value: "300"
       - key: CACHE_STORE
         value: database
       - key: SESSION_DRIVER
@@ -40,33 +50,8 @@ services:
       # - key: FILESYSTEM_DISK
       #   value: public
 
-  - type: worker
-    name: anhs-sis-worker
-    runtime: docker
-    dockerCommand: php artisan queue:work database --tries=1 --timeout=1200 --sleep=2
-    maxShutdownDelaySeconds: 300
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: APP_DEBUG
-        value: "false"
-      - key: LOG_CHANNEL
-        value: stderr
-      - key: DB_CONNECTION
-        value: pgsql
-      - key: DB_URL
-        fromDatabase:
-          name: anhs-sis-db
-          property: connectionString
-      - key: QUEUE_CONNECTION
-        value: database
-      - key: APP_KEY
-        fromService:
-          name: anhs-sis
-          type: web
-          envVarKey: APP_KEY
-
 databases:
   - name: anhs-sis-db
+    plan: free
     databaseName: anhs_sis
     user: anhs_sis
