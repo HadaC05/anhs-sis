@@ -12,8 +12,8 @@
     <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first() }}</div>
 @endif
 
-<div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-    <table class="min-w-full divide-y divide-gray-200 text-sm">
+<div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+    <table class="w-full min-w-[640px] divide-y divide-gray-200 text-sm">
         <thead class="bg-gray-50 text-left text-xs font-bold uppercase tracking-wide text-gray-500"><tr><th class="px-5 py-3">Learner</th><th class="px-5 py-3">Completed enrollment</th><th class="px-5 py-3">Promote to</th></tr></thead>
         <tbody class="divide-y divide-gray-100">
         @forelse($enrollments as $enrollment)

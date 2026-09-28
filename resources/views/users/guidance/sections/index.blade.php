@@ -45,7 +45,7 @@
     <form method="GET" action="{{ route('guidance.sections.index') }}" class="flex-1">
         <input type="hidden" name="per_page" value="{{ request('per_page', 16) }}">
 
-        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+        <div class="guidance-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
             <select name="grade_level" id="grade_level" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition hover:border-[#296374]/40 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All levels</option>
                 @foreach ($gradeLevels ?? [] as $level)
@@ -89,7 +89,7 @@
 </div>
 
 @if ($sectionsList->isNotEmpty())
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="guidance-section-grid grid gap-5">
         @foreach($sectionsList as $section)
             @php
                 $cap = (int) ($section->capacity ?? 0);
@@ -167,7 +167,7 @@
     </div>
 @endif
 
-<div id="sectionModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+<div id="sectionModal" class="guidance-modal fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
     <div class="mx-4 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div class="border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent p-6">
             <h3 class="text-xl font-bold text-gray-800">Add Section</h3>
@@ -195,7 +195,7 @@
                 <p id="section_cluster_hint" class="mt-1 text-xs text-gray-500">Required for Grade 11 and Grade 12 sections.</p>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label for="section_name" class="mb-1 block text-sm font-semibold text-gray-700">Section Name</label>
                     <input id="section_name" name="name" type="text" value="{{ old('name') }}" class="w-full rounded-lg border border-gray-300 px-4 py-2" required>
@@ -219,7 +219,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label for="section_room" class="mb-1 block text-sm font-semibold text-gray-700">Room</label>
                     <input id="section_room" name="room" type="text" value="{{ old('room') }}" class="w-full rounded-lg border border-gray-300 px-4 py-2">

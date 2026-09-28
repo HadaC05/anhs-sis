@@ -997,7 +997,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
     });
 </script>
 
-<div id="documentReturnModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="documentReturnTitle">
+<div id="documentReturnModal" class="guidance-modal fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="documentReturnTitle">
     <div class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
             <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Documents</p>

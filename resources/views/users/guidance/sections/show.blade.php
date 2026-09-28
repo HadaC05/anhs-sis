@@ -147,7 +147,7 @@
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full text-left">
+        <table class="w-full min-w-[720px] text-left">
             <thead>
                 <tr class="border-b border-gray-200 bg-gray-50/80 text-xs font-bold uppercase tracking-wider text-[#296374]">
                     <th class="w-12 px-4 py-3 lg:px-6">
@@ -231,7 +231,7 @@
 </form>
 
 @push('modals')
-<div id="transferModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24">
+<div id="transferModal" class="guidance-modal fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24">
     <div class="mx-auto flex w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div id="transferStepPick" class="flex flex-col">
             <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
@@ -357,7 +357,7 @@
     </div>
 </div>
 
-<div id="sectionSettingsModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24">
+<div id="sectionSettingsModal" class="guidance-modal fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24">
     <div class="mx-4 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div class="border-b border-gray-200 bg-gradient-to-r from-[#296374]/10 to-transparent p-6">
             <h3 class="text-xl font-bold text-gray-800">Section details</h3>

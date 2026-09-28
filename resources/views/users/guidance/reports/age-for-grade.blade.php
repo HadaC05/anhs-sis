@@ -61,7 +61,7 @@
 @endif
 
 <form method="GET" action="{{ route($reportRoute) }}" class="mb-6">
-    <div class="{{ ($layout ?? '') === 'users.principal.layout' ? 'principal-filters' : '' }} flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+    <div class="{{ ($layout ?? '') === 'users.principal.layout' ? 'principal-filters' : 'guidance-filters' }} flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
         <select name="alignment" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             @foreach ($alignmentOptions as $value => $label)
                 <option value="{{ $value }}" {{ $alignment === $value ? 'selected' : '' }}>{{ $label }}</option>

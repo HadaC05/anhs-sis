@@ -7,7 +7,7 @@
 @endphp
 
 @push('modals')
-<div id="enrollmentConfirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="enrollmentConfirmTitle">
+<div id="enrollmentConfirmModal" class="guidance-modal fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="enrollmentConfirmTitle">
     <div class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
             <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Enrollment</p>
@@ -28,7 +28,7 @@
     @php
         $resultReturnUrl = $returnSectionUrl ?? null;
     @endphp
-    <div id="enrollmentResultModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="enrollmentResultTitle" @if ($resultReturnUrl) data-return-url="{{ $resultReturnUrl }}" @endif>
+    <div id="enrollmentResultModal" class="guidance-modal fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="enrollmentResultTitle" @if ($resultReturnUrl) data-return-url="{{ $resultReturnUrl }}" @endif>
         <div class="mx-auto w-full max-w-sm overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
             <div class="px-6 py-8 text-center">
                 <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -48,7 +48,7 @@
 @endif
 
 @if ($confirmContext === 'single' && isset($enrollment))
-    <div id="enrollmentStatusModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="enrollmentStatusTitle">
+    <div id="enrollmentStatusModal" class="guidance-modal fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="enrollmentStatusTitle">
         <div class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
             <div class="border-b border-gray-300 bg-[#296374] px-6 py-4">
                 <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Enrollment</p>

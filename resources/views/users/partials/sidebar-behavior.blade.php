@@ -74,7 +74,7 @@
         display: none;
     }
 
-    @media (max-width: 767px) {
+    @media (max-width: {{ $sidebarMobileBreakpoint ?? 767 }}px) {
         .app-sidebar {
             width: min(18rem, calc(100vw - 3.5rem));
             transform: translateX(-100%);
@@ -108,7 +108,7 @@
             }
         });
 
-        const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+        const isMobile = () => window.matchMedia('(max-width: {{ $sidebarMobileBreakpoint ?? 767 }}px)').matches;
         const savedState = localStorage.getItem('sidebar-collapsed');
         if (savedState === 'true' && !isMobile()) document.body.classList.add('sidebar-collapsed');
 

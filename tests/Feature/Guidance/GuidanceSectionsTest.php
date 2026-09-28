@@ -60,7 +60,7 @@ test('guidance counselor can view the sectioning index page', function () {
     $response->assertOk();
     $response->assertSee('Add Section');
     $response->assertSee('Apply');
-    $response->assertSee('lg:grid-cols-4', false);
+    $response->assertSee('guidance-section-grid', false);
     $response->assertDontSee('master-list.pdf');
     $response->assertDontSee('>PDF<', false);
     $response->assertDontSee('>Enrolled<', false);
