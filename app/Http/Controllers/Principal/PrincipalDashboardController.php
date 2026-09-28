@@ -13,6 +13,7 @@ use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\EnrollmentDashboardData;
+use App\Support\GradeRecordPeriodFilters;
 use App\Support\PlacementAssessmentAdvisor;
 use App\Support\StudentGradeNotifier;
 use App\Support\TeacherGradeNotifier;
@@ -47,7 +48,7 @@ class PrincipalDashboardController extends Controller
             'subject_id' => ['nullable', 'integer', 'exists:subjects,subject_ID'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
             'grade_level' => ['nullable', 'integer', 'exists:grade_level,grade_ID'],
-            'term_id' => ['nullable', 'integer', 'exists:grading_terms,term_ID'],
+            'term_id' => ['nullable', 'regex:/^(current|[0-9]+)$/'],
             'semester' => ['nullable', 'in:first,second'],
             'status' => ['nullable', 'in:approved,released,all'],
             'search' => ['nullable', 'string', 'max:100'],
@@ -56,7 +57,8 @@ class PrincipalDashboardController extends Controller
         $gradeLevels = GradeLevel::query()->orderBy('grade_ID')->get();
         $selectedGradeLevel = isset($validated['grade_level']) ? (int) $validated['grade_level'] : null;
         $selectedGrade = $selectedGradeLevel ? $gradeLevels->firstWhere('grade_ID', $selectedGradeLevel) : null;
-        $showSemesterFilter = in_array($selectedGrade?->grade_label, ['Grade 11', 'Grade 12'], true);
+        $periods = GradeRecordPeriodFilters::resolve($request, $selectedGrade);
+        $showSemesterFilter = $periods['showSemesterFilter'];
         $selectedAcademicYearId = $request->has('academic_year_id')
             ? (isset($validated['academic_year_id']) ? (int) $validated['academic_year_id'] : null)
             : AcademicYear::query()->where('status', true)->value('SY_ID');
@@ -64,29 +66,22 @@ class PrincipalDashboardController extends Controller
             'subject_id' => isset($validated['subject_id']) ? (int) $validated['subject_id'] : null,
             'academic_year_id' => $selectedAcademicYearId,
             'grade_level' => $selectedGradeLevel,
-            'term_id' => isset($validated['term_id']) ? (int) $validated['term_id'] : null,
-            'semester' => $showSemesterFilter ? ($validated['semester'] ?? null) : null,
+            'term_id' => $periods['term_id'],
+            'term_ids' => $periods['term_ids'],
+            'semester' => $periods['semester'],
             'search' => trim($validated['search'] ?? ''),
             'status' => $validated['status'] ?? 'all',
         ];
 
         return view('users.principal.grade-releases', [
             'assignments' => $this->gradeReleaseAssignments($filters),
-            'subjects' => Subject::query()->where('status', 'active')->orderBy('code')->orderBy('title')->get(),
+            'subjects' => Subject::query()->with('curriculumSubjects.curriculumGradeLevel')->where('status', 'active')->orderBy('code')->orderBy('title')->get(),
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->orderByDesc('SY_ID')->get(),
             'gradeLevels' => $gradeLevels,
-            'terms' => GradingTerm::query()
-                ->where(function ($query) use ($selectedGrade, $showSemesterFilter): void {
-                    if ($showSemesterFilter) {
-                        $query->seniorHighActive();
-                    } elseif ($selectedGrade) {
-                        $query->juniorHighActive();
-                    } else {
-                        $query->where(fn ($terms) => $terms->juniorHighActive())
-                            ->orWhere(fn ($terms) => $terms->seniorHighActive());
-                    }
-                })
-                ->orderBy('sort_order')->orderBy('term_ID')->get(),
+            'terms' => $periods['terms'],
+            'allTerms' => $periods['allTerms'],
+            'termDefaults' => $periods['termDefaults'],
+            'activeSemester' => $periods['activeSemester'],
             'filters' => $filters,
             'showSemesterFilter' => $showSemesterFilter,
         ]);
@@ -565,7 +560,7 @@ class PrincipalDashboardController extends Controller
     }
 
     /**
-     * @param  array{subject_id: ?int, academic_year_id: ?int, grade_level: ?int, term_id: ?int, semester: ?string, search: string, status: string}  $filters
+     * @param  array{subject_id: ?int, academic_year_id: ?int, grade_level: ?int, term_id: int|string|null, term_ids: ?array, semester: ?string, search: string, status: string}  $filters
      */
     private function gradeReleaseAssignments(array $filters): Collection
     {
@@ -578,13 +573,13 @@ class PrincipalDashboardController extends Controller
                 'staff',
                 'grades' => function ($query) use ($filters): void {
                     $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
-                        ->when($filters['term_id'], fn ($gradeQuery) => $gradeQuery->where('term_ID', $filters['term_id']))
+                        ->when($filters['term_ids'] !== null, fn ($gradeQuery) => $gradeQuery->whereIn('term_ID', $filters['term_ids']))
                         ->with(['gradeStatus', 'term']);
                 },
             ])
             ->whereHas('grades', function ($query) use ($filters): void {
                 $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
-                    ->when($filters['term_id'], fn ($gradeQuery) => $gradeQuery->where('term_ID', $filters['term_id']));
+                    ->when($filters['term_ids'] !== null, fn ($gradeQuery) => $gradeQuery->whereIn('term_ID', $filters['term_ids']));
             })
             ->when($filters['subject_id'], fn ($query) => $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $filters['subject_id'])))
             ->when($filters['academic_year_id'], fn ($query) => $query->where('SY_ID', $filters['academic_year_id']))

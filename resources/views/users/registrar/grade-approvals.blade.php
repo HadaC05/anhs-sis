@@ -19,53 +19,12 @@
     </div>
 @endif
 
-<form method="GET" action="{{ route('registrar.grade-approvals') }}" class="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-    <div class="flex items-end gap-3 overflow-x-auto pb-1">
-        <div class="w-60 shrink-0">
-            <label for="grade-approval-search" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Search</label>
-            <input id="grade-approval-search" type="search" name="search" value="{{ request('search') }}" placeholder="Section, subject, or teacher" class="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
-        </div>
-        <div class="min-w-[170px]">
-            <label for="grade-approval-subject" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Subject</label>
-            <select id="grade-approval-subject" name="subject_id" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
-                <option value="">All subjects</option>
-                @foreach($subjects as $subject)
-                    <option value="{{ $subject->subject_ID }}" @selected((string) request('subject_id') === (string) $subject->subject_ID)>{{ $subject->code }} - {{ $subject->title }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="min-w-[160px]">
-            <label for="grade-approval-level" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Grade level</label>
-            <select id="grade-approval-level" name="grade_level" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
-                <option value="">All grade levels</option>
-                @foreach($gradeLevels as $level)
-                    <option value="{{ $level->value }}" @selected(request('grade_level') === $level->value)>{{ $level->grade_label }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="min-w-[160px]">
-            <label for="grade-approval-year" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">School year</label>
-            <select id="grade-approval-year" name="academic_year_id" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
-                <option value="">All school years</option>
-                @foreach($academicYears as $academicYear)
-                    <option value="{{ $academicYear->SY_ID }}" @selected((string) request('academic_year_id') === (string) $academicYear->SY_ID)>{{ $academicYear->school_year }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="min-w-[150px]">
-            <label for="grade-approval-status" class="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Status</label>
-            <select id="grade-approval-status" name="status" class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
-                <option value="">All statuses</option>
-                <option value="submitted" @selected(request('status') === 'submitted')>Submitted</option>
-                <option value="approved" @selected(request('status') === 'approved')>Approved</option>
-            </select>
-        </div>
-        <div class="flex shrink-0 gap-2">
-            <button type="submit" class="inline-flex items-center rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">Filter</button>
-            <a href="{{ route('registrar.grade-approvals') }}" class="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-600 hover:bg-gray-50">Clear</a>
-        </div>
-    </div>
-</form>
+@include('users.partials.grade-record-filters', [
+    'principalFilters' => false,
+    'filterRoute' => route('registrar.grade-approvals'),
+    'filterValues' => $filters,
+    'statusOptions' => ['' => 'All statuses', 'submitted' => 'Submitted', 'approved' => 'Approved'],
+])
 
 <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
     <div class="overflow-x-auto">

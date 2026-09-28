@@ -9,6 +9,14 @@
         width: 18rem;
     }
 
+    .principal-layout .app-sidebar,
+    .registrar-layout .app-sidebar {
+        background-color: #fff;
+        opacity: 1;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
     .app-main {
         margin-left: 18rem;
     }

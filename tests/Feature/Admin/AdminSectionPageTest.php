@@ -350,6 +350,29 @@ test('both management tables sort grades numerically and details display availab
 })->with(['creation', 'details']);
 
 
+test('management section sorting quotes mixed case columns for PostgreSQL', function (string $role, string $tab) {
+    ['admin' => $user] = createSectionPageFixtures('quoted.'.$role.'.'.$tab);
+    $user->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    $connection = (new Section)->getConnection();
+    $originalGrammar = $connection->getQueryGrammar();
+    $connection->setQueryGrammar(new \Illuminate\Database\Query\Grammars\PostgresGrammar($connection));
+    $connection->enableQueryLog();
+
+    try {
+        $this->actingAs($user)->get(route($role.'.section-config.index', ['tab' => $tab]))
+            ->assertOk()->assertSee('Einstein');
+
+        $sectionQuery = collect($connection->getQueryLog())->pluck('query')
+            ->first(fn (string $sql) => str_contains($sql, 'order by CASE'));
+        expect($sectionQuery)->not->toBeNull()
+            ->toContain('CASE "sections"."grade_ID" WHEN');
+    } finally {
+        $connection->setQueryGrammar($originalGrammar);
+        $connection->disableQueryLog();
+        $connection->flushQueryLog();
+    }
+})->with(['admin', 'principal'])->with(['creation', 'details']);
+
 test('section details defaults to the current school year and allows other years or all years', function () {
     ['admin' => $admin, 'section' => $section, 'academicYear' => $current] = createSectionPageFixtures('details.current.year');
     $previous = AcademicYear::query()->create([

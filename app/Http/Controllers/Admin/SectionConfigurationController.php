@@ -43,6 +43,7 @@ class SectionConfigurationController extends Controller
         $gradeId = GradeLevel::idForValue($gradeLevel);
 
         $gradeOrder = GradeLevel::query()->get()->map(fn ($grade) => 'WHEN '.(int) $grade->grade_ID.' THEN '.(int) preg_replace('/\D+/', '', $grade->grade_label))->implode(' ');
+        $gradeColumn = (new Section)->getConnection()->getQueryGrammar()->wrap('sections.grade_ID');
 
         $sections = Section::query()
             ->withCount(['enrollments as enrolled_students_count' => fn ($query) => $query
@@ -72,7 +73,7 @@ class SectionConfigurationController extends Controller
             ->when($status === 'inactive', function ($query): void {
                 $query->where('status', false);
             })
-            ->orderByRaw('CASE sections.grade_ID '.$gradeOrder.' ELSE 999 END')
+            ->orderByRaw('CASE '.$gradeColumn.' '.$gradeOrder.' ELSE 999 END')
             ->orderBy('name')
             ->orderByDesc('status')
             ->orderByDesc('section_ID')

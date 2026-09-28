@@ -28,7 +28,7 @@ $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator 
 
 <div class="mb-6">
     <form method="GET" action="{{ route('registrar.class-subjects.index') }}">
-        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+        <div class="registrar-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
             <input
                 type="text"
                 id="search"

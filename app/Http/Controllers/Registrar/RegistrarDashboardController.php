@@ -17,9 +17,11 @@ use App\Models\Staff;
 use App\Models\Student;
 use App\Models\StudentObservedValue;
 use App\Models\StudentSubjectGrade;
+use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\EnrollmentDashboardData;
+use App\Support\GradeRecordPeriodFilters;
 use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
@@ -216,22 +218,35 @@ class RegistrarDashboardController extends Controller
         $subjectId = $request->integer('subject_id') ?: null;
         $gradeLevel = $request->string('grade_level')->toString();
         $gradeId = GradeLevel::idForValue($gradeLevel);
-        $academicYearId = $request->integer('academic_year_id') ?: null;
+        $request->validate([
+            'term_id' => ['nullable', 'regex:/^(current|[0-9]+)$/'],
+            'semester' => ['nullable', 'in:first,second'],
+        ]);
+        $academicYearId = $request->has('academic_year_id')
+            ? ($request->integer('academic_year_id') ?: null)
+            : AcademicYear::query()->where('status', true)->value('SY_ID');
+        $periods = GradeRecordPeriodFilters::resolve($request, $gradeId ? GradeLevel::find($gradeId) : null);
+        $filters = [
+            'search' => $search, 'status' => $status, 'subject_id' => $subjectId,
+            'grade_level' => $gradeLevel, 'academic_year_id' => $academicYearId,
+            'term_id' => $periods['term_id'], 'semester' => $periods['semester'],
+        ];
 
         return view('users.registrar.grade-approvals', [
-            'assignments' => $this->gradeApprovalAssignments($status, $subjectId, $gradeId, $academicYearId, $search),
-            'subjects' => $this->gradeApprovalAssignments()
-                ->map(fn (TeacherSubjectAssignment $assignment) => $assignment->curriculumSubject?->subject)
-                ->filter()
-                ->unique('subject_ID')
-                ->sortBy('title')
-                ->values(),
+            'assignments' => $this->gradeApprovalAssignments($status, $subjectId, $gradeId, $academicYearId, $search, $periods['term_ids'], $periods['semester']),
+            'subjects' => Subject::query()->with('curriculumSubjects.curriculumGradeLevel')->orderBy('code')->orderBy('title')->get(),
+            'filters' => $filters,
+            'terms' => $periods['terms'],
+            'allTerms' => $periods['allTerms'],
+            'termDefaults' => $periods['termDefaults'],
+            'activeSemester' => $periods['activeSemester'],
+            'showSemesterFilter' => $periods['showSemesterFilter'],
             'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(['SY_ID', 'school_year']),
         ]);
     }
 
-    private function gradeApprovalAssignments(?string $status = null, ?int $subjectId = null, ?int $gradeId = null, ?int $academicYearId = null, string $search = '')
+    private function gradeApprovalAssignments(?string $status = null, ?int $subjectId = null, ?int $gradeId = null, ?int $academicYearId = null, string $search = '', ?array $termIds = null, ?string $semester = null)
     {
         $statuses = [GradeStatus::SUBMITTED, GradeStatus::APPROVED];
         $status = in_array($status, $statuses, true) ? $status : null;
@@ -241,13 +256,14 @@ class RegistrarDashboardController extends Controller
                 'section.gradeLevel',
                 'curriculumSubject.subject',
                 'staff',
-                'grades' => function ($query) use ($statuses, $status): void {
-                    $query->whereStatus($status ?: $statuses)->with('gradeStatus');
+                'grades' => function ($query) use ($statuses, $status, $termIds): void {
+                    $query->whereStatus($status ?: $statuses)->when($termIds !== null, fn ($grades) => $grades->whereIn('term_ID', $termIds))->with('gradeStatus');
                 },
             ])
-            ->whereHas('grades', function ($query) use ($statuses, $status): void {
-                $query->whereStatus($status ?: $statuses);
+            ->whereHas('grades', function ($query) use ($statuses, $status, $termIds): void {
+                $query->whereStatus($status ?: $statuses)->when($termIds !== null, fn ($grades) => $grades->whereIn('term_ID', $termIds));
             })
+            ->when($semester, fn ($query) => $query->whereHas('curriculumSubject.curriculumGradeLevel.gradingSemester', fn ($query) => $query->where('key', $semester)))
             ->when($subjectId, function ($query) use ($subjectId): void {
                 $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $subjectId));
             })

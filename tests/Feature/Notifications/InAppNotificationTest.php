@@ -271,7 +271,7 @@ test('grade releases default to all statuses and support status filters', functi
         ->assertOk()
         ->assertViewHas('filters', fn ($filters) => $filters['status'] === 'all')
         ->assertViewHas('assignments', fn ($rows) => $rows->count() === 2 && ! $rows->contains($submitted))
-        ->assertSeeInOrder(['name="search"', 'name="status"', 'name="subject_id"'], false);
+        ->assertSeeInOrder(['name="search"', 'name="grade_level"', 'name="subject_id"', 'name="academic_year_id"', 'name="status"'], false);
 
     $this->get(route('principal.grade-releases', ['status' => 'approved', 'academic_year_id' => '']))
         ->assertOk()
@@ -287,6 +287,72 @@ test('grade releases default to all statuses and support status filters', functi
 
     $this->get(route('principal.grade-releases', ['status' => 'invalid']))
         ->assertSessionHasErrors('status');
+});
+
+test('grade filters include curriculum grade mappings in both staff portals', function (string $portal, string $page) {
+    $fixtures = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $subject = $fixtures['assignment']->curriculumSubject->subject;
+    $gradeId = $fixtures['assignment']->curriculumSubject->curriculumGradeLevel->grade_ID;
+
+    $this->actingAs($fixtures[$portal])->get(route($portal.'.'.$page))
+        ->assertOk()
+        ->assertSeeInOrder(['name="grade_level"', 'name="subject_id"'], false)
+        ->assertSee('data-grade-ids="'.$gradeId.'" value="'.$subject->subject_ID.'"', false);
+})->with([
+    ['principal', 'grade-releases'],
+    ['registrar', 'grade-approvals'],
+]);
+
+test('grade pages default to the current term and filter grade records by term', function (string $portal, string $page) {
+    $fixtures = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $grade = GradeLevel::query()->where('grade_label', 'Grade 7')->firstOrFail();
+    $terms = \App\Models\GradingTerm::query()->juniorHigh()->orderBy('sort_order')->get();
+    $current = $terms[1];
+    \App\Models\GradingTerm::query()->juniorHigh()->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::closedId()]);
+    $current->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    $record = $fixtures['assignment']->grades()->firstOrFail()->replicate();
+    $record->term_ID = $current->term_ID;
+    $record->save();
+    $query = ['grade_level' => $portal === 'principal' ? $grade->grade_ID : $grade->value];
+
+    $this->actingAs($fixtures[$portal])->get(route($portal.'.'.$page, $query))
+        ->assertOk()
+        ->assertViewHas('filters', fn ($filters) => (int) $filters['term_id'] === $current->term_ID && (int) $filters['academic_year_id'] === $fixtures['assignment']->SY_ID)
+        ->assertViewHas('assignments', fn ($rows) => $rows->count() === 1 && $rows->first()->grades->pluck('term_ID')->all() === [$current->term_ID])
+        ->assertSeeInOrder(['name="grade_level"', 'name="semester"', 'name="term_id"', 'name="subject_id"'], false);
+
+    $this->get(route($portal.'.'.$page, $query + ['term_id' => '', 'academic_year_id' => '']))
+        ->assertOk()
+        ->assertViewHas('filters', fn ($filters) => ! $filters['term_id'] && ! $filters['academic_year_id'])
+        ->assertViewHas('assignments', fn ($rows) => $rows->first()->grades->count() === 2);
+})->with([['principal', 'grade-releases'], ['registrar', 'grade-approvals']]);
+
+test('senior high grade filters default to the configured semester and open senior high term', function (string $portal, string $page) {
+    $fixtures = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $grade = GradeLevel::query()->where('grade_label', 'Grade 11')->firstOrFail();
+    $term = \App\Models\GradingTerm::query()->seniorHigh()->orderByDesc('sort_order')->firstOrFail();
+    \App\Models\GradingTerm::query()->seniorHigh()->update(['senior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::closedId()]);
+    $term->update(['senior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    \App\Models\GradingTermSetting::current()->update(['semester_ID' => \App\Models\GradingSemester::idFor('second'), 'term_ID' => $term->term_ID]);
+
+    $this->actingAs($fixtures[$portal])->get(route($portal.'.'.$page, ['grade_level' => $portal === 'principal' ? $grade->grade_ID : $grade->value]))
+        ->assertOk()
+        ->assertViewHas('showSemesterFilter', true)
+        ->assertViewHas('filters', fn ($filters) => (int) $filters['term_id'] === $term->term_ID && $filters['semester'] === 'second')
+        ->assertViewHas('terms', fn ($terms) => $terms->every(fn ($term) => $term->school_level === 'senior_high'));
+})->with([['principal', 'grade-releases'], ['registrar', 'grade-approvals']]);
+
+test('registrar subject options include subjects without grade submissions', function () {
+    $fixtures = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $subject = Subject::query()->create(['code' => 'NO-GRADES', 'title' => 'Subject without submissions', 'type' => 'core', 'status' => 'active']);
+    CurriculumSubject::query()->create([
+        'curriculum_grade_level_ID' => $fixtures['assignment']->curriculumSubject->curriculum_grade_level_ID,
+        'subject_ID' => $subject->subject_ID,
+    ]);
+
+    $this->actingAs($fixtures['registrar'])->get(route('registrar.grade-approvals'))
+        ->assertOk()->assertSee('Subject without submissions')
+        ->assertViewHas('subjects', fn ($subjects) => $subjects->contains('subject_ID', $subject->subject_ID));
 });
 
 test('grade release term options exclude archived terms for the selected school level', function () {

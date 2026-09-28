@@ -14,7 +14,7 @@
 </div>
 
 <form method="GET" action="{{ route('registrar.teacher-assignments') }}" class="mb-6">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+    <div class="registrar-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
         <input name="search" value="{{ $filters['search'] }}" placeholder="Search teacher or employee no." class="h-10 w-56 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
         <select name="SY_ID" class="h-10 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-[#296374]">
             <option value="">All school years</option>
