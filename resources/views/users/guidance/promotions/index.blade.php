@@ -32,7 +32,7 @@
         <div>
             <label for="promotion-eligibility" class="mb-1 block text-xs font-semibold text-gray-600">Eligibility</label>
             <select id="promotion-eligibility" name="eligibility" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                @foreach (['all' => 'All eligibility', 'eligible' => 'Eligible for Promotion', 'pending' => 'Pending Evaluation', 'retained' => 'Not Eligible'] as $value => $label)
+                @foreach (['all' => 'All eligibility', 'eligible' => 'Eligible for Promotion', 'pending' => 'Pending Evaluation', 'retained' => 'Not Eligible', 'conditionally_promoted' => 'Conditionally Promoted', 'promoted' => 'Promoted'] as $value => $label)
                     <option value="{{ $value }}" @selected($eligibility === $value)>{{ $label }}</option>
                 @endforeach
             </select>
@@ -61,6 +61,7 @@
         <h2 class="font-bold text-gray-800">Promotion</h2>
         <p class="mt-1 text-sm text-gray-500">Eligible learners have passed every released subject. Promoting creates their enrollment in the next active school year without assigning a section.</p>
         <p class="mt-2 text-xs text-gray-500">Select all selects eligible learners on this page. Eligibility is rechecked when promoting.</p>
+        <p class="mt-2 text-xs text-gray-500">One or two failing released grades are tagged Conditionally Promoted. This status does not allow advancement to the next grade.</p>
         </div>
         <button id="promote-selected" form="bulkPromotionForm" type="submit" hidden disabled class="shrink-0 rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Promote selected (<span id="promotion-selected-count" aria-live="polite">0</span>)</button>
     </div>
@@ -87,11 +88,14 @@
                         $status = $enrollment->promotion_status;
                         $badge = match ($status) {
                             'eligible' => 'bg-emerald-100 text-emerald-800',
+                            'promoted' => 'bg-emerald-100 text-emerald-800',
                             'retained' => 'bg-red-100 text-red-800',
                             default => 'bg-amber-100 text-amber-800',
                         };
                         $label = match ($status) {
                             'eligible' => 'Eligible for Promotion',
+                            'conditionally_promoted' => 'Conditionally Promoted',
+                            'promoted' => 'Promoted',
                             'retained' => 'Not Eligible',
                             default => 'Pending Evaluation',
                         };
@@ -120,7 +124,7 @@
                                 <button type="submit" class="rounded-lg bg-[#296374] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f4e5c]">Promote</button>
                             </form>
                             @else
-                                <span class="text-xs text-gray-500">{{ $isCompleter && $status === 'eligible' ? 'Grade 12 completed' : 'Promotion requirements are not yet complete.' }}</span>
+                                <span class="text-xs text-gray-500">{{ match (true) { $status === 'promoted' => 'Already promoted.', $status === 'conditionally_promoted' => 'Conditional promotion does not permit advancement to the next grade.', $isCompleter && $status === 'eligible' => 'Grade 12 completed', default => 'Promotion requirements are not yet complete.' } }}</span>
                             @endif
                         </td>
                     </tr>

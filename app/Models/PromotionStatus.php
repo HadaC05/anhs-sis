@@ -14,6 +14,10 @@ class PromotionStatus extends Model
 
     public const RETAINED = 'retained';
 
+    public const CONDITIONALLY_PROMOTED = 'conditionally_promoted';
+
+    public const PROMOTED = 'promoted';
+
     protected $table = 'promotion_statuses';
 
     protected $primaryKey = 'promotion_status_ID';
@@ -28,6 +32,8 @@ class PromotionStatus extends Model
             ['slug' => self::PENDING, 'name' => 'Pending Evaluation', 'sort_order' => 1],
             ['slug' => self::ELIGIBLE, 'name' => 'Eligible for Promotion', 'sort_order' => 2],
             ['slug' => self::RETAINED, 'name' => 'Retained', 'sort_order' => 3],
+            ['slug' => self::CONDITIONALLY_PROMOTED, 'name' => 'Conditionally Promoted', 'sort_order' => 4],
+            ['slug' => self::PROMOTED, 'name' => 'Promoted', 'sort_order' => 5],
         ];
     }
 

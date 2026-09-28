@@ -166,6 +166,8 @@ class Sf9ReportCardBuilder
         $periodKeys = array_column($periods, 'key');
         $observedPeriods = $isSeniorHigh ? self::seniorHighObservedPeriods() : $periods;
 
+        $school = \App\Models\SchoolInformation::current();
+
         $base = [
             'student' => $student,
             'is_senior_high' => $isSeniorHigh,
@@ -184,8 +186,12 @@ class Sf9ReportCardBuilder
             'shs_track' => $isSeniorHigh ? self::seniorHighTrackGroup($enrollment, $section) : '',
             'adviser' => $adviser ? trim($adviser->first_name.' '.$adviser->last_name) : '',
             'principal' => $principalName ?? self::principalName(),
-            'school_name' => (string) config('app.name'),
-            'school_region' => 'Region XIII',
+            'school_name' => $school->name,
+            'school_region' => $school->region,
+            'school_id' => $school->school_id,
+            'school_division' => $school->division,
+            'school_district' => $school->district,
+            'school_logo' => $school->logoDataUri(),
             'performance_descriptors' => $isSeniorHigh ? self::seniorHighPerformanceDescriptors() : [],
             'attendance_months' => $isSeniorHigh
                 ? self::seniorHighAttendanceMonthKeys()

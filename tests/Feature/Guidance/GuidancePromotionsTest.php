@@ -20,6 +20,7 @@ use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\Models\User;
+use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
 
 test('guidance counselor can open the promotions page', function (bool $hasEligibleLearner) {
@@ -168,6 +169,8 @@ test('guidance promotion automatically uses the later active year and ignores su
     expect($next->curriculum_grade_level_ID)->toBe($offerings[8]->curriculum_ID)
         ->and($next->section_ID)->toBeNull()
         ->and($next->enrollment_status)->toBe('pending');
+    expect($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::PROMOTED);
+    expect(PromotionEligibility::synchronize($enrollment->fresh())['status'])->toBe(PromotionStatus::PROMOTED);
     $this->assertDatabaseMissing('enrollments', ['student_ID' => $enrollment->student_ID, 'SY_ID' => $inactiveYear->SY_ID]);
     $this->post(route('guidance.promotions.confirm', $enrollment))->assertSessionHasNoErrors();
     expect(Enrollment::query()->where('student_ID', $enrollment->student_ID)->count())->toBe(2);
@@ -297,3 +300,66 @@ test('guidance bulk promotion validates its selection', function (array $payload
     [['enrollment_ids' => [999999]]],
     [['enrollment_ids' => [1, 1]]],
 ]);
+
+test('promotion pages automatically persist failing grade tags without advancing learners', function (int $failures, string $status) {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    StudentSubjectGrade::query()->orderBy('grade_ID')->take($failures)->get()
+        ->each(fn ($grade) => $grade->update(['numeric_grade' => 74]));
+
+    $this->actingAs($user)->get(route('guidance.promotions.index', ['eligibility' => $status]))
+        ->assertOk()
+        ->assertViewHas('enrollments', fn ($rows) => $rows->pluck('enrollment_ID')->all() === [$enrollment->enrollment_ID]);
+    expect($enrollment->fresh()->promotion_status)->toBe($status)
+        ->and(Enrollment::query()->count())->toBe(1);
+})->with([
+    [0, PromotionStatus::ELIGIBLE],
+    [1, PromotionStatus::CONDITIONALLY_PROMOTED],
+    [2, PromotionStatus::CONDITIONALLY_PROMOTED],
+    [3, PromotionStatus::RETAINED],
+]);
+
+test('conditional promotion blocks individual and bulk grade advancement', function (int $failures, bool $bulk) {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    StudentSubjectGrade::query()->orderBy('grade_ID')->take($failures)->get()
+        ->each(fn ($grade) => $grade->update(['numeric_grade' => 74]));
+    AcademicYear::query()->create([
+        'school_year' => '2027-2028', 'start_date' => '2027-06-01',
+        'end_date' => '2028-03-31', 'status' => true,
+    ]);
+    $this->actingAs($user)->get(route('guidance.promotions.index', ['eligibility' => 'conditionally_promoted']))
+        ->assertOk()->assertSee('Conditionally Promoted')
+        ->assertDontSee('data-promotion-checkbox aria-label=', false);
+    $this->post(
+        $bulk ? route('guidance.promotions.bulk') : route('guidance.promotions.confirm', $enrollment),
+        $bulk ? ['enrollment_ids' => [$enrollment->enrollment_ID]] : [],
+    )->assertSessionHasErrors('promotion');
+    expect(Enrollment::query()->count())->toBe(1)
+        ->and($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::CONDITIONALLY_PROMOTED);
+})->with([1, 2])->with([false, true]);
+
+test('incomplete grades stay pending and corrected failing grades become eligible', function () {
+    ['enrollment' => $enrollment] = guidancePromotionFixtures();
+    $grade = StudentSubjectGrade::query()->firstOrFail();
+    $grade->update(['numeric_grade' => 74, 'status' => GradeStatus::DRAFT]);
+    expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::PENDING);
+    $grade->update(['status' => GradeStatus::RELEASED]);
+    expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::CONDITIONALLY_PROMOTED);
+    $grade->update(['numeric_grade' => 75]);
+    expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::ELIGIBLE);
+});
+
+test('existing next grade enrollments are recognized as completed promotions', function () {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    AcademicYear::query()->create([
+        'school_year' => '2027-2028', 'start_date' => '2027-06-01',
+        'end_date' => '2028-03-31', 'status' => true,
+    ]);
+    PromotionRegistrar::promote($enrollment);
+    $enrollment->update(['promotion_status' => PromotionStatus::ELIGIBLE]);
+
+    $this->actingAs($user)->get(route('guidance.promotions.index', ['eligibility' => 'promoted']))
+        ->assertOk()->assertSee('Already promoted.')
+        ->assertDontSee('data-promotion-checkbox aria-label=', false)
+        ->assertViewHas('enrollments', fn ($rows) => $rows->pluck('enrollment_ID')->all() === [$enrollment->enrollment_ID]);
+    expect($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::PROMOTED);
+});

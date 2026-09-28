@@ -469,11 +469,16 @@
                                 <div>Republic of the Philippines</div>
                                 <div>Department of Education</div>
                                 <div>{{ $card['school_region'] ?? 'Region XIII' }}</div>
-                                <div>DIVISION OF <span class="line" style="min-width: 28mm;"></span></div>
-                                <div>District of <span class="line" style="min-width: 24mm;"></span></div>
+                                <div>DIVISION OF <span class="line" style="min-width: 28mm;">{{ $card['school_division'] ?? '' }}</span></div>
+                                <div>District of <span class="line" style="min-width: 24mm;">{{ $card['school_district'] ?? '' }}</span></div>
                                 <div>{{ $card['school_name'] ?? config('app.name') }}</div>
+                                <div>School ID: {{ $card['school_id'] ?? '' }}</div>
                             </div>
-                            <div class="logo-placeholder">School<br>Logo</div>
+                            @if ($card['school_logo'] ?? null)
+                                <img src="{{ $card['school_logo'] }}" alt="School logo" class="logo-image">
+                            @else
+                                <div class="logo-placeholder">School<br>Logo</div>
+                            @endif
                         </div>
 
                         <div class="shs-title">Learner's Performance Report</div>
@@ -826,13 +831,15 @@
                         <div>
                             <div>Republic of the Philippines</div>
                             <div>Department of Education</div>
-                            <div>Region XIII</div>
-                            <div>Division of <span class="line" style="min-width: 28mm;"></span></div>
-                            <div><span class="line"></span></div>
-                            <div>District</div>
-                            <div><span class="line"></span></div>
-                            <div>{{ config('app.name') }}</div>
+                            <div>{{ $card['school_region'] ?? 'Region XIII' }}</div>
+                            <div>Division of {{ $card['school_division'] ?? '' }}</div>
+                            <div>District of {{ $card['school_district'] ?? '' }}</div>
+                            <div>{{ $card['school_name'] ?? config('app.name') }}</div>
+                            <div>School ID: {{ $card['school_id'] ?? '' }}</div>
                         </div>
+                        @if ($card['school_logo'] ?? null)
+                            <img src="{{ $card['school_logo'] }}" alt="School logo" class="logo-image">
+                        @endif
                     </div>
 
                     <div class="small bold">SF 9 - JHS</div>

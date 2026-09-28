@@ -28,6 +28,7 @@ use App\Notifications\DocumentStatusUpdated;
 use App\Support\EnrollmentDashboardData;
 use App\Support\EnrollmentDocumentCompletion;
 use App\Support\PlacementAssessmentAdvisor;
+use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
 use App\Support\StudentAccountProvisioner;
 use App\Support\StudentEnrollmentNotifier;
@@ -50,10 +51,17 @@ class GuidanceDashboardController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:200'],
             'grade_level' => ['nullable', 'integer', Rule::exists(GradeLevel::class, 'grade_ID')],
-            'eligibility' => ['nullable', Rule::in(['all', PromotionStatus::ELIGIBLE, PromotionStatus::PENDING, PromotionStatus::RETAINED])],
+            'eligibility' => ['nullable', Rule::in(['all', ...array_column(PromotionStatus::definitions(), 'slug')])],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
         ]);
         $eligibility = $filters['eligibility'] ?? PromotionStatus::ELIGIBLE;
+        Enrollment::query()
+            ->whereNotNull('section_ID')
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+            ->where('promotion_status_ID', '!=', PromotionStatus::idFor(PromotionStatus::PROMOTED))
+            ->with(['section.gradeLevel', 'gradingSemester.status'])
+            ->each(fn (Enrollment $enrollment) => PromotionEligibility::synchronize($enrollment));
+
         $query = Enrollment::query()
             ->with(['student.application', 'gradeLevel', 'academicYear', 'promotionStatus'])
             ->when($eligibility !== 'all', fn ($query) => $query->where('promotion_status_ID', PromotionStatus::idFor($eligibility)))

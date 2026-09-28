@@ -14,6 +14,7 @@ use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
 use App\Models\GradeStatus;
 use App\Models\GradingTerm;
+use App\Models\SchoolInformation;
 use App\Models\Section;
 use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
@@ -29,6 +30,8 @@ use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
+use App\Support\Sf5ReportBuilder;
+use App\Support\Sf5Workbook;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
 use App\Support\StudentCredentials;
@@ -436,7 +439,7 @@ class TeacherSectionController extends Controller
             ->values();
 
         $evaluations = $enrollments
-            ->mapWithKeys(fn (Enrollment $enrollment): array => [$enrollment->enrollment_ID => PromotionEligibility::evaluate($enrollment)])
+            ->mapWithKeys(fn (Enrollment $enrollment): array => [$enrollment->enrollment_ID => PromotionEligibility::synchronize($enrollment)])
             ->all();
 
         $nextAcademicYear = AcademicYear::query()
@@ -459,6 +462,33 @@ class TeacherSectionController extends Controller
             'nextAcademicYear',
             'alreadyPromotedStudentIds',
         ));
+    }
+
+    public function downloadSf5(Request $request, Section $section): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $this->authorizeAdvisorySection($request, $section);
+        $school = SchoolInformation::current();
+        $section->load(['academicYear', 'gradeLevel', 'adviser', 'curriculum']);
+        $rows = Sf5ReportBuilder::rows($section);
+        $path = Sf5Workbook::create($rows, [
+            'C3' => $school->region ?? '',
+            'E3' => $school->division ?? '',
+            'J3' => $school->district ?? '',
+            'C5' => $school->school_id ?? '',
+            'G5' => $section->academicYear?->school_year ?? '',
+            'J5' => $section->curriculum?->name ?? '',
+            'C7' => $school->name ?? '',
+            'J7' => $section->getRelation('gradeLevel')?->grade_label ?? '',
+            'M7' => $section->name,
+            'L36' => trim(($section->adviser?->first_name ?? '').' '.($section->adviser?->last_name ?? '')),
+            'L41' => Sf9ReportCardBuilder::principalName(),
+        ]);
+        $filename = 'SF5-'.Str::slug($section->name.'-'.$section->academicYear?->school_year).'.xlsx';
+
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'private, no-store',
+        ])->deleteFileAfterSend(true);
     }
 
     public function advisoryAttendance(Request $request, Section $section): View

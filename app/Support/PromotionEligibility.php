@@ -16,6 +16,37 @@ class PromotionEligibility
 {
     public const PASSING_GRADE = 75;
 
+    /** Evaluate and save the tag without advancing the learner. */
+    public static function synchronize(Enrollment $enrollment): array
+    {
+        $enrollment->loadMissing(['academicYear', 'curriculumGradeLevel', 'section.gradeLevel']);
+        $currentGradeId = $enrollment->section?->grade_ID ?: $enrollment->curriculumGradeLevel?->grade_ID;
+        // Recognize promotions completed before the Promoted status was introduced.
+        if ($enrollment->promotion_status !== PromotionStatus::PROMOTED
+            && $enrollment->academicYear?->start_date && $currentGradeId
+            && Enrollment::query()
+                ->where('student_ID', $enrollment->student_ID)
+                ->whereHas('academicYear', fn ($query) => $query->whereDate('start_date', '>', $enrollment->academicYear->start_date))
+                ->whereHas('curriculumGradeLevel', fn ($query) => $query->where('grade_ID', '>', $currentGradeId))
+                ->exists()) {
+            $enrollment->update(['promotion_status' => PromotionStatus::PROMOTED]);
+            $enrollment->unsetRelation('promotionStatus');
+        }
+
+        if ($enrollment->promotion_status === PromotionStatus::PROMOTED) {
+            return ['status' => PromotionStatus::PROMOTED, 'reason' => 'Already promoted.', 'subject_averages' => []];
+        }
+
+        $evaluation = self::evaluate($enrollment);
+        $enrollment->promotion_status = $evaluation['status'];
+        if ($enrollment->isDirty('promotion_status_ID')) {
+            $enrollment->save();
+            $enrollment->unsetRelation('promotionStatus');
+        }
+
+        return $evaluation;
+    }
+
     /** @return array{status: string, reason: string, subject_averages: array<int, float>} */
     public static function evaluate(Enrollment $enrollment): array
     {
@@ -68,13 +99,22 @@ class PromotionEligibility
             $averages[$assignment->assignment_ID] = round((float) $subjectGrades->avg('numeric_grade'), 2);
         }
 
-        $status = $grades->flatten()->every(fn (StudentSubjectGrade $grade): bool => (float) $grade->numeric_grade >= self::PASSING_GRADE)
-            ? PromotionStatus::ELIGIBLE
-            : PromotionStatus::RETAINED;
+        $failingGrades = $grades->flatten()
+            ->filter(fn (StudentSubjectGrade $grade): bool => (float) $grade->numeric_grade < self::PASSING_GRADE)
+            ->count();
+        $status = match (true) {
+            $failingGrades === 0 => PromotionStatus::ELIGIBLE,
+            $failingGrades <= 2 => PromotionStatus::CONDITIONALLY_PROMOTED,
+            default => PromotionStatus::RETAINED,
+        };
 
         return [
             'status' => $status,
-            'reason' => $status === PromotionStatus::RETAINED ? 'The learner has one or more failing grades.' : '',
+            'reason' => match ($status) {
+                PromotionStatus::CONDITIONALLY_PROMOTED => 'The learner has one or two failing grades. Conditional promotion does not permit advancement to the next grade.',
+                PromotionStatus::RETAINED => 'The learner has more than two failing grades.',
+                default => '',
+            },
             'subject_averages' => $averages,
         ];
     }

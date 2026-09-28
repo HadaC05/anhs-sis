@@ -22,7 +22,9 @@ class PromotionRegistrar
     {
         $enrollment->loadMissing(['academicYear', 'section.gradeLevel', 'curriculumGradeLevel']);
         $evaluation = PromotionEligibility::evaluate($enrollment);
-        $enrollment->update(['promotion_status' => $evaluation['status']]);
+        if ($enrollment->promotion_status !== PromotionStatus::PROMOTED) {
+            $enrollment->update(['promotion_status' => $evaluation['status']]);
+        }
 
         if ($evaluation['status'] !== PromotionStatus::ELIGIBLE) {
             throw ValidationException::withMessages([
@@ -83,6 +85,7 @@ class PromotionRegistrar
         );
 
         StudentSubjectRoster::sync($nextEnrollment);
+        $enrollment->update(['promotion_status' => PromotionStatus::PROMOTED]);
 
         return $nextEnrollment;
     }

@@ -2,6 +2,8 @@
 
 use App\Support\LearnerPermanentRecordBuilder;
 
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
 it('maps subjects to sf10 learning area slots', function () {
     expect(LearnerPermanentRecordBuilder::subjectSlot('Filipino'))->toBe('filipino')
         ->and(LearnerPermanentRecordBuilder::subjectSlot('Values Education'))->toBe('values_education')

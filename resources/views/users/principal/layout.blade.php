@@ -132,6 +132,10 @@
                             </svg>
                             <span class="font-semibold">Users</span>
                         </a>
+                        <a href="{{ route('principal.school-information.edit') }}" class="sidebar-link {{ request()->routeIs('principal.school-information.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h1m4 0h1M9 12h1m4 0h1"></path></svg>
+                            <span class="font-semibold">School Information</span>
+                        </a>
                         <a href="{{ route('principal.academic-year-config.index') }}" class="sidebar-link {{ request()->routeIs('principal.academic-year-config.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z"></path>
@@ -208,6 +212,7 @@
         </main>
     </div>
 
+    @stack('toasts')
     <x-idle-session-timeout />
 </body>
 

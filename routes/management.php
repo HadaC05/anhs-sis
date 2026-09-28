@@ -12,6 +12,9 @@ use App\Http\Controllers\Admin\SubjectConfigurationController;
 use App\Http\Controllers\Admin\TeacherAssignmentController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/school-information', [\App\Http\Controllers\Admin\SchoolInformationController::class, 'edit'])->name('school-information.edit');
+Route::put('/school-information', [\App\Http\Controllers\Admin\SchoolInformationController::class, 'update'])->name('school-information.update');
+
 Route::get('/users', [AdminUserController::class, 'index'])
     ->name('users');
 Route::post('/users', [AdminUserController::class, 'store'])

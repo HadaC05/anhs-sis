@@ -12,6 +12,11 @@
     <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ $errors->first() }}</div>
 @endif
 
+<form method="POST" action="{{ route('teacher.advisory.promotions.sf5', $section) }}" class="mb-5">
+    @csrf
+    <button type="submit" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Generate SF 5 (.xlsx)</button>
+</form>
+
 <form id="bulkPromotionForm" method="POST" action="{{ route('teacher.advisory.promotions.bulk', $section) }}">
     @csrf
 </form>
@@ -21,6 +26,7 @@
         <div>
             <h2 class="font-bold text-gray-800">Promotion</h2>
             <p class="mt-1 text-sm text-gray-500">Eligibility is determined automatically. Learners can be promoted only after complete released grades, no failing grades, and closure of all Junior High terms or their Senior High semester.</p>
+            <p class="mt-2 text-xs text-gray-500">One or two failing released grades are tagged Conditionally Promoted. This status does not allow advancement to the next grade.</p>
         </div>
         <button form="bulkPromotionForm" type="submit" class="shrink-0 rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Bulk promote selected</button>
     </div>
@@ -43,8 +49,8 @@
                         $name = $student?->application ? trim($student->application->last_name.', '.$student->application->first_name.' '.$student->application->middle_name) : ($student?->name ?? 'Learner');
                         $evaluation = $evaluations[$enrollment->enrollment_ID];
                         $status = $evaluation['status'];
-                        $badge = match ($status) { 'eligible' => 'bg-emerald-100 text-emerald-800', 'retained' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' };
-                        $label = match ($status) { 'eligible' => 'Eligible for Promotion', 'retained' => 'Not Eligible', default => 'Pending Requirements' };
+                        $badge = match ($status) { 'eligible', 'promoted' => 'bg-emerald-100 text-emerald-800', 'retained' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' };
+                        $label = match ($status) { 'eligible' => 'Eligible for Promotion', 'promoted' => 'Promoted', 'conditionally_promoted' => 'Conditionally Promoted', 'retained' => 'Not Eligible', default => 'Pending Requirements' };
                         $isGradeTwelve = $section->getRelation('gradeLevel')?->grade_label === 'Grade 12';
                         $alreadyPromoted = in_array((int) $enrollment->student_ID, $alreadyPromotedStudentIds, true);
                         $canPromote = $status === 'eligible' && ! $isGradeTwelve && ! $alreadyPromoted && $nextAcademicYear;
@@ -66,7 +72,7 @@
                                 </form>
                             @elseif ($isGradeTwelve && $status === 'eligible')
                                 <span class="text-xs font-medium text-gray-500">Grade 12 completed</span>
-                            @elseif ($alreadyPromoted)
+                            @elseif ($alreadyPromoted || $status === 'promoted')
                                 <span class="text-xs font-medium text-emerald-700">Already promoted{{ $nextAcademicYear ? ' to '.$nextAcademicYear->school_year : '' }}</span>
                             @elseif ($status === 'eligible' && ! $nextAcademicYear)
                                 <span class="text-xs text-gray-500">Configure the next school year to promote.</span>

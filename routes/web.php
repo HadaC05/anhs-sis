@@ -119,6 +119,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/teacher/advisory/{section}/promotions', [TeacherSectionController::class, 'advisoryPromotions'])
         ->middleware('teacher')
         ->name('teacher.advisory.promotions.index');
+    Route::post('/teacher/advisory/{section}/promotions/sf5', [TeacherSectionController::class, 'downloadSf5'])
+        ->middleware('teacher')
+        ->name('teacher.advisory.promotions.sf5');
     Route::get('/teacher/advisory/{section}/attendance', [TeacherSectionController::class, 'advisoryAttendance'])
         ->middleware('teacher')
         ->name('teacher.advisory.attendance');

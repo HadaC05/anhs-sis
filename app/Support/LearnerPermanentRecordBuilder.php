@@ -276,12 +276,14 @@ class LearnerPermanentRecordBuilder
      */
     public static function defaultSchoolMeta(): array
     {
+        $school = \App\Models\SchoolInformation::current();
+
         return [
-            'name' => (string) config('app.name'),
-            'id' => '',
-            'district' => '',
-            'division' => '',
-            'region' => 'Region XIII',
+            'name' => $school->name,
+            'id' => $school->school_id ?? '',
+            'district' => $school->district ?? '',
+            'division' => $school->division ?? '',
+            'region' => $school->region ?? '',
         ];
     }
 
