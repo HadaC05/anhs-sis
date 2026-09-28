@@ -26,7 +26,7 @@
     <button
         type="button"
         @click="open = ! open"
-        class="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+        class="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 text-white transition hover:border-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
         aria-label="Student profile menu"
         :aria-expanded="open.toString()"
         data-test="student-profile-menu"
@@ -35,12 +35,12 @@
             <img
                 src="{{ $profileStudentPhotoUrl }}"
                 alt=""
-                class="h-10 w-10 rounded-full object-cover"
+                class="h-8 w-8 rounded-full object-cover"
                 data-test="student-profile-photo"
             >
         @else
             <span
-                class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15"
                 data-test="student-profile-photo-placeholder"
             >
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

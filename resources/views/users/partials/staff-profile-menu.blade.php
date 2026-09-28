@@ -10,11 +10,11 @@
 
 <details class="group relative">
     <summary
-        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 [&::-webkit-details-marker]:hidden"
+        class="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-white/80 text-white transition hover:border-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 [&::-webkit-details-marker]:hidden"
         aria-label="Profile menu"
         data-test="staff-profile-menu"
     >
-        <span class="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white/15">
+        <span class="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/15">
             @if ($profileUser?->photoUrl())
                 <img src="{{ $profileUser->photoUrl() }}" alt="Profile photo" class="h-full w-full object-cover" data-test="staff-profile-photo">
             @else

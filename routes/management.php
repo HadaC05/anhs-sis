@@ -148,3 +148,8 @@ Route::patch('/teacher-assignments/{assignment}/unlock-grades', [TeacherAssignme
     ->name('teacher-assignments.unlock-grades');
 Route::delete('/teacher-assignments/{assignment}', [TeacherAssignmentController::class, 'destroy'])
     ->name('teacher-assignments.delete');
+
+Route::post('/section-configuration/{section}/students/import', [SectionConfigurationController::class, 'importStudents'])
+    ->name('section-config.import');
+Route::get('/section-configuration/{section}/students/import/{import}/status', [SectionConfigurationController::class, 'importStatus'])
+    ->name('section-config.import-status');

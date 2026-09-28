@@ -7,45 +7,53 @@
 @section('title', 'Sections')
 
 @push('toasts')
-    <x-password-reset-toasts :include-errors="false" test-prefix="sections" />
+    @include('users.admin.partials.section-toasts')
 @endpush
 
 @section('content')
 @php
-    $modalOpen = $errors->any();
+    $showSeniorColumns = $sections->getCollection()->contains(fn ($section) => in_array($section->grade_level, ['grade_11', 'grade_12'], true));
+    $modalOpen = ! $detailsTab && $errors->any();
     $fieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
 @endphp
 
-<div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+<div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
         <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Sections</h1>
     </div>
-    <div class="flex flex-wrap gap-2">
+
+</div>
+
+<nav aria-label="Section tabs" class="mb-4" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:4px;padding:4px;background:#dce9ed;border-radius:12px;">
+    @foreach(['creation' => 'Section Creation', 'details' => 'Section Details'] as $tab => $label)
+        @php
+            $activeTab = ($tab === 'details') === $detailsTab;
+        @endphp
+        <a href="{{ route($managementRoutePrefix.'section-config.index', ['tab' => $tab]) }}" @if($activeTab) aria-current="page" @endif style="display:flex;align-items:center;justify-content:center;text-align:center;padding:9px 8px;font-size:13px;border-radius:8px;font-weight:800;background:{{ $activeTab ? '#296374' : '#f0f6f8' }};color:{{ $activeTab ? '#fff' : '#245566' }};box-shadow:{{ $activeTab ? '0 3px 8px #29637440' : 'none' }};">{{ $label }}</a>
+    @endforeach
+</nav>
+
+@include('users.admin.partials.copy-sections-modal')
+
+
+
+<div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
+    <div class="border-b border-gray-100 px-4 py-4">
+            @unless($detailsTab)
+    <div class="mb-3 flex flex-wrap justify-end gap-2">
     <button id="copySectionsTrigger" type="button" onclick="openCopySectionsModal()" class="inline-flex items-center justify-center rounded-lg border border-[#296374] bg-white px-4 py-2.5 text-sm font-bold text-[#296374] shadow-sm transition hover:bg-gray-50">Copy Sections</button>
     <button type="button" onclick="openSectionModal()" class="inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style="background-color: #296374;">
         Add Section
     </button>
     </div>
-</div>
-
-@include('users.admin.partials.copy-sections-modal')
-
-@if ($errors->any())
-    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        @foreach ($errors->all() as $error)
-            <p>{{ $error }}</p>
-        @endforeach
-    </div>
-@endif
-
-<div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
-    <div class="border-b border-gray-100 px-4 py-4">
+    @endunless
         <form method="GET" action="{{ route($managementRoutePrefix.'section-config.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <input type="hidden" name="tab" value="{{ $detailsTab ? 'details' : 'creation' }}">
             <div class="relative min-w-0 sm:col-span-2">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path>
                 </svg>
-                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search section or room"
+                <input type="search" aria-label="Search sections" name="search" value="{{ request('search') }}" placeholder="Search section or room"
                     class="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none transition focus:border-[#296374] focus:bg-white focus:ring-2 focus:ring-[#296374]/10">
             </div>
             <select name="cluster_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
@@ -54,16 +62,16 @@
                     <option value="{{ $cluster->cluster_ID }}" @selected((int) request('cluster_ID') === (int) $cluster->cluster_ID)>{{ $cluster->name }}</option>
                 @endforeach
             </select>
-            <select name="grade_level" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select aria-label="Grade level" name="grade_level" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All grades</option>
                 @foreach ($gradeLevels as $level)
-                    <option value="{{ $level['value'] }}" @selected(request('grade_level') === $level['value'])>{{ $level['label'] }}</option>
+                    <option value="{{ $level['value'] }}" @selected(request('grade_level') === $level['value'])>{{ preg_replace('/\D+/', '', $level['label']) }}</option>
                 @endforeach
             </select>
-            <select name="SY_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
+            <select aria-label="School year" name="SY_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
                 <option value="">All years</option>
                 @foreach ($academicYears as $year)
-                    <option value="{{ $year->SY_ID }}" @selected((int) request('SY_ID') === (int) $year->SY_ID)>{{ $year->school_year }}</option>
+                    <option value="{{ $year->SY_ID }}" @selected($selectedSchoolYearId === (int) $year->SY_ID)>{{ $year->school_year }}</option>
                 @endforeach
             </select>
             <select name="curriculum_grade_level_ID" class="h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
@@ -84,28 +92,35 @@
             </select>
             <button type="submit" class="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold text-white shadow-sm" style="background-color: #296374;">Apply</button>
             @if (request()->hasAny(['search', 'cluster_ID', 'grade_level', 'SY_ID', 'curriculum_grade_level_ID', 'per_page', 'status']))
-                <a href="{{ route($managementRoutePrefix.'section-config.index') }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+                <a href="{{ route($managementRoutePrefix.'section-config.index', ['tab' => $detailsTab ? 'details' : 'creation']) }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
             @endif
         </form>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[1100px] border-collapse text-left">
+        <table class="w-full border-collapse text-left [overflow-wrap:anywhere]" style="min-width:{{ $showSeniorColumns ? 850 : 650 }}px">
             <thead>
                 <tr class="border-b border-gray-300 bg-gray-100 whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                    <th class="border-r border-gray-200 px-5 py-4">Name</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Cluster</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Grade</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Semester</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Adviser</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Academic Year</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Room</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Capacity</th>
-                    <th class="border-r border-gray-200 px-5 py-4">Status</th>
-                    <th class="px-5 py-4 text-right">Actions</th>
+                    <th class="border-r border-gray-200 px-4 py-1.5">Name</th>
+                    @if($showSeniorColumns)
+                    <th class="border-r border-gray-200 px-4 py-1.5">Cluster</th>
+                    @endif
+                    <th class="border-r border-gray-200 px-4 py-1.5">Grade</th>
+                    @if($showSeniorColumns)
+                    <th class="border-r border-gray-200 px-4 py-1.5">Semester</th>
+                    @endif
+                    <th class="border-r border-gray-200 px-4 py-1.5">Adviser</th>
+                    <th class="border-r border-gray-200 px-4 py-1.5">Academic Year</th>
+                    @if($detailsTab)
+                    <th class="border-r border-gray-200 px-4 py-1.5">Availability</th>
+                    @else
+                    <th class="border-r border-gray-200 px-4 py-1.5">Capacity</th>
+                    <th class="border-r border-gray-200 px-4 py-1.5">Status</th>
+                    @endif
+                    <th class="px-4 py-1.5 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
+            <tbody class="divide-y divide-gray-200 text-[13px] leading-5">
                 @forelse ($sections as $section)
                     @php
                         $adviserName = optional($section->adviser)->last_name
@@ -124,23 +139,37 @@
                         ];
                     @endphp
                     <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
-                        <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $section->name }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ optional($section->cluster)->name ?? '—' }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $section->gradeLevel?->grade_label ?? $section->curriculumGradeLevel?->gradeLevel?->grade_label ?? '—' }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $section->curriculumGradeLevel?->gradingSemester?->label ?? '—' }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $adviserName }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ optional($section->academicYear)->school_year ?? '—' }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $section->room ?: '—' }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $section->capacity }}</td>
-                        <td class="border-r border-gray-100 px-5 py-4">
+                        <td class="border-r border-gray-100 px-4 py-1.5 font-semibold text-gray-900">{{ $section->name }}</td>
+                        @if($showSeniorColumns)
+                        <td class="border-r border-gray-100 px-4 py-1.5 text-gray-700">{{ optional($section->cluster)->name ?? '—' }}</td>
+                        @endif
+                        <td class="border-r border-gray-100 px-4 py-1.5 text-gray-700">{{ preg_replace('/\D+/', '', $section->grade_level) }}</td>
+                        @if($showSeniorColumns)
+                        <td class="border-r border-gray-100 px-4 py-1.5 text-gray-700">{{ $section->curriculumGradeLevel?->gradingSemester?->label ?? '—' }}</td>
+                        @endif
+                        <td class="border-r border-gray-100 px-4 py-1.5 text-gray-700">{{ $adviserName }}</td>
+                        <td class="border-r border-gray-100 px-4 py-1.5 text-gray-700">{{ optional($section->academicYear)->school_year ?? '—' }}</td>
+                        @if($detailsTab)
+                        <td class="border-r border-gray-100 px-4 py-1.5">
+                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ ($section->capacity > 0 && $section->enrolled_students_count >= $section->capacity) ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700' }}">{{ ($section->capacity > 0 && $section->enrolled_students_count >= $section->capacity) ? 'Full' : 'Available' }}</span>
+                        </td>
+                        @else
+                        <td class="border-r border-gray-100 px-4 py-1.5 text-gray-700">{{ $section->capacity }}</td>
+                        <td class="border-r border-gray-100 px-4 py-1.5">
                             <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $section->status ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">
                                 {{ $section->status ? 'Active' : 'Inactive' }}
                             </span>
                         </td>
-                        <td class="px-5 py-4">
+                        @endif
+                        <td class="px-4 py-1.5">
                             <div class="flex items-center justify-end gap-1">
+                                @if($detailsTab)
+                                    <a href="{{ route($managementRoutePrefix.'section-config.index', array_merge(request()->except('section'), ['tab' => 'details', 'section' => $section->section_ID])) }}" class="inline-flex rounded-lg p-1.5 text-[#296374] transition hover:bg-[#296374]/10" title="View students" aria-label="View students in {{ $section->name }}">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3" stroke-width="1.8"/></svg>
+                                    </a>
+                                @else
                                 <button type="button" onclick='openSectionModal(@json($sectionPayload))'
-                                    class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
+                                    class="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
@@ -148,7 +177,7 @@
                                 <form action="{{ route($managementRoutePrefix.'section-config.toggle-status', $section) }}" method="POST" class="inline" data-confirm-action="{{ $section->status ? 'Archive' : 'Activate' }}" data-confirm-message="{{ $section->status ? 'Archive this section?' : 'Activate this section?' }}">
                                     @csrf
                                     @method('PATCH')
-                                    <button type="submit" class="rounded-lg p-2 text-gray-500 transition {{ $section->status ? 'hover:bg-amber-50 hover:text-amber-700' : 'hover:bg-emerald-50 hover:text-emerald-600' }}" title="{{ $section->status ? 'Archive' : 'Activate' }}">
+                                    <button type="submit" class="rounded-lg p-1.5 text-gray-500 transition {{ $section->status ? 'hover:bg-amber-50 hover:text-amber-700' : 'hover:bg-emerald-50 hover:text-emerald-600' }}" title="{{ $section->status ? 'Archive' : 'Activate' }}">
                                         @if ($section->status)
                                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
@@ -160,12 +189,13 @@
                                         @endif
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="px-6 py-16 text-center text-gray-500">No sections found.</td>
+                        <td colspan="{{ ($detailsTab ? 8 : 9) - ($showSeniorColumns ? 0 : 2) }}" class="px-6 py-16 text-center text-gray-500">No sections found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -178,6 +208,8 @@
         </div>
     @endif
 </div>
+
+@include('users.admin.partials.section-details-modal')
 
 <div id="sectionModal" role="dialog" aria-modal="true" aria-labelledby="sectionModalTitle" data-open="{{ $modalOpen ? 'true' : 'false' }}"
     class="fixed inset-0 z-[100] {{ $modalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4">
@@ -233,7 +265,7 @@
                             class="{{ $fieldClass }} {{ $errors->has('grade_level') ? 'border-red-300' : 'border-gray-200' }}">
                             <option value="">Select</option>
                             @foreach ($gradeLevels as $level)
-                                <option value="{{ $level['value'] }}" @selected(old('grade_level') === $level['value'])>{{ $level['label'] }}</option>
+                                <option value="{{ $level['value'] }}" @selected(old('grade_level') === $level['value'])>{{ preg_replace('/\D+/', '', $level['label']) }}</option>
                             @endforeach
                         </select>
                         @error('grade_level')

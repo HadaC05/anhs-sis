@@ -202,7 +202,7 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             </form>
 
             @if ($enrollments->isNotEmpty() && $canEditCurrentTerm)
-            <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <div class="teacher-actions flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
                 <button type="button" id="saveGradesButton" class="inline-flex items-center justify-center rounded-md px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:opacity-90" style="background-color: #296374;">
                     Save Grades
                 </button>
@@ -307,7 +307,7 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
 </script>
 
 @push('modals')
-<div id="gradeConfirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4 pt-24" role="dialog" aria-modal="true" aria-labelledby="gradeConfirmTitle">
+<div id="gradeConfirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true" aria-labelledby="gradeConfirmTitle">
     <div class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div id="gradeConfirmHeader" class="border-b border-gray-300 bg-[#296374] px-6 py-4">
             <p id="gradeConfirmEyebrow" class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Grade sheet</p>

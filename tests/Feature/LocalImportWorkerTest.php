@@ -20,7 +20,8 @@ test('local imports launch a hidden worker and throttle repeated polling', funct
         return $process->command[0] === 'powershell.exe'
             && str_contains($script, '-WindowStyle Hidden')
             && str_contains($script, 'queue:work')
-            && str_contains($script, '--stop-when-empty');
+            && str_contains($script, '--stop-when-empty')
+            && $process->environment === getenv();
     });
 });
 
@@ -46,4 +47,19 @@ test('import jobs use the production timeout configured by the dispatching serve
     config(['queue.class_list_import_timeout' => 240]);
     $job = unserialize(serialize(new \App\Jobs\ProcessAdvisoryClassListImport(1)));
     expect($job->timeout)->toBe(240)->and($job->failOnTimeout)->toBeTrue();
+});
+
+
+test('local imports fall back to Windows Script Host when PowerShell cannot initialize', function () {
+    app()->instance('env', 'local');
+    config(['queue.auto_start_local_import_worker' => true, 'queue.default' => 'database']);
+    Cache::forget('local-import-worker-starting');
+    Process::fake(fn ($process) => $process->command[0] === 'powershell.exe'
+        ? Process::result(errorOutput: 'Internal Windows PowerShell error 8009001d', exitCode: 1)
+        : Process::result());
+    app(LocalImportWorker::class)->start();
+    Process::assertRan(fn ($process) => $process->command[0] === 'cscript.exe'
+        && $process->command[2] === base_path('scripts/start-import-worker.vbs')
+        && $process->command[4] === base_path()
+        && $process->environment === getenv());
 });

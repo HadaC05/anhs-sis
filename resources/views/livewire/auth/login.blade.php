@@ -212,19 +212,7 @@
             @endif
 
             @if (session('application_status_enrollment_year'))
-            <div class="mb-4 rounded border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 space-y-3">
-                <div>
-                    <p class="font-semibold">Login Instructions</p>
-                    <p>Use these instructions to sign in, then change your password immediately after your first login.</p>
-                </div>
-                <div class="text-xs leading-relaxed">
-                    Username: use your LRN.
-                </div>
-                <div class="text-xs leading-relaxed">
-                    Password: use the first 2 letters of your first name + the first 2 letters of your last name + {{ session('application_status_enrollment_year') }} + anhs.
-                    Example format only: `jado{{ session('application_status_enrollment_year') }}anhs`
-                </div>
-            </div>
+            @include('partials.first-time-sign-in', ['enrollmentYear' => session('application_status_enrollment_year')])
             @endif
 
             @if ($errors->statusCheck->has('status_lookup') || $errors->statusCheck->has('status_lrn') || $errors->statusCheck->has('status_birthdate'))

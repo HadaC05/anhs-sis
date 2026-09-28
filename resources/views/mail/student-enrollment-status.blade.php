@@ -36,37 +36,7 @@
                                     while some required documents are still pending. Please sign in and upload your Birth Certificate and Form 137 / SF9.
                                 </p>
                             @endif
-                            <p style="margin:0 0 8px;font-size:14px;font-weight:bold;">Login instructions</p>
-                            <p style="margin:0 0 12px;font-size:14px;line-height:1.6;">
-                                Use these instructions to sign in, then change your password immediately after your first login.
-                            </p>
-                            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;">
-                                Username: use your LRN.
-                            </p>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;">
-                                <tr>
-                                    <td style="padding:14px;font-size:13px;line-height:1.7;">
-                                        <strong>Sample student (for illustration only)</strong><br>
-                                        First name: Jane<br>
-                                        Last name: Doe<br>
-                                        LRN: <code>123456789012</code><br>
-                                        Enrollment year: {{ $enrollmentYear }}
-                                    </td>
-                                </tr>
-                            </table>
-                            <p style="margin:0 0 16px;font-size:13px;line-height:1.6;">
-                                Password: use the first 2 letters of your first name + the first 2 letters of your last name + {{ $enrollmentYear }} + anhs.
-                                Use lowercase letters and no spaces.
-                            </p>
-                            <p style="margin:0 0 16px;font-size:13px;line-height:1.6;">
-                                For Jane Doe: <strong>ja</strong> (Jane) + <strong>do</strong> (Doe) + <strong>{{ $enrollmentYear }}</strong> + <strong>anhs</strong>.<br>
-                                Example username: <code>123456789012</code><br>
-                                Example password: <code>{{ $passwordExample }}</code>
-                            </p>
-                            <p style="margin:0 0 16px;font-size:13px;line-height:1.6;">
-                                The details above are examples only. Use your own registered first name, last name, and LRN to sign in.
-                                If you have already changed your password, use your current password instead.
-                            </p>
+                            @include('partials.first-time-sign-in', ['enrollmentYear' => $enrollmentYear])
                             <p style="margin:0;">
                                 <a href="{{ $loginUrl }}" style="display:inline-block;background:#296374;color:#ffffff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 16px;border-radius:8px;">
                                     Go to Login

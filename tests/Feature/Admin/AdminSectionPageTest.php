@@ -81,10 +81,10 @@ test('admin can view the restyled sections page', function () {
     $response->assertSee('Sections');
     $response->assertSee('Add Section');
     $response->assertSee('Einstein');
-    $response->assertSee('Grade 7');
+    $response->assertSee('>7</td>', false);
     $response->assertSee('Adviser, Ada');
     $response->assertSee('2026-2027');
-    $response->assertSee('Room 201');
+    $response->assertDontSee('>Room</th>', false);
     $response->assertSee('Active');
     $response->assertSee('>Sections</span>', false);
     $response->assertSee('title="Edit"', false);
@@ -284,5 +284,89 @@ test('teachers cannot copy sections through management routes', function () {
     $teacher->update(['role_id' => Role::query()->firstOrCreate(['role_name' => 'teacher'])->id]);
     foreach (['admin', 'principal'] as $role) {
         $this->actingAs($teacher)->post(route($role.'.section-config.copy'), [])->assertForbidden();
+    }
+});
+
+test('management details tab filters sections and opens the student modal', function (string $role) {
+    ['admin' => $user, 'section' => $section, 'academicYear' => $year] = createSectionPageFixtures('details.'.$role);
+    $user->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    $url = route($role.'.section-config.index', ['tab' => 'details', 'search' => 'Einstein', 'SY_ID' => $year->SY_ID, 'grade_level' => 'grade_7']);
+    $this->actingAs($user)->get($url)->assertOk()->assertSee('Section Creation')->assertSee('Section Details')
+        ->assertSee('title="View students"', false)->assertDontSee('title="Edit"', false);
+    foreach ([['search' => 'Unknown'], ['grade_level' => 'grade_8'], ['SY_ID' => 999999]] as $filter) {
+        $this->get(route($role.'.section-config.index', array_merge(['tab' => 'details'], $filter)))
+            ->assertOk()->assertSee('No sections found.');
+    }
+    $this->get($url.'&section='.$section->section_ID)->assertOk()
+        ->assertSee('id="sectionDetailsModal"', false)->assertSee('No students enrolled in this section yet.')
+        ->assertSee(route($role.'.section-config.import', $section));
+})->with(['admin', 'principal']);
+
+test('management imports students through the shared teacher worker and preserves the modal', function (string $role) {
+    ['admin' => $user, 'section' => $section] = createSectionPageFixtures('import.'.$role);
+    $user->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    \Illuminate\Support\Facades\Queue::fake();
+    $url = route($role.'.section-config.index', ['tab' => 'details', 'section' => $section->section_ID]);
+    $section->update(['capacity' => 1]);
+    $uploadUrl = route($role.'.section-config.import', $section);
+    $this->actingAs($user)->from($url)->post($uploadUrl, [])->assertSessionHasErrors('class_list')->assertRedirect($url);
+    $this->get($url)->assertOk()->assertSee('id="sectionDetailsModal"', false)
+        ->assertSee('data-open="false"', false);
+    $this->from($url)->post($uploadUrl, [
+        'class_list' => \Illuminate\Http\UploadedFile::fake()->createWithContent('students.csv', "LRN,Name,Sex\n987654321098,\"Cruz, Juan\",M\n"),
+    ])->assertSessionHasNoErrors()->assertRedirect($url);
+    $import = \App\Models\AdvisoryClassListImport::query()->sole();
+    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ProcessAdvisoryClassListImport::class);
+    $statusUrl = route($role.'.section-config.import-status', [$section, $import]);
+    $this->getJson($statusUrl)->assertOk()->assertJsonPath('status', 'queued');
+    $this->get($url)->assertOk()->assertSee('sectionImportProgress');
+    (new \App\Jobs\ProcessAdvisoryClassListImport($import->id))->handle(app(\App\Http\Controllers\Teacher\TeacherSectionController::class));
+    expect($import->fresh()->status)->toBe('completed');
+    $this->get($url)->assertOk()->assertSee('Cruz, Juan')->assertSee('987654321098')->assertSee('Student import complete.')->assertSee('>Full</span>', false)->assertSee('data-section-toast', false);
+    $this->getJson($statusUrl)->assertJsonPath('status', 'completed');
+    $import->update(['requested_by' => $section->staff_ID]);
+    $this->getJson($statusUrl)->assertNotFound();
+    $teacherRole = Role::query()->firstOrCreate(['role_name' => 'teacher']);
+    $user->update(['role_id' => $teacherRole->id, 'change_password' => false]);
+    $this->actingAs($user->fresh())->post($uploadUrl, [])->assertForbidden();
+    $this->getJson($statusUrl)->assertForbidden();
+    $this->get($url)->assertForbidden();
+})->with(['admin', 'principal']);
+
+
+test('both management tables sort grades numerically and details display availability', function (string $tab) {
+    ['admin' => $admin, 'section' => $section] = createSectionPageFixtures('ordered.'.$tab);
+    foreach ([12, 10, 8, 11, 9] as $grade) {
+        $copy = $section->replicate();
+        $copy->fill(['name' => 'Section level '.$grade, 'grade_ID' => GradeLevel::idForValue('grade_'.$grade)])->save();
+    }
+    $response = $this->actingAs($admin)->get(route('admin.section-config.index', ['tab' => $tab]));
+    $response->assertOk()->assertDontSee('>Room</th>', false);
+    expect($response->viewData('sections')->pluck('grade_level')->all())->toBe(['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12']);
+    if ($tab === 'details') {
+        $response->assertSee('>Available</span>', false)->assertSee('>Availability</th>', false)
+            ->assertDontSee('>Capacity</th>', false)->assertDontSee('>Status</th>', false);
+    }
+})->with(['creation', 'details']);
+
+
+test('section details defaults to the current school year and allows other years or all years', function () {
+    ['admin' => $admin, 'section' => $section, 'academicYear' => $current] = createSectionPageFixtures('details.current.year');
+    $previous = AcademicYear::query()->create([
+        'school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false,
+    ]);
+    $olderSection = $section->replicate();
+    $olderSection->fill(['name' => 'Previous year section', 'SY_ID' => $previous->SY_ID])->save();
+    $this->actingAs($admin);
+    foreach ([['tab' => 'details'], ['tab' => 'details', 'search' => 'Einstein']] as $query) {
+        $response = $this->get(route('admin.section-config.index', $query))->assertOk();
+        expect($response->viewData('selectedSchoolYearId'))->toBe($current->SY_ID)
+            ->and($response->viewData('sections')->pluck('section_ID')->all())->toBe([$section->section_ID]);
+    }
+    $response = $this->get(route('admin.section-config.index', ['tab' => 'details', 'SY_ID' => $previous->SY_ID]))->assertOk();
+    expect($response->viewData('sections')->pluck('section_ID')->all())->toBe([$olderSection->section_ID]);
+    foreach ([['tab' => 'details', 'SY_ID' => ''], ['tab' => 'creation']] as $query) {
+        $response = $this->get(route('admin.section-config.index', $query))->assertOk();
+        expect($response->viewData('sections')->total())->toBe(2);
     }
 });

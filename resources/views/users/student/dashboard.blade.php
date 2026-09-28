@@ -51,6 +51,7 @@
     $schoolYear = $currentEnrollment?->academicYear?->school_year ?? $activeYear?->school_year ?? '—';
     $needsEnrollment = $currentEnrollment === null;
     $initials = $student?->initials() ?? strtoupper(\Illuminate\Support\Str::substr($firstName, 0, 1));
+    $studentPhotoUrl = $student?->photoUrl();
     $infoRows = [
         ['label' => 'Enrollment Status', 'value' => $enrollmentStatus],
         ['label' => 'Grade Level', 'value' => $gradeLabel],
@@ -140,8 +141,12 @@
 
                 <div class="border-b border-slate-200 px-6 py-5">
                     <div class="flex items-start gap-4">
-                        <div class="flex h-12 w-12 shrink-0 items-center justify-center border border-slate-300 bg-slate-50 text-sm font-semibold tracking-wide text-slate-800">
-                            {{ $initials }}
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border border-slate-300 bg-slate-50 text-sm font-semibold tracking-wide text-slate-800">
+                            @if ($studentPhotoUrl)
+                                <img src="{{ $studentPhotoUrl }}" alt="{{ $studentName }} profile photo" class="h-full w-full object-cover" data-test="student-record-photo">
+                            @else
+                                {{ $initials }}
+                            @endif
                         </div>
                         <div class="min-w-0">
                             <h3 class="text-lg font-semibold tracking-tight text-slate-900">{{ $studentName }}</h3>

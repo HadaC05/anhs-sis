@@ -41,10 +41,26 @@ class LocalImportWorker
                 .' -RedirectStandardOutput '.$quote(storage_path('logs/import-worker.log'))
                 .' -RedirectStandardError '.$quote(storage_path('logs/import-worker-error.log'));
 
-            Process::timeout(10)->run([
+            // The development server's $_SERVER omits Windows environment keys.
+            // Explicitly inherit the OS environment so child processes can load
+            // Windows libraries and connect to MySQL (SystemRoot is required).
+            $environment = getenv();
+            $result = Process::env($environment)->timeout(10)->run([
                 'powershell.exe', '-NoProfile', '-NonInteractive', '-EncodedCommand',
                 base64_encode(mb_convert_encoding($script, 'UTF-16LE', 'UTF-8')),
-            ])->throw();
+            ]);
+            if ($result->failed()) {
+                // Some Apache service accounts cannot initialize PowerShell's CLR.
+                // Windows Script Host can start the same hidden worker without it.
+                $fallback = Process::env($environment)->timeout(10)->run([
+                    'cscript.exe', '//Nologo', base_path('scripts/start-import-worker.vbs'),
+                    $php, base_path(), (string) config('queue.connections.database.queue', 'default'),
+                ])->throw();
+                // Script Host sometimes reports a script error with exit code 0.
+                if (trim($fallback->errorOutput()) !== '') {
+                    throw new RuntimeException($fallback->errorOutput());
+                }
+            }
         } catch (Throwable $exception) {
             report($exception);
             // Keep the queued job available to a regular worker or a later startup attempt.

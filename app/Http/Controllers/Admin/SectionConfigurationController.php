@@ -29,7 +29,11 @@ class SectionConfigurationController extends Controller
         $search = trim($request->string('search')->toString());
         $clusterId = $request->integer('cluster_ID');
         $gradeLevel = $request->string('grade_level')->toString();
+        $detailsTab = $request->string('tab')->toString() === 'details';
         $syId = $request->integer('SY_ID');
+        if ($detailsTab && ! $request->has('SY_ID')) {
+            $syId = (int) AcademicYear::query()->where('status', true)->orderByDesc('SY_ID')->value('SY_ID');
+        }
         $curriculumGradeLevelId = $request->integer('curriculum_grade_level_ID');
         $status = $request->string('status')->toString();
         if ($status === '') {
@@ -38,7 +42,11 @@ class SectionConfigurationController extends Controller
 
         $gradeId = GradeLevel::idForValue($gradeLevel);
 
+        $gradeOrder = GradeLevel::query()->get()->map(fn ($grade) => 'WHEN '.(int) $grade->grade_ID.' THEN '.(int) preg_replace('/\D+/', '', $grade->grade_label))->implode(' ');
+
         $sections = Section::query()
+            ->withCount(['enrollments as enrolled_students_count' => fn ($query) => $query
+                ->whereIn('enrollment_status_ID', \App\Models\EnrollmentStatus::activeIds())])
             ->with(['cluster', 'gradeLevel', 'adviser', 'academicYear', 'curriculumGradeLevel.gradeLevel', 'curriculumGradeLevel.gradingSemester'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
@@ -64,6 +72,8 @@ class SectionConfigurationController extends Controller
             ->when($status === 'inactive', function ($query): void {
                 $query->where('status', false);
             })
+            ->orderByRaw('CASE sections.grade_ID '.$gradeOrder.' ELSE 999 END')
+            ->orderBy('name')
             ->orderByDesc('status')
             ->orderByDesc('section_ID')
             ->paginate($perPage)
@@ -81,7 +91,26 @@ class SectionConfigurationController extends Controller
             ->orderBy('first_name')
             ->get(['staff_id', 'first_name', 'middle_name', 'last_name', 'suffix']);
 
+        $selectedSection = null;
+        $enrollments = collect();
+        $latestImport = null;
+        if ($detailsTab && $request->integer('section') > 0) {
+            $selectedSection = Section::with(['academicYear', 'gradeLevel', 'adviser'])->findOrFail($request->integer('section'));
+            $enrollments = $selectedSection->enrollments()->with('student')
+                ->whereIn('enrollment_status_ID', \App\Models\EnrollmentStatus::activeIds())->get()
+                ->sortBy(fn ($enrollment) => strtolower(($enrollment->student?->last_name ?? '').' '.($enrollment->student?->first_name ?? '')))->values();
+            $latestImport = \App\Models\AdvisoryClassListImport::query()
+                ->select(['id', 'status', 'result', 'failure_message', 'total_students', 'processed_students'])
+                ->where('section_ID', $selectedSection->section_ID)
+                ->where('requested_by', $request->user()->staff_id)->latest('id')->first();
+        }
+
         return view('users.admin.section-config', [
+            'detailsTab' => $detailsTab,
+            'selectedSchoolYearId' => $syId,
+            'selectedSection' => $selectedSection,
+            'enrollments' => $enrollments,
+            'latestImport' => $latestImport,
             'sections' => $sections,
             'clusters' => $clusters,
             'academicYears' => $academicYears,
@@ -91,6 +120,16 @@ class SectionConfigurationController extends Controller
             'perPage' => $perPage,
             'status' => $status,
         ]);
+    }
+
+    public function importStudents(Request $request, Section $section): RedirectResponse
+    {
+        return app(\App\Support\SectionStudentImport::class)->importAdvisoryClassList($request, $section);
+    }
+
+    public function importStatus(Request $request, Section $section, int $import): \Illuminate\Http\JsonResponse
+    {
+        return app(\App\Support\SectionStudentImport::class)->advisoryClassListImportStatus($request, $section, $import);
     }
 
     public function copy(CopySectionsRequest $request): RedirectResponse

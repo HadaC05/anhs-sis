@@ -17,7 +17,7 @@
     </div>
 </section>
 
-<div class="mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-[#296374]/40 bg-white shadow-sm sm:grid-cols-5">
+<div class="teacher-advisory-tabs mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-[#296374]/40 bg-white shadow-sm sm:grid-cols-5">
     <a href="{{ route('teacher.advisory.class-list.index', $section) }}"
         class="flex min-w-0 items-center justify-center gap-2 border-b border-r border-[#296374]/30 px-3 py-3 text-center text-sm font-semibold transition sm:border-b-0 {{ ($active ?? 'grades') === 'class-list' ? 'bg-[#296374] text-white' : 'bg-white text-[#296374] hover:bg-[#296374]/10' }}">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-5a4 4 0 11-8 0 4 4 0z"></path></svg>

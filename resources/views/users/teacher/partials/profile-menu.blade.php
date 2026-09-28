@@ -14,12 +14,12 @@
     <button
         type="button"
         @click="open = ! open"
-        class="inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/80 text-white transition hover:border-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
         aria-label="Teacher profile menu"
         :aria-expanded="open.toString()"
         data-test="teacher-profile-menu"
     >
-        <span class="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white/15">
+        <span class="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/15">
             @if ($profileTeacher?->photoUrl())
                 <img src="{{ $profileTeacher->photoUrl() }}" alt="Profile photo" class="h-full w-full object-cover" data-test="teacher-profile-photo">
             @else

@@ -9,19 +9,13 @@
         <form id="copySectionsForm" method="POST" action="{{ route($managementRoutePrefix.'section-config.copy') }}" class="overflow-y-auto p-6 space-y-4">
             @csrf
             <p class="text-sm text-gray-600">Copy section names, grades, curricula, clusters, rooms and capacities into another school year. Active and archived source sections are included; new sections will be active.</p>
-            @if ($copyOpen)
-                <div role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                    @foreach ($errors->getBag('copySections')->all() as $error)
-                        <p>{{ $error }}</p>
-                    @endforeach
-                </div>
-            @endif
+
             <div>
                 <label for="copy_grade_level" class="mb-1 block text-sm font-semibold text-gray-700">Grade level</label>
                 <select id="copy_grade_level" name="copy_grade_level" required class="{{ $fieldClass }} border-gray-200">
                     <option value="all">All grade levels</option>
                     @foreach ($gradeLevels as $level)
-                        <option value="{{ $level['value'] }}" @selected(old('copy_grade_level') === $level['value'])>{{ $level['label'] }}</option>
+                        <option value="{{ $level['value'] }}" @selected(old('copy_grade_level') === $level['value'])>{{ preg_replace('/\D+/', '', $level['label']) }}</option>
                     @endforeach
                 </select>
             </div>
