@@ -221,7 +221,7 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Zip Code {!! $requiredMark !!}</label>
-                                <input type="text" name="curr_zip_code" value="{{ old('curr_zip_code', $currentAddress?->zip_code) }}" placeholder="Enter ZIP code" required class="{{ $fieldClass }}">
+                                <input type="text" name="curr_zip_code" value="{{ old('curr_zip_code', $currentAddress?->zip_code) }}" placeholder="Auto-filled from address" readonly class="{{ $readonlyClass }}">
                                 <p class="mt-1 text-xs text-gray-500">Suggested when available. Verify or enter the ZIP code for your postal area.</p>
                             </div>
                             <div>
@@ -261,7 +261,7 @@
                             </div>
                             <div>
                                 <label class="{{ $labelClass }}">Zip Code {!! $requiredMark !!}</label>
-                                <input type="text" name="perm_zip_code" value="{{ old('perm_zip_code', $permanentAddress?->zip_code) }}" placeholder="Enter ZIP code" required class="{{ $fieldClass }}" data-perm-field>
+                                <input type="text" name="perm_zip_code" value="{{ old('perm_zip_code', $permanentAddress?->zip_code) }}" placeholder="Auto-filled from address" readonly class="{{ $readonlyClass }}" data-perm-field>
                                 <p class="mt-1 text-xs text-gray-500">Suggested when available. Verify or enter the ZIP code for your postal area.</p>
                             </div>
                             <div>
@@ -825,7 +825,7 @@
             const isSameAddress = Boolean(sameAddress?.checked);
 
             if (!isSameAddress) {
-                [permanentFields.perm_house_no, permanentFields.perm_street_name, permanentFields.perm_zip_code].forEach((field) => {
+                [permanentFields.perm_house_no, permanentFields.perm_street_name].forEach((field) => {
                     field?.removeAttribute('readonly');
                 });
                 syncAddressSelectsFromValues('perm');

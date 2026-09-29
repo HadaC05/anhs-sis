@@ -10,6 +10,10 @@
     $periodLabels = collect($periods)->pluck('label', 'key');
     $subjectColumnSpan = max(1, $periodKeys->count()) + 1;
     $periodGroupLabel = \App\Models\GradingTerm::periodGroupLabel($periods);
+    $activePeriodKey = \App\Models\GradingTerm::currentEditablePeriodKeyForSection($section);
+    $gradeColor = fn ($value) => $value === null || $value === ''
+        ? ''
+        : ((float) $value >= 75 ? 'text-emerald-700' : 'text-red-700');
 @endphp
 
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'grades'])
@@ -43,7 +47,7 @@
                 $subjectFinals = [];
             @endphp
             @if($currentSexGroup !== $sexGroup)@php $currentSexGroup = $sexGroup; @endphp<tr><td colspan="{{ 3 + ($assignments->count() * $subjectColumnSpan) }}" class="border border-gray-200 bg-[#296374]/10 px-3 py-2 text-left text-xs font-extrabold uppercase text-[#296374]">{{ $sexGroup }}</td></tr>@endif
-            <tr class="hover:bg-gray-50"><td class="border border-gray-200 px-2 py-2 text-center font-semibold">{{ $sexGroupCounts[$sexGroup] }}</td><td class="border border-gray-200 px-3 py-2 font-semibold uppercase">{{ $row['name'] }}</td>@foreach($assignments as $assignment)@php $subjectGrades = $row['subjects'][$assignment->assignment_ID] ?? null; $periodValues = $periodKeys->map(fn ($periodKey) => $subjectGrades ? $subjectGrades['periods']->get($periodKey)?->numeric_grade : null)->filter(fn ($value) => $value !== null && $value !== ''); $finalGrade = $periodValues->isNotEmpty() ? round($periodValues->avg()) : null; if ($finalGrade !== null) $subjectFinals[] = $finalGrade; @endphp@forelse($periodKeys as $periodKey)@php $grade = $subjectGrades ? $subjectGrades['periods']->get($periodKey)?->numeric_grade : null; @endphp<td class="border border-gray-200 px-2 py-2 text-center font-semibold">{{ $grade === null || $grade === '' ? '' : number_format((float) $grade, 0) }}</td>@empty<td class="border border-gray-200 px-2 py-2"></td>@endforelse<td class="border border-gray-200 bg-gray-50 px-2 py-2 text-center font-bold">{{ $finalGrade === null ? '' : number_format((float) $finalGrade, 0) }}</td>@endforeach<td class="border border-gray-200 bg-gray-50 px-2 py-2 text-center font-extrabold">
+            <tr class="hover:bg-gray-50"><td class="border border-gray-200 px-2 py-2 text-center font-semibold">{{ $sexGroupCounts[$sexGroup] }}</td><td class="border border-gray-200 px-3 py-2 font-semibold uppercase">{{ $row['name'] }}</td>@foreach($assignments as $assignment)@php $subjectGrades = $row['subjects'][$assignment->assignment_ID] ?? null; $periodValues = $periodKeys->map(fn ($periodKey) => $subjectGrades ? $subjectGrades['periods']->get($periodKey)?->numeric_grade : null)->filter(fn ($value) => $value !== null && $value !== ''); $finalGrade = $periodValues->isNotEmpty() ? round($periodValues->avg()) : null; if ($finalGrade !== null) $subjectFinals[] = $finalGrade; @endphp@forelse($periodKeys as $periodKey)@php $grade = $subjectGrades ? $subjectGrades['periods']->get($periodKey)?->numeric_grade : null; @endphp<td class="border border-gray-200 px-2 py-2 text-center font-semibold {{ $periodKey === $activePeriodKey ? $gradeColor($grade) : '' }}">{{ $grade === null || $grade === '' ? '' : number_format((float) $grade, 0) }}</td>@empty<td class="border border-gray-200 px-2 py-2"></td>@endforelse<td class="border border-gray-200 bg-gray-50 px-2 py-2 text-center font-bold {{ $gradeColor($finalGrade) }}">{{ $finalGrade === null ? '' : number_format((float) $finalGrade, 0) }}</td>@endforeach<td class="border border-gray-200 bg-gray-50 px-2 py-2 text-center font-extrabold">
                 @php
                     $generalAverage = count($subjectFinals) ? round(collect($subjectFinals)->avg()) : null;
                 @endphp

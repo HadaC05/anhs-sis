@@ -3,9 +3,9 @@
 @section('title', 'Advisory Sections')
 
 @section('content')
-<div class="mb-8 flex items-end justify-between gap-4 border-b-2 border-[#296374] pb-3">
+<div class="mb-8 flex flex-col items-stretch justify-between gap-4 border-b-2 border-[#296374] pb-3 sm:flex-row sm:items-end">
     <h1 class="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Advisory</h1>
-    <form method="GET" action="{{ route('teacher.advisory.index') }}" class="shrink-0">
+    <form method="GET" action="{{ route('teacher.advisory.index') }}" class="min-w-0 sm:shrink-0">
         <label for="SY_ID" class="mb-1 block text-xs font-semibold text-gray-600">School Year</label>
         <select name="SY_ID" id="SY_ID" onchange="this.form.submit()" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             <option value="">All school years</option>

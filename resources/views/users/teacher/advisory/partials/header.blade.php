@@ -10,7 +10,7 @@
 
 <section class="mb-6 overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm">
     <div class="flex flex-col divide-y divide-slate-200 sm:flex-row sm:divide-x sm:divide-y-0">
-        <div class="min-w-0 px-5 py-4 sm:flex-1"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Advisory Class</p><h1 class="mt-1 truncate text-xl font-semibold tracking-tight text-slate-900">{{ $section->name }}</h1></div>
+        <div class="min-w-0 px-5 py-4 sm:flex-1"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Advisory Class</p><h1 class="mt-1 break-words text-xl font-semibold tracking-tight text-slate-900">{{ $section->name }}</h1></div>
         <div class="min-w-0 px-5 py-4 sm:flex-1"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Grade Level</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $gradeLabel }}</p></div>
         <div class="min-w-0 px-5 py-4 sm:flex-1"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">School Year</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $schoolYear }}</p></div>
         <div class="min-w-0 px-5 py-4 sm:flex-1"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Students</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $activeLearnerCount }}</p></div>

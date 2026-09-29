@@ -3,37 +3,11 @@
 @section('title', 'Enrollment Details')
 
 @section('content')
-@if (session('toast_success'))
-<div id="guidanceEnrollmentSuccessToast" role="status" aria-live="polite" class="fixed right-5 top-24 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl">
-    <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-    </svg>
-    <span>{{ session('toast_success') }}</span>
-    <button type="button" class="ml-auto -mr-1 -mt-1 rounded p-1 text-emerald-700/70 transition hover:bg-emerald-50 hover:text-emerald-800" data-dismiss-guidance-enrollment-toast aria-label="Close notification">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-    </button>
-</div>
-<script>
-    document.querySelector('[data-dismiss-guidance-enrollment-toast]')?.addEventListener('click', () => document.getElementById('guidanceEnrollmentSuccessToast')?.remove());
-    window.setTimeout(() => document.getElementById('guidanceEnrollmentSuccessToast')?.remove(), 4000);
-</script>
-@endif
+@include('users.guidance.enrollments.partials.result-toasts')
 
 @if (session('status') && ! session('enrollment_result'))
 <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
     {{ session('status') }}
-</div>
-@endif
-
-@if (session('success'))
-<div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-    {{ session('success') }}
-</div>
-@endif
-
-@if ($errors->any())
-<div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-    {{ $errors->first() }}
 </div>
 @endif
 
@@ -642,17 +616,19 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
                 <tr>
-                    <th class="w-12 px-4 py-3"><span class="sr-only">Select</span></th>
+                    <th class="w-12 px-4 py-3">
+                        <input type="checkbox" id="select-all-documents" class="h-4 w-4 rounded border-gray-300 text-[#296374] focus:ring-[#296374]" aria-label="Select all pending documents" title="Select all pending documents" @disabled($pendingDocuments->isEmpty())>
+                    </th>
                     <th class="px-4 py-3">Document</th>
                     <th class="px-4 py-3">Uploaded</th>
                     <th class="px-4 py-3">Status</th>
                     <th class="px-4 py-3">Remarks</th>
-                    <th class="px-4 py-3 text-right">Actions</th>
+                    <th class="px-4 py-3 text-left">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 bg-white">
         @foreach($documents as $doc)
-        <tr class="align-top hover:bg-slate-50/70">
+        <tr class="align-middle hover:bg-slate-50/70">
             <td class="px-4 py-4">
                 @if(($doc->status ?? '') === 'pending')
                 <input type="checkbox" form="bulk-verify-form" name="document_ids[]" value="{{ $doc->doc_ID }}" class="document-verify-checkbox h-4 w-4 rounded border-gray-300 text-[#296374] focus:ring-[#296374]" aria-label="Select document">
@@ -679,17 +655,17 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                 @endif
             </td>
             <td class="px-4 py-4">
-                <div class="flex flex-wrap justify-end gap-2">
+                <div class="grid w-max grid-cols-[repeat(3,6rem)] items-center gap-2">
 
             @if($doc->file_path)
             <a href="{{ route('guidance.documents.view', $doc) }}"
                target="_blank"
                rel="noopener noreferrer"
-               class="inline-flex items-center gap-1 rounded-lg border border-[#296374]/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#296374] hover:bg-[#296374]/5">
+               class="inline-flex h-9 w-full items-center justify-center gap-1 rounded-lg border border-[#296374]/20 px-3 text-xs font-bold uppercase tracking-wide text-[#296374] hover:bg-[#296374]/5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
-                View document
+                View
             </a>
             @else
             <span class="text-xs text-gray-500">No file attached.</span>
@@ -701,14 +677,14 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                     @if ($fromSectionId)
                         <input type="hidden" name="from_section" value="{{ $fromSectionId }}">
                     @endif
-                    <button type="submit" class="rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-white bg-green-600 hover:bg-green-700 transition-colors">
+                    <button type="submit" class="h-9 w-full rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-white bg-green-600 hover:bg-green-700 transition-colors">
                         Verify
                     </button>
                 </form>
                 <button type="button"
                     data-return-document-id="{{ $doc->doc_ID }}"
                     data-return-action="{{ route('guidance.documents.reject', $doc) }}"
-                    class="document-return-trigger rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white bg-red-600 hover:bg-red-700 transition-colors">
+                    class="document-return-trigger h-9 w-full rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-white bg-red-600 hover:bg-red-700 transition-colors">
                     Return
                 </button>
             @elseif($doc->isVerified())
@@ -717,7 +693,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                     @if ($fromSectionId)
                         <input type="hidden" name="from_section" value="{{ $fromSectionId }}">
                     @endif
-                    <button type="submit" class="rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-white bg-amber-600 hover:bg-amber-700 transition-colors">
+                    <button type="submit" class="h-9 w-full rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-white bg-amber-600 hover:bg-amber-700 transition-colors">
                         Unverify
                     </button>
                 </form>
@@ -884,34 +860,47 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
         var bulkForm = document.getElementById('bulk-verify-form');
         var bulkSubmit = document.getElementById('bulk-verify-submit');
         var bulkCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.document-verify-checkbox'));
+        var selectAllDocuments = document.getElementById('select-all-documents');
 
         function syncBulkVerifyState() {
-            if (!bulkSubmit) return;
-            bulkSubmit.disabled = !bulkCheckboxes.some(function(checkbox) { return checkbox.checked; });
+            var selectedCount = bulkCheckboxes.filter(function(checkbox) { return checkbox.checked; }).length;
+            if (bulkSubmit) bulkSubmit.disabled = selectedCount === 0;
+            if (selectAllDocuments) {
+                selectAllDocuments.disabled = bulkCheckboxes.length === 0;
+                selectAllDocuments.checked = selectedCount > 0 && selectedCount === bulkCheckboxes.length;
+                selectAllDocuments.indeterminate = selectedCount > 0 && selectedCount < bulkCheckboxes.length;
+            }
         }
 
+        selectAllDocuments?.addEventListener('change', function() {
+            bulkCheckboxes.forEach(function(checkbox) { checkbox.checked = selectAllDocuments.checked; });
+            syncBulkVerifyState();
+        });
         bulkCheckboxes.forEach(function(checkbox) {
             checkbox.addEventListener('change', syncBulkVerifyState);
         });
         syncBulkVerifyState();
 
         function showActionConfirmation(form) {
-            var previous = document.getElementById('document-action-toast');
-            if (previous) previous.remove();
+            if (document.getElementById('document-action-modal')) return;
 
-            var toast = document.createElement('div');
-            toast.id = 'document-action-toast';
-            toast.className = 'fixed bottom-5 right-5 z-[110] w-[min(24rem,calc(100vw-2.5rem))] rounded-xl border border-slate-200 bg-white p-4 shadow-xl';
-            toast.innerHTML = '<p class="text-sm font-bold text-slate-800"></p><p class="mt-1 text-xs leading-relaxed text-slate-600"></p><div class="mt-4 flex justify-end gap-2"><button type="button" data-toast-cancel class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-700">Cancel</button><button type="button" data-toast-confirm class="rounded-lg bg-[#296374] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">Confirm</button></div>';
-            toast.querySelector('p:first-child').textContent = form.dataset.confirmTitle || 'Confirm action?';
-            toast.querySelector('p:nth-child(2)').textContent = form.dataset.confirmMessage || 'This action will update the document.';
-            toast.querySelector('[data-toast-cancel]').addEventListener('click', function() { toast.remove(); });
-            toast.querySelector('[data-toast-confirm]').addEventListener('click', function() {
+            var modal = document.createElement('dialog');
+            modal.id = 'document-action-modal';
+            modal.className = 'fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-900/70';
+            modal.setAttribute('aria-labelledby', 'document-action-title');
+            modal.setAttribute('aria-describedby', 'document-action-message');
+            modal.innerHTML = '<h3 id="document-action-title" class="text-lg font-bold text-slate-800"></h3><p id="document-action-message" class="mt-2 text-sm leading-relaxed text-slate-600"></p><div class="mt-6 flex justify-end gap-2"><button type="button" data-modal-cancel autofocus class="h-10 w-24 rounded-lg border border-gray-300 text-sm font-bold text-gray-700 hover:bg-gray-50">Cancel</button><button type="button" data-modal-confirm class="h-10 w-24 rounded-lg bg-[#296374] text-sm font-bold text-white hover:opacity-90">Confirm</button></div>';
+            modal.querySelector('h3').textContent = form.dataset.confirmTitle || 'Confirm action?';
+            modal.querySelector('p').textContent = form.dataset.confirmMessage || 'This action will update the document.';
+            modal.addEventListener('close', function() { modal.remove(); });
+            modal.querySelector('[data-modal-cancel]').addEventListener('click', function() { modal.close(); });
+            modal.querySelector('[data-modal-confirm]').addEventListener('click', function() {
                 form.dataset.confirmed = 'true';
-                toast.remove();
+                modal.close();
                 form.requestSubmit();
             });
-            document.body.appendChild(toast);
+            document.body.appendChild(modal);
+            modal.showModal();
         }
 
         document.querySelectorAll('.document-action-form').forEach(function(form) {
@@ -961,7 +950,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
             }
         });
         document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && returnModal && !returnModal.classList.contains('hidden')) {
+            if (event.key === 'Escape' && !document.getElementById('document-action-modal') && returnModal && !returnModal.classList.contains('hidden')) {
                 closeReturnModal();
             }
         });
