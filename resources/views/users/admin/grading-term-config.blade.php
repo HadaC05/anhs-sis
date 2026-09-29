@@ -12,6 +12,8 @@
     $editFormAction = $editingTermId
         ? route($managementRoutePrefix.'grading-term-config.update', ['term' => $editingTermId])
         : '#';
+    $editingSeniorHighTerm = $seniorHighTerms->contains('term_ID', $editingTermId);
+    $editOrderMaximum = $editingSeniorHighTerm ? $seniorHighTerms->count() : $terms->count();
     $isJuniorHighTab = $activeTab === 'junior_high';
     $currentSeniorHighSemesterLabel = $currentSeniorHighPeriod['semester_label'] ?? 'First Semester';
     $currentSeniorHighTermLabel = $currentSeniorHighPeriod['term_label'] ?? 'Term 1';
@@ -110,7 +112,7 @@
                         </td>
                         <td class="px-5 py-4">
                             <div class="flex items-center justify-end gap-1">
-                                <button type="button" onclick='openEditTermModal(@json(["term_ID" => $term->term_ID, "label" => $term->label, "sort_order" => $term->sort_order]))'
+                                <button type="button" data-term="{{ json_encode(['term_ID' => $term->term_ID, 'label' => $term->label, 'sort_order' => $term->sort_order, 'school_level' => $term->school_level]) }}" onclick="openEditTermModal(JSON.parse(this.dataset.term))"
                                     class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -174,20 +176,29 @@
                             <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $semester->label }} @if ($isCurrentSemester)<p class="mt-0.5 text-xs font-semibold text-[#296374]">Active semester</p>@endif</td>
                             <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($semester->status?->slug) }}">{{ $semester->status?->name ?? 'Available' }}</span></td>
                             <td class="px-5 py-4 text-right">
-                                <details data-grading-dropdown class="relative inline-block">
-                                    <summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary>
-                                    <div class="absolute right-0 z-20 mt-2 w-32 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                                        @foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)
-                                            <form action="{{ route($managementRoutePrefix.'grading-term-config.senior-high.semester.status', $semester) }}" @if ($status === 'archived') data-confirm-action="Archive" data-confirm-name="{{ $semester->label }}" @endif method="POST"
-                                                @if ($status === 'closed') data-confirm-close="Close {{ $semester->label }} and its grading periods? Teachers will no longer be able to enter grades for this semester." data-confirm-title="Close {{ $semester->label }}?" @endif>
-                                                @csrf
-                                                @method('PUT')
-                                                <input type="hidden" name="status" value="{{ $status }}">
-                                                <button type="submit" class="block w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $label }}</button>
-                                            </form>
-                                        @endforeach
-                                    </div>
-                                </details>
+                                <div class="ml-auto flex w-36 flex-col gap-2">
+                                    <form action="{{ route($managementRoutePrefix.'grading-term-config.senior-high.semester.status', $semester) }}" method="POST" class="w-full"
+                                        @if ($isCurrentSemester && $semester->isActive()) data-confirm-close="Close {{ $semester->label }} and all configured Senior High terms?" data-confirm-title="Close semester?" @endif>
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="status" value="{{ $isCurrentSemester && $semester->isActive() ? 'closed' : 'open' }}">
+                                        <button type="submit" class="flex h-9 w-full items-center justify-center whitespace-nowrap rounded-lg px-3 text-xs font-bold text-white transition {{ $isCurrentSemester && $semester->isActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-[#296374] hover:opacity-90' }}">{{ $isCurrentSemester && $semester->isActive() ? 'Close semester' : 'Open semester' }}</button>
+                                    </form>
+                                    <details data-grading-dropdown class="relative w-full">
+                                        <summary class="flex h-9 w-full cursor-pointer list-none items-center justify-center whitespace-nowrap rounded-lg px-3 text-xs font-semibold text-[#296374] ring-1 ring-[#296374]/25 transition hover:bg-[#296374]/5">Change status</summary>
+                                        <div class="absolute right-0 z-20 mt-2 w-32 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                                            @foreach (['open' => 'Open', 'active' => 'Active', 'closed' => 'Close', 'archived' => 'Archive'] as $status => $label)
+                                                <form action="{{ route($managementRoutePrefix.'grading-term-config.senior-high.semester.status', $semester) }}" @if ($status === 'archived') data-confirm-action="Archive" data-confirm-name="{{ $semester->label }}" @endif method="POST"
+                                                    @if ($status === 'closed') data-confirm-close="Close {{ $semester->label }} and its grading periods? Teachers will no longer be able to enter grades for this semester." data-confirm-title="Close {{ $semester->label }}?" @endif>
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <input type="hidden" name="status" value="{{ $status }}">
+                                                    <button type="submit" class="block w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $label }}</button>
+                                                </form>
+                                            @endforeach
+                                        </div>
+                                    </details>
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -222,7 +233,7 @@
                         <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                             <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $term->label }} @if ($isCurrentTerm)<p class="mt-0.5 text-xs font-semibold text-[#296374]">Active term</p>@endif</td>
                             <td class="border-r border-gray-100 px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadgeClass($term->seniorHighStatus?->slug) }}">{{ $term->seniorHighStatus?->name ?? 'Archived' }}</span></td>
-                            <td class="px-5 py-4 text-right"><div class="flex items-center justify-end gap-2"><button type="button" onclick='openEditTermModal(@json(["term_ID" => $term->term_ID, "label" => $term->label, "sort_order" => $term->sort_order]))' class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit" aria-label="Edit Senior High term">
+                            <td class="px-5 py-4 text-right"><div class="flex items-center justify-end gap-2"><button type="button" data-term="{{ json_encode(['term_ID' => $term->term_ID, 'label' => $term->label, 'sort_order' => $term->sort_order, 'school_level' => $term->school_level]) }}" onclick="openEditTermModal(JSON.parse(this.dataset.term))"  class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit" aria-label="Edit Senior High term">
                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
@@ -237,6 +248,7 @@
 </section>
 </div>
 
+@push('modals')
 <div id="shsAddTermModal" role="dialog" aria-modal="true" aria-labelledby="shsAddTermModalTitle" data-open="{{ $shsAddTermModalOpen ? 'true' : 'false' }}"
     class="fixed inset-0 z-[100] {{ $shsAddTermModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
     <div class="mx-auto w-full max-w-lg overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
@@ -325,9 +337,9 @@
 
                 <div>
                     <label for="senior_high_max_terms" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Allowed terms <span class="text-red-500">*</span></label>
-                    <input id="senior_high_max_terms" name="senior_high_max_terms" type="number" min="2" max="{{ min(12, $seniorHighTerms->count()) }}" value="{{ old('_form') === 'shs_max_terms' ? old('senior_high_max_terms') : $settings->senior_high_max_terms }}" required
+                    <input id="senior_high_max_terms" name="senior_high_max_terms" type="text" inputmode="numeric" pattern="[0-9]*" data-whole-number data-min="2" data-max="{{ min(12, $seniorHighTerms->count()) }}" value="{{ old('_form') === 'shs_max_terms' ? old('senior_high_max_terms') : $settings->senior_high_max_terms }}" required
                         class="{{ $fieldClass }} {{ $shsMaxTermsModalOpen && $errors->has('senior_high_max_terms') ? 'border-red-300' : 'border-gray-200' }}">
-                    <p class="mt-1 text-xs text-gray-500">Minimum: 2. Terms beyond this limit are archived.</p>
+                    <p class="mt-1 text-xs text-gray-500">Enter a whole number from 2 up to the existing terms (maximum 12). Terms beyond this limit are archived.</p>
                     @error('senior_high_max_terms')
                         @if (old('_form') === 'shs_max_terms')
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
@@ -436,9 +448,9 @@
 
                 <div>
                     <label for="max_terms" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Allowed terms <span class="text-red-500">*</span></label>
-                    <input id="max_terms" name="max_terms" type="number" min="2" max="12" value="{{ old('_form') === 'max_terms' ? old('max_terms') : $settings->max_terms }}" required
+                    <input id="max_terms" name="max_terms" type="text" inputmode="numeric" pattern="[0-9]*" data-whole-number data-min="2" data-max="{{ min(12, $terms->count()) }}" value="{{ old('_form') === 'max_terms' ? old('max_terms') : $settings->max_terms }}" required
                         class="{{ $fieldClass }} {{ $maxTermsModalOpen && $errors->has('max_terms') ? 'border-red-300' : 'border-gray-200' }}">
-                    <p class="mt-1 text-xs text-gray-500">Minimum: 2. Terms beyond this limit are archived.</p>
+                    <p class="mt-1 text-xs text-gray-500">Enter a whole number from 2 up to the existing terms (maximum 12). Terms beyond this limit are archived.</p>
                     @error('max_terms')
                         @if (old('_form') === 'max_terms')
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
@@ -504,9 +516,9 @@
 
                 <div>
                     <label for="edit_term_sort_order" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Order <span class="text-red-500">*</span></label>
-                    <input id="edit_term_sort_order" name="sort_order" type="number" min="1" max="99" value="{{ old('_form') === 'edit_term' ? old('sort_order') : '' }}" required
+                    <input id="edit_term_sort_order" name="sort_order" type="text" inputmode="numeric" pattern="[0-9]*" data-whole-number data-min="1" data-max="{{ $editOrderMaximum }}" value="{{ old('_form') === 'edit_term' ? old('sort_order') : '' }}" required
                         class="{{ $fieldClass }} {{ $editTermModalOpen && $errors->has('sort_order') ? 'border-red-300' : 'border-gray-200' }}">
-                    <p class="mt-1 text-xs text-gray-500">Lower numbers appear first. Active status follows this order up to the maximum terms limit.</p>
+                    <p class="mt-1 text-xs text-gray-500">Enter a whole number from 1 up to the number of existing terms for this school level. Lower numbers appear first.</p>
                     @error('sort_order')
                         @if (old('_form') === 'edit_term')
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
@@ -528,6 +540,37 @@
 </div>
 
 <script>
+    function validateGradingNumber(input) {
+        const minimum = Number(input.dataset.min);
+        const maximum = Number(input.dataset.max);
+        const invalid = input.value !== '' && (!/^[0-9]+$/.test(input.value)
+            || Number(input.value) < minimum || Number(input.value) > maximum);
+        input.setCustomValidity(invalid ? 'Enter a whole number from ' + minimum + ' to ' + maximum + '.' : '');
+    }
+
+    document.querySelectorAll('[data-whole-number]').forEach(function (input) {
+        input.addEventListener('keydown', function (event) {
+            if (!event.ctrlKey && !event.metaKey && event.key.length === 1 && !/^[0-9]$/.test(event.key)) {
+                event.preventDefault();
+            }
+        });
+        input.addEventListener('beforeinput', function (event) {
+            if (event.data && /[^0-9]/.test(event.data)) {
+                event.preventDefault();
+            }
+        });
+        input.addEventListener('paste', function (event) {
+            if (!/^[0-9]+$/.test(event.clipboardData.getData('text'))) {
+                event.preventDefault();
+            }
+        });
+        input.addEventListener('input', function () {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            validateGradingNumber(input);
+        });
+        validateGradingNumber(input);
+    });
+
     function closeGradingTermSettingsMenu() {
         document.getElementById('gradingTermSettings').open = false;
     }
@@ -540,6 +583,7 @@
 
     function openModal(id) {
         const modal = document.getElementById(id);
+        modal.querySelectorAll('[data-whole-number]').forEach(validateGradingNumber);
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         modal.setAttribute('data-open', 'true');
@@ -583,6 +627,8 @@
         form.action = updateRouteTemplate.replace('__TERM__', term.term_ID);
         document.getElementById('edit_term_id').value = term.term_ID;
         document.getElementById('edit_term_label').value = term.label || '';
+        document.getElementById('edit_term_sort_order').dataset.max = term.school_level === 'senior_high'
+            ? {{ $seniorHighTerms->count() }} : {{ $terms->count() }};
         document.getElementById('edit_term_sort_order').value = term.sort_order || '';
         openModal('editTermModal');
         document.getElementById('edit_term_label').focus();
@@ -630,3 +676,5 @@
 </script>
 
 @include('users.partials.grading-term-interactions')
+
+@endpush

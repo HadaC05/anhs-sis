@@ -55,6 +55,15 @@
     </div>
 </form>
 
+<form method="POST" action="{{ route($isPrincipal ? 'principal.promotions.sf5' : 'guidance.promotions.sf5') }}" class="mb-5">
+    @csrf
+    @foreach (['search', 'grade_level', 'academic_year_id'] as $filter)
+        <input type="hidden" name="{{ $filter }}" value="{{ request($filter) }}">
+    @endforeach
+    <input type="hidden" name="eligibility" value="{{ $eligibility }}">
+    <button type="submit" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white hover:bg-[#1f4e5c]">Generate SF 5 (filtered results)</button>
+</form>
+
 @if (! $isPrincipal)
 <form id="bulkPromotionForm" method="POST" action="{{ route('guidance.promotions.bulk') }}">
     @csrf
@@ -65,11 +74,7 @@
     <div class="flex flex-col gap-3 border-b border-gray-100 bg-gray-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
         <h2 class="font-bold text-gray-800">Promotion</h2>
-        <p class="mt-1 text-sm text-gray-500">Eligible learners have passed every released subject. Promoting creates their enrollment in the next active school year without assigning a section.</p>
-        @if (! $isPrincipal)
-            <p class="mt-2 text-xs text-gray-500">Select all selects eligible learners on this page. Eligibility is rechecked when promoting.</p>
-        @endif
-        <p class="mt-2 text-xs text-gray-500">One or two failing released grades are tagged Conditionally Promoted. This status does not allow advancement to the next grade.</p>
+        @include('partials.promotion-criteria')
         </div>
         @if (! $isPrincipal)
             <button id="promote-selected" form="bulkPromotionForm" type="submit" hidden disabled class="shrink-0 rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Promote selected (<span id="promotion-selected-count" aria-live="polite">0</span>)</button>

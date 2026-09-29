@@ -14,12 +14,14 @@ use Illuminate\Validation\ValidationException;
 
 class Sf5ReportBuilder
 {
-    public static function rows(Section $section): Collection
+    public static function rows(Section $section, ?Collection $selectedEnrollments = null): Collection
     {
-        $enrollments = Enrollment::query()->with(['student', 'studentSubjects'])
+        $enrollments = $selectedEnrollments ?? Enrollment::query()->with(['student', 'studentSubjects'])
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())->get();
+
+        $enrollments->loadMissing(['student', 'studentSubjects']);
 
         if ($enrollments->isEmpty()) {
             throw ValidationException::withMessages(['sf5' => 'There are no active learners in this advisory class.']);
@@ -31,13 +33,18 @@ class Sf5ReportBuilder
 
         $assignments = TeacherSubjectAssignment::query()->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester'])
             ->where('section_ID', $section->section_ID)->where('SY_ID', $section->SY_ID)->get();
-        $grades = StudentSubjectGrade::query()->with(['studentSubject.enrollment', 'term'])
+        $periodsBySemester = [];
+        foreach ($assignments as $assignment) {
+            $key = GradingTerm::isSeniorHighSection($section) ? ($assignment->curriculumSubject?->semester ?? '') : 'jhs';
+            $periodsBySemester[$key] ??= $key === 'jhs' ? GradingTerm::configuredPeriods() : GradingTerm::seniorHighPeriods($assignment->curriculumSubject?->semester);
+        }
+        $grades = StudentSubjectGrade::query()->with(['studentSubject.enrollment.gradingSemester', 'term'])
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->where('grade_status_ID', GradeStatus::idFor(GradeStatus::RELEASED))->get()
             ->groupBy(fn ($grade) => $grade->studentSubject->enrollment_ID);
 
-        return $enrollments->map(function (Enrollment $enrollment) use ($section, $assignments, $grades): array {
+        return $enrollments->map(function (Enrollment $enrollment) use ($section, $assignments, $grades, $periodsBySemester): array {
             $student = $enrollment->student;
             $byAssignment = $grades->get($enrollment->enrollment_ID, collect())->groupBy('assignment_ID');
             $subjectIds = $enrollment->studentSubjects->pluck('curr_subj_ID');
@@ -45,9 +52,8 @@ class Sf5ReportBuilder
             $finals = [];
             $complete = $subjectIds->isNotEmpty() && $subjectIds->diff($learnerAssignments->pluck('curr_subj_ID'))->isEmpty();
             foreach ($learnerAssignments as $assignment) {
-                $periods = GradingTerm::isSeniorHighSection($section)
-                    ? GradingTerm::seniorHighPeriods($assignment->curriculumSubject?->semester)
-                    : GradingTerm::configuredPeriods();
+                $key = GradingTerm::isSeniorHighSection($section) ? ($assignment->curriculumSubject?->semester ?? '') : 'jhs';
+                $periods = $periodsBySemester[$key];
                 $byPeriod = $byAssignment->get($assignment->assignment_ID, collect())->keyBy('grading_period');
                 $values = collect($periods)->map(fn ($period) => $byPeriod->get($period['key'])?->numeric_grade);
                 if ($values->isEmpty() || $values->containsStrict(null)) {

@@ -127,7 +127,7 @@ class GradingTermConfigurationController extends Controller
     public function updateSeniorHighSettings(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'senior_high_max_terms' => ['required', 'integer', 'min:2', 'max:'.min(12, GradingTerm::query()->seniorHigh()->count())],
+            'senior_high_max_terms' => ['required', 'integer', 'regex:/^[0-9]+$/', 'min:2', 'max:'.min(12, GradingTerm::query()->seniorHigh()->count())],
         ]);
         $limit = (int) $validated['senior_high_max_terms'];
 

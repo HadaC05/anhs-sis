@@ -48,24 +48,29 @@ class GuidanceDashboardController extends Controller
 {
     public function promotions(Request $request): View
     {
+        [$query, $eligibility] = $this->promotionQuery($request);
+        $isPrincipal = $request->routeIs('principal.*');
+
+        return view('users.guidance.promotions.index', [
+            'isPrincipal' => $isPrincipal,
+            'enrollments' => $query->latest('SY_ID')->orderBy('enrollment_ID')->paginate(15)->withQueryString(),
+            'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
+            'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),
+            'eligibility' => $eligibility,
+        ]);
+    }
+
+    private function promotionQuery(Request $request): array
+    {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:200'],
             'grade_level' => ['nullable', 'integer', Rule::exists(GradeLevel::class, 'grade_ID')],
             'eligibility' => ['nullable', Rule::in(['all', ...array_column(PromotionStatus::definitions(), 'slug')])],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
         ]);
-        $isPrincipal = $request->routeIs('principal.*');
-        $eligibility = $filters['eligibility'] ?? ($isPrincipal ? 'all' : PromotionStatus::ELIGIBLE);
-        Enrollment::query()
-            ->whereNotNull('section_ID')
-            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->where('promotion_status_ID', '!=', PromotionStatus::idFor(PromotionStatus::PROMOTED))
-            ->with(['section.gradeLevel', 'gradingSemester.status'])
-            ->each(fn (Enrollment $enrollment) => PromotionEligibility::synchronize($enrollment));
-
+        $eligibility = $filters['eligibility'] ?? ($request->routeIs('principal.*') ? 'all' : PromotionStatus::ELIGIBLE);
         $query = Enrollment::query()
             ->with(['student.application', 'gradeLevel', 'academicYear', 'promotionStatus'])
-            ->when($eligibility !== 'all', fn ($query) => $query->where('promotion_status_ID', PromotionStatus::idFor($eligibility)))
             ->when($filters['grade_level'] ?? null, fn ($query, $grade) => $query->whereHas('curriculumGradeLevel', fn ($query) => $query->where('grade_ID', $grade)))
             ->when($filters['academic_year_id'] ?? null, fn ($query, $year) => $query->where('SY_ID', $year));
 
@@ -85,13 +90,20 @@ class GuidanceDashboardController extends Controller
             });
         }
 
-        return view('users.guidance.promotions.index', [
-            'isPrincipal' => $isPrincipal,
-            'enrollments' => $query->latest('SY_ID')->orderBy('enrollment_ID')->paginate(15)->withQueryString(),
-            'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
-            'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),
-            'eligibility' => $eligibility,
-        ]);
+        (clone $query)->whereNotNull('section_ID')
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+            ->where('promotion_status_ID', '!=', PromotionStatus::idFor(PromotionStatus::PROMOTED))
+            ->chunkById(250, fn ($enrollments) => PromotionEligibility::synchronizeMany($enrollments), 'enrollment_ID');
+        $query->when($eligibility !== 'all', fn ($query) => $query->where('promotion_status_ID', PromotionStatus::idFor($eligibility)));
+
+        return [$query, $eligibility];
+    }
+
+    public function downloadPromotionSf5(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        [$query] = $this->promotionQuery($request);
+
+        return \App\Support\Sf5Export::download($query->get());
     }
 
     public function bulkPromote(Request $request): RedirectResponse

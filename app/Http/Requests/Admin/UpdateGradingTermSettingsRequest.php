@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\GradingTerm;
 use App\Models\Staff;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -18,7 +19,7 @@ class UpdateGradingTermSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'max_terms' => ['required', 'integer', 'min:2', 'max:12'],
+            'max_terms' => ['required', 'integer', 'regex:/^[0-9]+$/', 'min:2', 'max:'.min(12, GradingTerm::query()->juniorHigh()->count())],
         ];
     }
 
@@ -30,7 +31,7 @@ class UpdateGradingTermSettingsRequest extends FormRequest
         return [
             'max_terms.required' => 'The maximum number of terms is required.',
             'max_terms.min' => 'The maximum number of terms must be at least 2.',
-            'max_terms.max' => 'The maximum number of terms may not be greater than 12.',
+            'max_terms.max' => 'The maximum number of terms cannot exceed the existing Junior High terms (up to 12).',
         ];
     }
 }

@@ -13,7 +13,6 @@ use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
 use App\Models\GradeStatus;
 use App\Models\GradingTerm;
-use App\Models\SchoolInformation;
 use App\Models\Section;
 use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
@@ -27,8 +26,6 @@ use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
-use App\Support\Sf5ReportBuilder;
-use App\Support\Sf5Workbook;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
 use App\Support\StudentCredentials;
@@ -440,17 +437,7 @@ class TeacherSectionController extends Controller
         $this->authorizeAdvisorySection($request, $section);
         $section->load(['academicYear', 'cluster', 'gradeLevel']);
 
-        $enrollments = Enrollment::query()
-            ->with(['student.application', 'promotionStatus', 'gradingSemester.status'])
-            ->where('section_ID', $section->section_ID)
-            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->get()
-            ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
-            ->values();
-
-        $evaluations = $enrollments
-            ->mapWithKeys(fn (Enrollment $enrollment): array => [$enrollment->enrollment_ID => PromotionEligibility::synchronize($enrollment)])
-            ->all();
+        [$enrollments, $evaluations] = $this->filteredAdvisoryPromotions($request, $section);
 
         $nextAcademicYear = AcademicYear::query()
             ->whereDate('start_date', '>', $section->academicYear?->start_date)
@@ -474,31 +461,51 @@ class TeacherSectionController extends Controller
         ));
     }
 
+    private function filteredAdvisoryPromotions(Request $request, Section $section): array
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:200'],
+            'eligibility' => ['nullable', \Illuminate\Validation\Rule::in(['all', ...array_column(\App\Models\PromotionStatus::definitions(), 'slug')])],
+        ]);
+        $enrollments = Enrollment::query()
+            ->with(['student.application', 'promotionStatus', 'gradingSemester.status'])
+            ->where('section_ID', $section->section_ID)
+            ->where('SY_ID', $section->SY_ID)
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+            ->get()
+            ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
+            ->values();
+
+        $evaluations = PromotionEligibility::synchronizeMany($enrollments);
+
+        $enrollments = $enrollments->filter(function ($enrollment) use ($filters, $evaluations) {
+            $status = $filters['eligibility'] ?? 'all';
+            if ($status !== 'all' && $evaluations[$enrollment->enrollment_ID]['status'] !== $status) {
+                return false;
+            }
+            $student = $enrollment->student;
+            $searchable = mb_strtolower(implode(' ', [
+                $student?->lrn, $student?->first_name, $student?->middle_name, $student?->last_name,
+                $student?->application?->first_name, $student?->application?->middle_name, $student?->application?->last_name,
+            ]));
+            foreach (preg_split('/[\s,]+/', trim($filters['search'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $term) {
+                if (! str_contains($searchable, mb_strtolower($term))) {
+                    return false;
+                }
+            }
+
+            return true;
+        })->values();
+
+        return [$enrollments, $evaluations];
+    }
+
     public function downloadSf5(Request $request, Section $section): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $this->authorizeAdvisorySection($request, $section);
-        $school = SchoolInformation::current();
-        $section->load(['academicYear', 'gradeLevel', 'adviser', 'curriculum']);
-        $rows = Sf5ReportBuilder::rows($section);
-        $path = Sf5Workbook::create($rows, [
-            'C3' => $school->region ?? '',
-            'E3' => $school->division ?? '',
-            'J3' => $school->district ?? '',
-            'C5' => $school->school_id ?? '',
-            'G5' => $section->academicYear?->school_year ?? '',
-            'J5' => $section->curriculum?->name ?? '',
-            'C7' => $school->name ?? '',
-            'J7' => $section->getRelation('gradeLevel')?->grade_label ?? '',
-            'M7' => $section->name,
-            'L36' => trim(($section->adviser?->first_name ?? '').' '.($section->adviser?->last_name ?? '')),
-            'L41' => Sf9ReportCardBuilder::principalName(),
-        ]);
-        $filename = 'SF5-'.Str::slug($section->name.'-'.$section->academicYear?->school_year).'.xlsx';
+        [$enrollments] = $this->filteredAdvisoryPromotions($request, $section);
 
-        return response()->download($path, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Cache-Control' => 'private, no-store',
-        ])->deleteFileAfterSend(true);
+        return \App\Support\Sf5Export::download($enrollments);
     }
 
     public function advisoryAttendance(Request $request, Section $section): View

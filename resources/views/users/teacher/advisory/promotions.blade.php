@@ -12,8 +12,26 @@
     <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ $errors->first() }}</div>
 @endif
 
+<form method="GET" action="{{ route('teacher.advisory.promotions.index', $section) }}" class="mb-5 flex flex-wrap items-end gap-3">
+    <label class="text-sm text-gray-600">Learner / LRN
+        <input type="search" name="search" value="{{ request('search') }}" class="block rounded-lg border-gray-300" placeholder="Name or LRN">
+    </label>
+    <label class="text-sm text-gray-600">Status
+        <select name="eligibility" class="block rounded-lg border-gray-300">
+            <option value="all">All statuses</option>
+            @foreach (\App\Models\PromotionStatus::definitions() as $status)
+                <option value="{{ $status['slug'] }}" @selected(request('eligibility') === $status['slug'])>{{ $status['name'] }}</option>
+            @endforeach
+        </select>
+    </label>
+    <button class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white">Apply</button>
+    <a href="{{ route('teacher.advisory.promotions.index', $section) }}" class="px-4 py-2 text-sm text-gray-600">Reset</a>
+</form>
+
 <form method="POST" action="{{ route('teacher.advisory.promotions.sf5', $section) }}" class="mb-5">
     @csrf
+    <input type="hidden" name="search" value="{{ request('search') }}">
+    <input type="hidden" name="eligibility" value="{{ request('eligibility', 'all') }}">
     <button type="submit" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Generate SF 5 (.xlsx)</button>
 </form>
 
@@ -25,8 +43,7 @@
     <div class="flex flex-col gap-3 border-b border-gray-100 bg-gray-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h2 class="font-bold text-gray-800">Promotion</h2>
-            <p class="mt-1 text-sm text-gray-500">Eligibility is determined automatically. Learners can be promoted only after complete released grades, no failing grades, and closure of all Junior High terms or their Senior High semester.</p>
-            <p class="mt-2 text-xs text-gray-500">One or two failing released grades are tagged Conditionally Promoted. This status does not allow advancement to the next grade.</p>
+            @include('partials.promotion-criteria')
         </div>
         <button form="bulkPromotionForm" type="submit" class="shrink-0 rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Bulk promote selected</button>
     </div>
@@ -82,7 +99,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-12 text-center text-gray-500">No active learners are assigned to this advisory section.</td></tr>
+                    <tr><td colspan="5" class="px-5 py-12 text-center text-gray-500">No active learners match the selected filters in this advisory section.</td></tr>
                 @endforelse
             </tbody>
         </table>

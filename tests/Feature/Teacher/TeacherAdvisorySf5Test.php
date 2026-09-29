@@ -245,3 +245,16 @@ test('SF5 paginates without dropping learners and preserves LRNs as text', funct
         unlink($path);
     }
 });
+
+test('adviser SF5 respects learner and status filters', function () {
+    ['teacher' => $teacher, 'section' => $section] = createAdvisorySf5Fixtures(false);
+    $filters = ['search' => '123456789012', 'eligibility' => 'pending'];
+    $this->actingAs($teacher)->get(route('teacher.advisory.promotions.index', [$section, ...$filters]))
+        ->assertOk()->assertSee('Santos, Ana');
+    $response = $this->post(route('teacher.advisory.promotions.sf5', $section), $filters)->assertOk()->assertDownload();
+    unlink($response->baseResponse->getFile()->getPathname());
+    $this->post(route('teacher.advisory.promotions.sf5', $section), ['eligibility' => 'eligible'])->assertSessionHasErrors('sf5');
+    $this->post(route('teacher.advisory.promotions.sf5', $section), ['search' => 'NoMatch'])->assertSessionHasErrors('sf5');
+    $this->post(route('principal.promotions.sf5'))->assertForbidden();
+    $this->post(route('guidance.promotions.sf5'))->assertForbidden();
+});

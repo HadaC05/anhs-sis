@@ -235,6 +235,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/principal/promotions', [GuidanceDashboardController::class, 'promotions'])
         ->middleware('principal')
         ->name('principal.promotions.index');
+    Route::post('/principal/promotions/sf5', [GuidanceDashboardController::class, 'downloadPromotionSf5'])
+        ->middleware('principal')
+        ->name('principal.promotions.sf5');
     Route::get('/principal/reports/age-for-grade', [PrincipalDashboardController::class, 'ageForGradeReport'])
         ->middleware('principal')
         ->name('principal.reports.age-for-grade');
@@ -260,6 +263,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/guidance/promotions', [GuidanceDashboardController::class, 'promotions'])
         ->middleware('guidance')
         ->name('guidance.promotions.index');
+    Route::post('/guidance/promotions/sf5', [GuidanceDashboardController::class, 'downloadPromotionSf5'])
+        ->middleware('guidance')
+        ->name('guidance.promotions.sf5');
     Route::post('/guidance/promotions/bulk', [GuidanceDashboardController::class, 'bulkPromote'])
         ->middleware('guidance')
         ->name('guidance.promotions.bulk');

@@ -409,3 +409,83 @@ test('existing next grade enrollments are recognized as completed promotions', f
         ->assertViewHas('enrollments', fn ($rows) => $rows->pluck('enrollment_ID')->all() === [$enrollment->enrollment_ID]);
     expect($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::PROMOTED);
 });
+
+test('promotion SF5 exports all filtered rows and excludes other statuses', function (string $roleName) {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    $prefix = $roleName === 'principal' ? 'principal' : 'guidance';
+    $user->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $roleName])->id]);
+    $user->unsetRelation('role');
+    $enrollment->student->update(['sex' => 'female']);
+    for ($i = 0; $i < 17; $i++) {
+        $student = Student::query()->create([
+            'lrn' => (string) (888888888800 + $i), 'first_name' => 'Filtered', 'last_name' => 'Learner'.$i,
+            'sex' => 'male', 'status' => 'active',
+        ]);
+        Enrollment::query()->create([
+            'student_ID' => $student->id, 'section_ID' => $enrollment->section_ID,
+            'SY_ID' => $enrollment->SY_ID, 'enrollment_status' => 'enrolled',
+        ]);
+    }
+    $filters = ['search' => 'Filtered', 'eligibility' => 'pending', 'academic_year_id' => $enrollment->SY_ID,
+        'grade_level' => $enrollment->curriculumGradeLevel->grade_ID];
+    $this->actingAs($user)->get(route($prefix.'.promotions.index', $filters))->assertOk()
+        ->assertViewHas('enrollments', fn ($rows) => $rows->total() === 17 && $rows->count() === 15)
+        ->assertSee(route($prefix.'.promotions.sf5'), false);
+    $response = $this->post(route($prefix.'.promotions.sf5'), $filters)->assertOk()->assertDownload();
+    $path = $response->baseResponse->getFile()->getPathname();
+    try {
+        $zip = new ZipArchive;
+        expect($zip->open($path))->toBeTrue();
+        $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        expect($xml)->toContain('888888888800', '888888888816')->not->toContain('777777777778');
+        $zip->close();
+    } finally {
+        unlink($path);
+    }
+    $this->post(route($prefix.'.promotions.sf5'), ['search' => 'NoSuchLearner'])
+        ->assertSessionHasErrors('sf5');
+})->with(['guidance counselor', 'principal']);
+
+test('promotion batch queries do not grow per learner', function () {
+    ['enrollment' => $enrollment] = guidancePromotionFixtures();
+    $measure = function () {
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        PromotionEligibility::synchronizeMany(Enrollment::query()->get());
+        $count = count(\Illuminate\Support\Facades\DB::getQueryLog());
+        \Illuminate\Support\Facades\DB::disableQueryLog();
+
+        return $count;
+    };
+    $baseline = $measure();
+    for ($i = 0; $i < 25; $i++) {
+        $student = Student::query()->create(['lrn' => (string) (999999999900 + $i), 'first_name' => 'Batch', 'last_name' => 'Learner', 'status' => 'active']);
+        Enrollment::query()->create(['student_ID' => $student->id, 'section_ID' => $enrollment->section_ID,
+            'SY_ID' => $enrollment->SY_ID, 'enrollment_status' => 'enrolled']);
+    }
+    expect($measure())->toBeLessThanOrEqual($baseline + 3);
+});
+
+test('promotion SF5 separates sections into workbooks', function () {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    $enrollment->student->update(['sex' => 'female']);
+    $section = $enrollment->section->replicate();
+    $section->name = 'Other Section';
+    $section->save();
+    $student = Student::query()->create(['lrn' => '999999999998', 'first_name' => 'Other', 'last_name' => 'Learner', 'sex' => 'male', 'status' => 'active']);
+    Enrollment::query()->create(['student_ID' => $student->id, 'section_ID' => $section->section_ID,
+        'SY_ID' => $section->SY_ID, 'enrollment_status' => 'enrolled']);
+    $response = $this->actingAs($user)->post(route('guidance.promotions.sf5'), ['eligibility' => 'all'])
+        ->assertOk()->assertDownload('SF5-filtered-results.zip');
+    $path = $response->baseResponse->getFile()->getPathname();
+    try {
+        $zip = new ZipArchive;
+        expect($zip->open($path))->toBeTrue();
+        expect($zip->numFiles)->toBe(2);
+        expect($zip->getNameIndex(0))->toEndWith('.xlsx');
+        expect($zip->getNameIndex(1))->toEndWith('.xlsx');
+        $zip->close();
+    } finally {
+        unlink($path);
+    }
+});

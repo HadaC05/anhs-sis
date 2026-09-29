@@ -31,7 +31,7 @@ class UpdateGradingTermRequest extends FormRequest
                     'term_ID',
                 ),
             ],
-            'sort_order' => ['required', 'integer', 'min:1', 'max:99'],
+            'sort_order' => ['required', 'integer', 'regex:/^[0-9]+$/', 'min:1', 'max:'.GradingTerm::query()->where('school_level', $term?->school_level ?? 'junior_high')->count()],
         ];
     }
 
@@ -45,7 +45,7 @@ class UpdateGradingTermRequest extends FormRequest
             'label.unique' => 'This term label already exists.',
             'sort_order.required' => 'The term order is required.',
             'sort_order.min' => 'The term order must be at least 1.',
-            'sort_order.max' => 'The term order may not be greater than 99.',
+            'sort_order.max' => 'The term order cannot exceed the number of existing terms for this school level.',
         ];
     }
 }

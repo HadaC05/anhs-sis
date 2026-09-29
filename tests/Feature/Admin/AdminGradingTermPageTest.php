@@ -125,13 +125,13 @@ test('admin can update the maximum terms from the settings modal', function () {
         ->from(route('admin.grading-term-config.index'))
         ->put(route('admin.grading-term-config.settings.update'), [
             '_form' => 'max_terms',
-            'max_terms' => 6,
+            'max_terms' => 4,
         ]);
 
     $response->assertRedirect(route('admin.grading-term-config.index'));
     $response->assertSessionHas('success');
 
-    expect(GradingTermSetting::current()->max_terms)->toBe(6);
+    expect(GradingTermSetting::current()->max_terms)->toBe(4);
 });
 
 test('admin can edit a term label and order from the modal', function () {
@@ -502,3 +502,61 @@ test('closing another semester does not close the current semesters terms', func
     $fullYear = GradingSemester::query()->where('key', 'full_year')->firstOrFail();
     $this->put(route('admin.grading-term-config.senior-high.semester.status', $fullYear), ['status' => 'open'])->assertNotFound();
 });
+
+test('management limits maximum terms and term order to whole numbers and existing school level terms', function (string $role) {
+    $staff = createGradingTermAdmin('management.numeric.limits');
+    $staff->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    $this->actingAs($staff)->from(route($role.'.grading-term-config.index'));
+    $this->post(route($role.'.grading-term-config.store'), ['label' => 'Extra Junior Term'])
+        ->assertSessionHasNoErrors();
+
+    foreach (['junior_high', 'senior_high'] as $level) {
+        $count = GradingTerm::query()->where('school_level', $level)->count();
+        $term = GradingTerm::query()->where('school_level', $level)->firstOrFail();
+        $field = $level === 'junior_high' ? 'max_terms' : 'senior_high_max_terms';
+        $settingsRoute = $level === 'junior_high' ? 'settings.update' : 'senior-high.settings.update';
+        $previous = GradingTermSetting::current()->getAttribute($field);
+
+        foreach ([$count + 1, 'abc', '2.5', '2e0', '-2', '0'] as $invalid) {
+            $this->put(route($role.'.grading-term-config.'.$settingsRoute), [$field => $invalid])
+                ->assertSessionHasErrors($field);
+            expect(GradingTermSetting::current()->getAttribute($field))->toBe($previous);
+            $this->put(route($role.'.grading-term-config.update', $term), [
+                'label' => $term->label, 'sort_order' => $invalid,
+            ])->assertSessionHasErrors('sort_order');
+            expect($term->fresh()->sort_order)->toBe($term->sort_order);
+        }
+
+        $this->put(route($role.'.grading-term-config.'.$settingsRoute), [$field => $count])
+            ->assertSessionHasNoErrors();
+        $this->put(route($role.'.grading-term-config.update', $term), [
+            'label' => $term->label, 'sort_order' => $count,
+        ])->assertSessionHasNoErrors();
+    }
+
+    $this->get(route($role.'.grading-term-config.index'))->assertOk()
+        ->assertSee('Open semester')->assertSee('Close semester')
+        ->assertSee('data-whole-number', false);
+})->with(['admin', 'principal']);
+
+test('management edit buttons preserve term data and modals sit outside the main page', function (string $role) {
+    $staff = createGradingTermAdmin('management.modal.markup');
+    $staff->update(['role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id]);
+    $term = GradingTerm::query()->seniorHigh()->firstOrFail();
+    $term->update(['label' => 'Term "One" & Teacher'.chr(39).'s']);
+    $response = $this->actingAs($staff)->get(route($role.'.grading-term-config.index'))->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $buttons = $xpath->query('//button[@data-term]');
+    expect($buttons->length)->toBe(GradingTerm::query()->count());
+    foreach ($buttons as $button) {
+        expect($button->getAttribute('onclick'))->toBe('openEditTermModal(JSON.parse(this.dataset.term))');
+        $data = json_decode($button->getAttribute('data-term'), true, flags: JSON_THROW_ON_ERROR);
+        expect($data['label'])->toBe(GradingTerm::findOrFail($data['term_ID'])->label);
+    }
+    foreach (['maxTermsModal', 'shsMaxTermsModal', 'editTermModal'] as $id) {
+        expect($xpath->query('//*[@id="'.$id.'"]')->length)->toBe(1)
+            ->and($xpath->query('//main//*[@id="'.$id.'"]')->length)->toBe(0);
+    }
+})->with(['admin', 'principal']);
