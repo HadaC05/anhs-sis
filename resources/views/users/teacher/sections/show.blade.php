@@ -12,7 +12,7 @@ $subjectTitle = $subject?->title ?? 'Subject';
 $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
 $lockedPeriodKeys = $lockedPeriodKeys ?? [];
 $studentCount = $enrollments->count();
-$inputColspan = 3 + count($periods);
+$inputColspan = 3 + count($inputPeriods);
 $summaryColspan = 4 + count($periods);
 $gradeReturnReasons = $gradeReturnReasons ?? collect();
 @endphp
@@ -117,7 +117,7 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             </div>
             @elseif (count($lockedPeriodKeys) > 0)
             <div class="border-b border-gray-200 bg-amber-50 px-6 py-3 text-sm text-amber-800">
-                Earlier terms are locked by the school administrator. Only {{ $editablePeriodLabel }} can be edited.
+                Editing is available for {{ $editablePeriodLabel }}. Other terms remain locked.
             </div>
             @endif
 

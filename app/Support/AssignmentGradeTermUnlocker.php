@@ -81,6 +81,82 @@ class AssignmentGradeTermUnlocker
     }
 
     /**
+     * Build summaries in bulk. Period settings are resolved once per school level
+     * and semester, and grade records are counted in SQL rather than hydrated.
+     *
+     * @param iterable<TeacherSubjectAssignment> $assignments
+     * @return array<int, list<array<string, mixed>>>
+     */
+    public static function termSummariesForAssignments(iterable $assignments, bool $includeFuturePeriods = false): array
+    {
+        $assignments = collect($assignments);
+        if ($assignments->isEmpty()) {
+            return [];
+        }
+
+        $ids = $assignments->pluck('assignment_ID');
+        $counts = StudentSubjectGrade::query()
+            ->whereIn('assignment_ID', $ids)
+            ->select('assignment_ID', 'term_ID', 'grade_status_ID')
+            ->selectRaw('COUNT(*) as record_count')
+            ->groupBy('assignment_ID', 'term_ID', 'grade_status_ID')
+            ->get()
+            ->groupBy('assignment_ID');
+        $unlocks = AssignmentGradeTermUnlock::query()
+            ->whereIn('assignment_ID', $ids)
+            ->get(['assignment_ID', 'grading_period'])
+            ->groupBy('assignment_ID');
+        $juniorTermIds = GradingTerm::query()->juniorHigh()->pluck('term_ID', 'key');
+        $statusIds = GradeStatus::idsBySlug();
+        $contexts = [];
+        $summaries = [];
+
+        foreach ($assignments as $assignment) {
+            $section = $assignment->section;
+            $semester = $assignment->curriculumSubject?->semester;
+            $contextKey = GradingTerm::isSeniorHighSection($section) ? 'senior:'.($semester ?? 'all') : 'junior';
+            if (! isset($contexts[$contextKey])) {
+                $contexts[$contextKey] = [
+                    'periods' => $includeFuturePeriods ? GradingTerm::periodsForSection($section, $semester) : GradingTerm::openPeriodsForSection($section, $semester),
+                    'available' => $includeFuturePeriods ? array_column(GradingTerm::openPeriodsForSection($section, $semester), 'key') : null,
+                    'current' => GradingTerm::currentEditablePeriodKeyForSection($section, $semester),
+                ];
+            }
+            $context = $contexts[$contextKey];
+            $assignmentCounts = $counts->get($assignment->assignment_ID, collect())->groupBy('term_ID');
+            $unlockedKeys = $unlocks->get($assignment->assignment_ID, collect())->pluck('grading_period')->all();
+            $summaries[$assignment->assignment_ID] = [];
+
+            foreach ($context['periods'] as $period) {
+                $termId = $period['term_ID'] ?? $juniorTermIds->get($period['key']);
+                $termCounts = $assignmentCounts->get($termId, collect());
+                $byStatus = $termCounts->pluck('record_count', 'grade_status_ID');
+                $summary = [
+                    'key' => $period['key'],
+                    'label' => $period['label'],
+                    'total' => (int) $termCounts->sum('record_count'),
+                    'term_ID' => $termId,
+                ];
+                foreach (GradeStatus::slugs() as $status) {
+                    $summary[$status] = (int) $byStatus->get($statusIds[$status] ?? 0, 0);
+                }
+                $isCurrent = $period['key'] === $context['current'];
+                $isAvailable = $context['available'] === null || in_array($period['key'], $context['available'], true);
+                $lockedCount = array_sum(array_map(fn (string $status): int => $summary[$status], GradeStatus::teacherLockedSlugs()));
+                $summaries[$assignment->assignment_ID][] = $summary + [
+                    'is_school_locked' => ! $isCurrent,
+                    'is_registrar_unlocked' => in_array($period['key'], $unlockedKeys, true),
+                    'is_current_term' => $isCurrent,
+                    'can_unlock' => $isAvailable && (! $isCurrent || $lockedCount > 0),
+                    'is_available' => $isAvailable,
+                ];
+            }
+        }
+
+        return $summaries;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function termSummary(TeacherSubjectAssignment $assignment, array $period): array

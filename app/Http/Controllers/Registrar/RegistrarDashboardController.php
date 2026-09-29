@@ -13,7 +13,6 @@ use App\Models\GradeStatus;
 use App\Models\GradingTerm;
 use App\Models\LearnerType;
 use App\Models\Section;
-use App\Models\Staff;
 use App\Models\Student;
 use App\Models\StudentObservedValue;
 use App\Models\StudentSubjectGrade;
@@ -23,9 +22,11 @@ use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\EnrollmentDashboardData;
 use App\Support\GradeRecordPeriodFilters;
 use App\Support\LearnerPermanentRecordBuilder;
+use App\Support\SectionGradeSubmissionProgress;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
 use App\Support\TeacherGradeNotifier;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -419,22 +420,13 @@ class RegistrarDashboardController extends Controller
         $search = trim($request->string('search')->toString());
         $gradeLevel = $request->string('grade_level')->toString();
         $gradeId = GradeLevel::idForValue($gradeLevel);
-        $clusterId = $request->string('cluster_ID')->toString();
-        $schoolYearId = $request->string('SY_ID')->toString();
+        $periods = $this->classSubjectPeriods($request);
+        $clusterId = $periods['showSemesterFilter'] ? $request->string('cluster_ID')->toString() : '';
+        $schoolYearId = $request->has('SY_ID') ? $request->string('SY_ID')->toString() : (string) AcademicYear::query()->where('status', true)->value('SY_ID');
         $perPage = (int) $request->input('per_page', 10);
         if (! in_array($perPage, [10, 20, 50], true)) {
             $perPage = 10;
         }
-
-        $assignmentScope = function ($query): void {
-            $query->with(['curriculumSubject.subject', 'staff'])
-                ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
-                ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
-                ->leftJoin('subjects', 'curriculum_subjects.subject_ID', '=', 'subjects.subject_ID')
-                ->orderBy('curriculum_grade_levels.semester_ID')
-                ->orderBy('subjects.title')
-                ->select('teacher_subject_assignments.*');
-        };
 
         $sections = Section::query()
             ->with([
@@ -442,11 +434,10 @@ class RegistrarDashboardController extends Controller
                 'academicYear',
                 'cluster',
                 'adviser',
-                'teacherSubjectAssignments' => $assignmentScope,
+                'teacherSubjectAssignments' => fn ($query) => $query
+                    ->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester', 'staff'])
+                    ->orderBy('assignment_ID'),
             ])
-            ->withCount(['enrollments as active_enrollments_count' => function ($subQuery): void {
-                $subQuery->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
-            }])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($sectionQuery) use ($search): void {
                     $sectionQuery->where('name', 'like', "%{$search}%")
@@ -459,6 +450,16 @@ class RegistrarDashboardController extends Controller
                                 ->orWhere('last_name', 'like', "%{$search}%");
                         });
                 });
+            })
+            ->when($periods['term_id'] && $periods['term_id'] !== 'current', function ($query) use ($periods): void {
+                $term = $periods['allTerms']->firstWhere('term_ID', $periods['term_id']);
+                if ($term) {
+                    $query->whereHas('gradeLevel', function ($grades) use ($term): void {
+                        $term->school_level === 'senior_high'
+                            ? $grades->whereIn('grade_label', ['Grade 11', 'Grade 12'])
+                            : $grades->whereNotIn('grade_label', ['Grade 11', 'Grade 12']);
+                    });
+                }
             })
             ->when($gradeId, function ($query) use ($gradeId): void {
                 $query->where('grade_ID', $gradeId);
@@ -474,70 +475,27 @@ class RegistrarDashboardController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        [$assignments, $termsByAssignment, $allTermsByAssignment] = $this->classSubjectSummaries($sections->getCollection(), $periods);
+
         return view('users.registrar.class-subjects.index', [
+            'termsByAssignment' => $termsByAssignment,
+            'allTermsByAssignment' => $allTermsByAssignment,
+            'sectionProgress' => SectionGradeSubmissionProgress::forAssignments($assignments, $termsByAssignment),
             'sections' => $sections,
+            'periods' => $periods,
+            'showPeriodColumns' => $sections->getCollection()->contains(fn (Section $section): bool => GradingTerm::isSeniorHighSection($section)),
             'clusters' => Cluster::query()->orderBy('name')->get(['cluster_ID', 'name']),
             'academicYears' => AcademicYear::query()->orderByDesc('school_year')->get(['SY_ID', 'school_year']),
             'gradeLevels' => GradeLevel::options(),
             'filters' => [
+                'term_id' => $periods['term_id'],
+                'semester' => $periods['semester'],
                 'search' => $search,
                 'grade_level' => $gradeLevel,
                 'cluster_ID' => $clusterId,
                 'SY_ID' => $schoolYearId,
                 'per_page' => $perPage,
             ],
-        ]);
-    }
-
-    public function teacherAssignments(Request $request): View
-    {
-        $search = trim($request->string('search')->toString());
-        $schoolYearId = $request->string('SY_ID')->toString();
-        $perPage = (int) $request->input('per_page', 10);
-
-        if (! in_array($perPage, [10, 20, 50], true)) {
-            $perPage = 10;
-        }
-
-        $teachers = Staff::query()
-            ->whereHas('role', fn ($query) => $query->where('role_name', 'teacher'))
-            ->with([
-                'sections' => function ($query) use ($schoolYearId): void {
-                    $query->with([
-                        'gradeLevel',
-                        'academicYear',
-                        'teacherSubjectAssignments' => function ($assignmentQuery): void {
-                            $assignmentQuery->with(['curriculumSubject.subject', 'staff'])
-                                ->withGradeStatusCounts();
-                        },
-                    ])
-                        ->when($schoolYearId !== '', fn ($sectionQuery) => $sectionQuery->where('SY_ID', $schoolYearId))
-                        ->orderBy('grade_ID')
-                        ->orderBy('name');
-                },
-                'teacherSubjectAssignments' => function ($query) use ($schoolYearId): void {
-                    $query->with(['section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject'])
-                        ->withGradeStatusCounts()
-                        ->when($schoolYearId !== '', fn ($assignmentQuery) => $assignmentQuery->where('SY_ID', $schoolYearId))
-                        ->orderBy('section_ID');
-                },
-            ])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($teacherQuery) use ($search): void {
-                    $teacherQuery->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('employee_no', 'like', "%{$search}%");
-                });
-            })
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->paginate($perPage)
-            ->withQueryString();
-
-        return view('users.registrar.teacher-assignments', [
-            'teachers' => $teachers,
-            'academicYears' => AcademicYear::query()->orderByDesc('school_year')->get(['SY_ID', 'school_year']),
-            'filters' => compact('search', 'schoolYearId', 'perPage'),
         ]);
     }
 
@@ -555,6 +513,112 @@ class RegistrarDashboardController extends Controller
         ]);
 
         return view('users.registrar.class-status', compact('section'));
+    }
+
+    public function sectionSubjects(Request $request, Section $section): View
+    {
+        $section->load([
+            'gradeLevel',
+            'teacherSubjectAssignments' => fn ($query) => $query
+                ->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester', 'staff'])
+                ->orderBy('assignment_ID'),
+        ]);
+
+        $periods = $this->classSubjectPeriods($request);
+        [, $termsByAssignment, $allTermsByAssignment] = $this->classSubjectSummaries(collect([$section]), $periods);
+
+        $sectionProgress = SectionGradeSubmissionProgress::forAssignments($section->teacherSubjectAssignments, $termsByAssignment);
+
+        return view('users.registrar.class-subjects.subjects-modal', compact('section', 'termsByAssignment', 'allTermsByAssignment', 'sectionProgress'));
+    }
+
+    public function classSubjectGradeRecords(Request $request, TeacherSubjectAssignment $assignment): View
+    {
+        $assignment->load(['section.gradeLevel', 'curriculumSubject.gradingSemester']);
+        $periods = GradingTerm::periodsForSection($assignment->section, $assignment->curriculumSubject?->semester);
+        $validated = $request->validate([
+            'grading_period' => ['required', Rule::in(array_column($periods, 'key'))],
+        ]);
+        $period = collect($periods)->firstWhere('key', $validated['grading_period']);
+        $grades = $assignment->grades()
+            ->forPeriodKey($period['key'])
+            ->whereStatus(GradeStatus::teacherLockedSlugs())
+            ->whereHas('studentSubject', function ($query) use ($assignment): void {
+                $query->where('curr_subj_ID', $assignment->curr_subj_ID)
+                    ->whereHas('enrollment', function ($enrollments) use ($assignment): void {
+                        $enrollments->where('section_ID', $assignment->section_ID)
+                            ->where('SY_ID', $assignment->SY_ID)
+                            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
+                    });
+            })
+            ->with(['studentSubject.enrollment.student', 'gradeStatus'])
+            ->get()->sortBy(fn ($grade) => $grade->studentSubject?->enrollment?->student?->last_name);
+
+        return view('users.registrar.class-subjects.grade-records', compact('grades', 'period'));
+    }
+
+    private function classSubjectPeriods(Request $request): array
+    {
+        $request->validate([
+            'term_id' => ['nullable', 'regex:/^(current|[0-9]+)$/'],
+            'semester' => ['nullable', 'in:first,second'],
+        ]);
+        $gradeId = GradeLevel::idForValue($request->string('grade_level')->toString());
+        $periods = GradeRecordPeriodFilters::resolve($request, $gradeId ? GradeLevel::find($gradeId) : null);
+        // Mixed-level results still use the active semester for their SHS subjects.
+        if (! $gradeId) {
+            $periods['semester'] = $request->has('semester') ? $request->input('semester') : $periods['activeSemester'];
+        }
+
+        return $periods;
+    }
+
+    private function classSubjectSummaries($sections, array $periods): array
+    {
+        $assignments = $sections->flatMap(function (Section $section) use ($periods) {
+            $subjects = $section->teacherSubjectAssignments->filter(function ($assignment) use ($section, $periods): bool {
+                return ! GradingTerm::isSeniorHighSection($section)
+                    || ! $periods['semester']
+                    || ! $assignment->curriculumSubject?->semester
+                    || $assignment->curriculumSubject->semester === $periods['semester'];
+            })->values();
+            $section->setRelation('teacherSubjectAssignments', $subjects);
+            foreach ($subjects as $assignment) {
+                $assignment->setRelation('section', $section);
+            }
+
+            return $subjects;
+        });
+        $summaries = AssignmentGradeTermUnlocker::termSummariesForAssignments($assignments, true);
+        $allTermsByAssignment = $summaries;
+        foreach ($assignments as $assignment) {
+            $seniorHigh = GradingTerm::isSeniorHighSection($assignment->section);
+            $activeTermId = $periods['termDefaults'][$seniorHigh ? 'senior_high' : 'junior_high'] ?? null;
+            $activePrefix = $periods['activeSemester'] === 'second' ? 'shs_sem2_' : 'shs_sem1_';
+            $assignment->active_term_summary = collect($summaries[$assignment->assignment_ID] ?? [])->first(
+                fn (array $term): bool => (int) $term['term_ID'] === (int) $activeTermId
+                    && (! $seniorHigh || str_starts_with($term['key'], $activePrefix))
+            );
+            $terms = array_values(array_filter($summaries[$assignment->assignment_ID] ?? [], function (array $term) use ($assignment, $periods): bool {
+                if ($periods['term_ids'] !== null && ! in_array((int) $term['term_ID'], $periods['term_ids'], true)) {
+                    return false;
+                }
+                if (GradingTerm::isSeniorHighSection($assignment->section) && $periods['semester']) {
+                    $prefix = $periods['semester'] === 'second' ? 'shs_sem2_' : 'shs_sem1_';
+
+                    return str_starts_with($term['key'], $prefix);
+                }
+
+                return true;
+            }));
+            $summaries[$assignment->assignment_ID] = $terms;
+            $assignment->grades_count = array_sum(array_column($terms, 'total'));
+            foreach (GradeStatus::slugs() as $status) {
+                $assignment->{$status.'_grades_count'} = array_sum(array_column($terms, $status));
+            }
+        }
+
+        return [$assignments, $summaries, $allTermsByAssignment];
     }
 
     public function showClassSubject(TeacherSubjectAssignment $assignment): View
@@ -584,7 +648,7 @@ class RegistrarDashboardController extends Controller
         ]);
     }
 
-    public function unlockClassSubjectTerm(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse
+    public function unlockClassSubjectTerm(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse|JsonResponse
     {
         $assignment->load(['section.gradeLevel', 'curriculumSubject']);
         $periods = GradingTerm::openPeriodsForSection(
@@ -606,6 +670,12 @@ class RegistrarDashboardController extends Controller
         );
 
         $label = collect($periods)->firstWhere('key', $validated['grading_period'])['label'] ?? $validated['grading_period'];
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "{$label} unlocked for this class subject. {$updated} grade record(s) returned to draft for teacher editing.",
+            ]);
+        }
 
         return redirect()
             ->route('registrar.class-subjects.show', $assignment)

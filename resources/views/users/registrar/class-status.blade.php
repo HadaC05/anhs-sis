@@ -3,8 +3,8 @@
 @section('title', 'Class Subject Status')
 
 @section('content')
-<a href="{{ route('registrar.teacher-assignments') }}" class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
-    <span aria-hidden="true">←</span> Back to teacher assignments
+<a href="{{ route('registrar.class-subjects.index') }}" class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+    <span aria-hidden="true">←</span> Back to Class Subjects
 </a>
 
 @php

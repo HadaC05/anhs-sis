@@ -122,12 +122,6 @@
                             </svg>
                             <span class="font-semibold">Class Subjects</span>
                         </a>
-                        <a href="{{ route('registrar.teacher-assignments') }}" class="sidebar-link {{ request()->routeIs('registrar.teacher-assignments') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m18 0v-2a4 4 0 00-3-3.87m-2-12.13a4 4 0 010 7.75M10 11a4 4 0 100-8 4 4 0 000 8z"></path>
-                            </svg>
-                            <span class="font-semibold">Teacher Assignments</span>
-                        </a>
                         <a href="{{ route('registrar.students') }}" class="sidebar-link {{ request()->routeIs('registrar.students') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4a4 4 0 100 8 4 4 0 000-8zM6 20a6 6 0 0112 0v1H6v-1z"></path>

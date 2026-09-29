@@ -210,15 +210,18 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/registrar/class-subjects', [RegistrarDashboardController::class, 'classSubjects'])
         ->middleware('registrar')
         ->name('registrar.class-subjects.index');
-    Route::get('/registrar/teacher-assignments', [RegistrarDashboardController::class, 'teacherAssignments'])
-        ->middleware('registrar')
-        ->name('registrar.teacher-assignments');
     Route::get('/registrar/classes/{section}', [RegistrarDashboardController::class, 'classStatus'])
         ->middleware('registrar')
         ->name('registrar.classes.status');
+    Route::get('/registrar/classes/{section}/subjects', [RegistrarDashboardController::class, 'sectionSubjects'])
+        ->middleware('registrar')
+        ->name('registrar.classes.subjects');
     Route::get('/registrar/class-subjects/{assignment}', [RegistrarDashboardController::class, 'showClassSubject'])
         ->middleware('registrar')
         ->name('registrar.class-subjects.show');
+    Route::get('/registrar/class-subjects/{assignment}/grade-records', [RegistrarDashboardController::class, 'classSubjectGradeRecords'])
+        ->middleware('registrar')
+        ->name('registrar.class-subjects.grade-records');
     Route::post('/registrar/class-subjects/{assignment}/unlock-term', [RegistrarDashboardController::class, 'unlockClassSubjectTerm'])
         ->middleware('registrar')
         ->name('registrar.class-subjects.unlock-term');
