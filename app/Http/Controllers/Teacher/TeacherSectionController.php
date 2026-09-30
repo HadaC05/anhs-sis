@@ -514,8 +514,8 @@ class TeacherSectionController extends Controller
         $this->authorizeAdvisorySection($request, $section);
 
         $section->load(['academicYear', 'cluster', 'gradeLevel']);
-        $months = Sf9AttendanceSummary::months();
-        $schoolDays = Sf9AttendanceSummary::schoolDaysForSection($section);
+        $months = $section->academicYear->attendanceMonths();
+        $schoolDays = array_intersect_key(Sf9AttendanceSummary::schoolDaysForSection($section), $months);
 
         $enrollments = Enrollment::query()
             ->with(['student'])
@@ -537,7 +537,7 @@ class TeacherSectionController extends Controller
         $rows = $enrollments->map(function (Enrollment $enrollment) use ($attendanceRecords, $schoolDays): array {
             $student = $enrollment->student;
             $records = $attendanceRecords->get($enrollment->enrollment_ID, collect());
-            $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, $schoolDays);
+            $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, $schoolDays, array_keys($schoolDays));
 
             return [
                 'enrollment' => $enrollment,
@@ -585,7 +585,7 @@ class TeacherSectionController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
         $allowedEnrollmentIds = array_flip($allowedEnrollmentIds);
-        $monthKeys = array_flip(Sf9AttendanceSummary::monthKeys());
+        $monthKeys = $section->academicYear->attendanceMonths();
 
         DB::transaction(function () use ($validated, $section, $allowedEnrollmentIds, $monthKeys): void {
             foreach (($validated['school_days'] ?? []) as $month => $schoolDays) {
@@ -647,7 +647,7 @@ class TeacherSectionController extends Controller
         $this->authorizeAdvisorySection($request, $section);
 
         $validated = $request->validate([
-            'report_month' => ['required', 'integer', 'in:'.implode(',', Sf9AttendanceSummary::monthKeys())],
+            'report_month' => ['required', 'integer', 'in:'.implode(',', array_keys($section->academicYear->attendanceMonths()))],
             'sf2_file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 

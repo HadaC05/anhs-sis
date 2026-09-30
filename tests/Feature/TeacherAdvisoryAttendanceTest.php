@@ -71,6 +71,29 @@ function createAdvisoryAttendanceFixtures(): array
     return compact('teacher', 'section', 'enrollment');
 }
 
+test('teacher attendance uses configured months and excludes hidden months from totals without deleting records', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    $section->academicYear->update(['attendance_start_month' => 8, 'attendance_end_month' => 2]);
+
+    foreach ([6, 8] as $month) {
+        AcademicYearAttendanceSetting::factory()->create(['SY_ID' => $section->SY_ID, 'month' => $month, 'school_days' => 20]);
+        EnrollmentMonthlyAttendance::query()->create([
+            'enrollment_ID' => $enrollment->enrollment_ID,
+            'month' => $month,
+            'days_present' => 18,
+            'days_absent' => 2,
+        ]);
+    }
+
+    $this->actingAs($teacher)->get(route('teacher.advisory.attendance', $section))
+        ->assertOk()
+        ->assertViewHas('months', fn ($months) => array_keys($months) === [8, 9, 10, 11, 12, 1, 2])
+        ->assertViewHas('schoolDays', fn ($days) => array_sum($days) === 20)
+        ->assertViewHas('rows', fn ($rows) => $rows->first()['summary']['total_present'] === 18 && $rows->first()['summary']['total_absent'] === 2);
+
+    expect(EnrollmentMonthlyAttendance::query()->where('enrollment_ID', $enrollment->enrollment_ID)->count())->toBe(2);
+});
+
 test('advisory teacher can view attendance record page', function () {
     ['teacher' => $teacher, 'section' => $section] = createAdvisoryAttendanceFixtures();
 
@@ -78,6 +101,7 @@ test('advisory teacher can view attendance record page', function () {
 
     $response->assertOk();
     $response->assertSee('Attendance Record');
+    $response->assertViewHas('months', fn ($months) => array_keys($months) === [6, 7, 8, 9, 10, 11, 12, 1, 2, 3]);
     $response->assertSee('Monthly Attendance Summary');
     $response->assertSee('Upload SF2');
     $response->assertDontSee('Save Attendance');

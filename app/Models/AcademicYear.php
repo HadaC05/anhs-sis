@@ -27,6 +27,8 @@ class AcademicYear extends Model
         'start_date',
         'end_date',
         'status',
+        'attendance_start_month',
+        'attendance_end_month',
     ];
 
     protected function casts(): array
@@ -35,7 +37,38 @@ class AcademicYear extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'status' => 'boolean',
+            'attendance_start_month' => 'integer',
+            'attendance_end_month' => 'integer',
         ];
+    }
+
+    public function attendanceStartMonth(): int
+    {
+        return $this->attendance_start_month ?? $this->start_date?->month ?? 1;
+    }
+
+    public function attendanceEndMonth(): int
+    {
+        return $this->attendance_end_month ?? $this->end_date?->month ?? 12;
+    }
+
+    /** @return array<int, string> */
+    public function attendanceMonths(): array
+    {
+        $labels = Month::labels();
+        $months = [];
+        $start = $this->attendanceStartMonth();
+        $end = $this->attendanceEndMonth();
+
+        for ($offset = 0; $offset < 12; $offset++) {
+            $month = (($start - 1 + $offset) % 12) + 1;
+            $months[$month] = $labels[$month];
+            if ($month === $end) {
+                break;
+            }
+        }
+
+        return $months;
     }
 
     public function sections(): HasMany

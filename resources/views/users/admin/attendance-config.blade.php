@@ -6,6 +6,10 @@
 
 @section('title', 'Attendance Configuration')
 
+@push('toasts')
+    <x-password-reset-toasts :include-errors="false" test-prefix="attendance-config" />
+@endpush
+
 @section('content')
 @php
     $fieldClass = 'h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
@@ -24,16 +28,9 @@
 
 <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Attendance Configuration</h1>
-        <p class="mt-1 text-sm text-gray-500">Set the total school days per month. These counts appear on teacher advisory attendance records and SF9.</p>
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 tracking-tight">Attendance Configuration</h1>
     </div>
 </div>
-
-@if (session('success'))
-    <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-        {{ session('success') }}
-    </div>
-@endif
 
 @if ($errors->any())
     <div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -63,11 +60,11 @@
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Total School Days</p>
         <p class="mt-2 text-3xl font-bold text-gray-900">{{ number_format($totalSchoolDays) }}</p>
-        <p class="mt-1 text-xs text-gray-500">January through December</p>
+        <p class="mt-1 text-xs text-gray-500">{{ reset($attendanceMonths) }} through {{ end($attendanceMonths) }}</p>
     </div>
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Months Configured</p>
-        <p class="mt-2 text-3xl font-bold text-gray-900">{{ $configuredMonths }} / {{ count($months) }}</p>
+        <p class="mt-2 text-3xl font-bold text-gray-900">{{ $configuredMonths }} / {{ count($attendanceMonths) }}</p>
         <p class="mt-1 text-xs text-gray-500">Months with school days set</p>
     </div>
 </div>
@@ -114,6 +111,27 @@
             @method('PUT')
             <input type="hidden" name="SY_ID" value="{{ $selectedYear->SY_ID }}">
 
+            <div class="border-b border-gray-200 px-6 py-5">
+                <p class="is-viewing text-sm font-semibold text-gray-800">Attendance months: {{ $months[$selectedYear->attendanceStartMonth()] }} through {{ $months[$selectedYear->attendanceEndMonth()] }}</p>
+                <div class="is-editing grid gap-4 sm:grid-cols-2">
+                    @foreach (['start' => 'Starting Month', 'end' => 'Ending Month'] as $boundary => $label)
+                        @php
+                            $field = 'attendance_'.$boundary.'_month';
+                            $value = old($field, $boundary === 'start' ? $selectedYear->attendanceStartMonth() : $selectedYear->attendanceEndMonth());
+                        @endphp
+                        <div>
+                            <label for="{{ $field }}" class="mb-1 block text-sm font-semibold text-gray-700">{{ $label }}</label>
+                            <select id="{{ $field }}" name="{{ $field }}" data-original="{{ $value }}" class="attendance-month-input {{ $fieldClass }} border-gray-200" required>
+                                @foreach ($months as $monthKey => $monthLabel)
+                                    <option value="{{ $monthKey }}" @selected((int) $value === $monthKey)>{{ $monthLabel }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="mt-2 text-xs text-gray-500">Defaults follow the school year dates. The range includes both months and continues into the next calendar year when needed.</p>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[520px] border-collapse text-left">
                     <thead>
@@ -130,7 +148,7 @@
                                 $oldValue = old($inputName);
                                 $inputValue = $oldValue !== null ? $oldValue : ($storedDays > 0 ? (string) $storedDays : '');
                             @endphp
-                            <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
+                            <tr data-attendance-month="{{ $monthKey }}" class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                                 <td class="border-r border-gray-100 px-5 py-4">
                                     <p class="font-semibold text-gray-900">{{ $monthLabel }}</p>
                                 </td>
@@ -163,7 +181,7 @@
                     Cancel
                 </button>
                 <button type="submit" class="rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
-                    Save School Days
+                    Save Attendance Configuration
                 </button>
             </div>
         </form>
@@ -180,11 +198,28 @@
     }
 
     function cancelAttendanceEdit() {
-        document.querySelectorAll('.school-days-input').forEach(function (input) {
+        document.querySelectorAll('.school-days-input, .attendance-month-input').forEach(function (input) {
             input.value = input.getAttribute('data-original') || '';
         });
         document.getElementById('attendanceEditor').setAttribute('data-editing', 'false');
+        updateAttendanceMonths();
     }
+
+    function updateAttendanceMonths() {
+        const start = document.getElementById('attendance_start_month');
+        const end = document.getElementById('attendance_end_month');
+        if (!start || !end) return;
+        const length = (Number(end.value) - Number(start.value) + 12) % 12 + 1;
+        const rows = Array.from(document.querySelectorAll('[data-attendance-month]'));
+        rows.sort((a, b) => ((Number(a.dataset.attendanceMonth) - Number(start.value) + 12) % 12) - ((Number(b.dataset.attendanceMonth) - Number(start.value) + 12) % 12));
+        rows.forEach(row => {
+            row.hidden = (Number(row.dataset.attendanceMonth) - Number(start.value) + 12) % 12 >= length;
+            row.parentNode.appendChild(row);
+        });
+    }
+
+    document.querySelectorAll('.attendance-month-input').forEach(input => input.addEventListener('change', updateAttendanceMonths));
+    updateAttendanceMonths();
 
     document.querySelectorAll('.school-days-input').forEach(function (input) {
         input.addEventListener('input', function () {

@@ -27,16 +27,19 @@ class AttendanceConfigurationController extends Controller
         $selectedId = (int) $request->integer('sy_id', $currentYear?->SY_ID ?? 0);
         $selectedYear = $academicYears->firstWhere('SY_ID', $selectedId) ?? $currentYear;
         $schoolDays = Sf9AttendanceSummary::schoolDaysForAcademicYear($selectedYear?->SY_ID);
-        $configuredMonths = collect($schoolDays)->filter(fn (int $days): bool => $days > 0)->count();
+        $attendanceMonths = $selectedYear?->attendanceMonths() ?? Month::labels();
+        $activeSchoolDays = array_intersect_key($schoolDays, $attendanceMonths);
+        $configuredMonths = collect($activeSchoolDays)->filter(fn (int $days): bool => $days > 0)->count();
 
         return view('users.admin.attendance-config', [
             'academicYears' => $academicYears,
             'currentYear' => $currentYear,
             'selectedYear' => $selectedYear,
             'months' => Month::labels(),
+            'attendanceMonths' => $attendanceMonths,
             'schoolDays' => $schoolDays,
             'configuredMonths' => $configuredMonths,
-            'totalSchoolDays' => array_sum($schoolDays),
+            'totalSchoolDays' => array_sum($activeSchoolDays),
         ]);
     }
 
@@ -46,6 +49,8 @@ class AttendanceConfigurationController extends Controller
         $syId = (int) $validated['SY_ID'];
 
         DB::transaction(function () use ($validated, $syId): void {
+            $year = AcademicYear::query()->findOrFail($syId);
+            $year->fill(collect($validated)->only(['attendance_start_month', 'attendance_end_month'])->all())->save();
             foreach ($validated['school_days'] as $month => $schoolDays) {
                 AcademicYearAttendanceSetting::query()->updateOrCreate(
                     [
@@ -59,6 +64,6 @@ class AttendanceConfigurationController extends Controller
 
         return redirect()
             ->route($request->routeIs('principal.*') ? 'principal.attendance-config.index' : 'admin.attendance-config.index', ['sy_id' => $syId])
-            ->with('success', 'School days updated successfully.');
+            ->with('success', 'Attendance configuration updated successfully.');
     }
 }

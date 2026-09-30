@@ -40,6 +40,8 @@ class UpdateAttendanceConfigurationRequest extends FormRequest
     {
         return [
             'SY_ID' => ['required', 'integer', 'exists:academic_years,SY_ID'],
+            'attendance_start_month' => ['required_with:attendance_end_month', 'integer', 'between:1,12'],
+            'attendance_end_month' => ['required_with:attendance_start_month', 'integer', 'between:1,12'],
             'school_days' => ['required', 'array'],
             'school_days.*' => ['required', 'regex:/^\d{1,2}$/', 'numeric', 'min:0', 'max:31'],
         ];

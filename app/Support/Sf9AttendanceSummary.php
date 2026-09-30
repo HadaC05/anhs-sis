@@ -60,7 +60,7 @@ class Sf9AttendanceSummary
      * @param  array<int, int>  $schoolDaysByMonth
      * @return array<string, mixed>
      */
-    public static function forEnrollment(int $enrollmentId, array $schoolDaysByMonth): array
+    public static function forEnrollment(int $enrollmentId, array $schoolDaysByMonth, ?array $monthKeys = null): array
     {
         $records = EnrollmentMonthlyAttendance::query()
             ->where('enrollment_ID', $enrollmentId)
@@ -73,7 +73,7 @@ class Sf9AttendanceSummary
         $totalPresent = 0;
         $totalAbsent = 0;
 
-        foreach (self::monthKeys() as $month) {
+        foreach ($monthKeys ?? self::monthKeys() as $month) {
             $schoolDays = $schoolDaysByMonth[$month] ?? 0;
             $record = $records->get($month);
             $present = (int) ($record?->days_present ?? 0);

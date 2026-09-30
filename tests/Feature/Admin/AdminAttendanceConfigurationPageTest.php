@@ -35,6 +35,53 @@ function createAttendanceConfigYear(string $schoolYear = '2026-2027', bool $stat
     ]);
 }
 
+test('management can save an attendance range independently for each school year', function (string $roleName) {
+    $staff = createAttendanceConfigAdmin('attendance.range.'.$roleName);
+    $staff->role->update(['role_name' => $roleName]);
+    $year = createAttendanceConfigYear();
+    $otherYear = createAttendanceConfigYear('2025-2026', false);
+
+    $this->actingAs($staff)->put(route($roleName.'.attendance-config.update'), [
+        'SY_ID' => $year->SY_ID,
+        'attendance_start_month' => 8,
+        'attendance_end_month' => 4,
+        'school_days' => [8 => 20],
+    ])->assertSessionHasNoErrors()->assertRedirect(route($roleName.'.attendance-config.index', ['sy_id' => $year->SY_ID]));
+
+    expect(array_keys($year->fresh()->attendanceMonths()))->toBe([8, 9, 10, 11, 12, 1, 2, 3, 4])
+        ->and($otherYear->fresh()->attendanceStartMonth())->toBe(6)
+        ->and($otherYear->fresh()->attendanceEndMonth())->toBe(3);
+
+    $this->actingAs($staff)->get(route($roleName.'.attendance-config.index', ['sy_id' => $year->SY_ID]))
+        ->assertOk()->assertSee('August through April');
+})->with(['admin', 'principal']);
+
+test('attendance month boundaries reject invalid and incomplete ranges', function (array $range, string $error) {
+    $staff = createAttendanceConfigAdmin('attendance.range.invalid');
+    $year = createAttendanceConfigYear();
+
+    $this->actingAs($staff)->put(route('admin.attendance-config.update'), [
+        'SY_ID' => $year->SY_ID,
+        'school_days' => [6 => 20],
+        ...$range,
+    ])->assertSessionHasErrors($error);
+
+    expect($year->fresh()->attendance_start_month)->toBeNull();
+    expect(AcademicYearAttendanceSetting::query()->count())->toBe(0);
+})->with([
+    [['attendance_start_month' => 0, 'attendance_end_month' => 3], 'attendance_start_month'],
+    [['attendance_start_month' => 6, 'attendance_end_month' => 13], 'attendance_end_month'],
+    [['attendance_start_month' => 6], 'attendance_end_month'],
+]);
+
+test('attendance ranges support same year and single month selections', function () {
+    $year = createAttendanceConfigYear();
+    $year->fill(['attendance_start_month' => 2, 'attendance_end_month' => 5]);
+    expect(array_keys($year->attendanceMonths()))->toBe([2, 3, 4, 5]);
+    $year->attendance_end_month = 2;
+    expect(array_keys($year->attendanceMonths()))->toBe([2]);
+});
+
 test('admin can view the attendance configuration page', function () {
     $admin = createAttendanceConfigAdmin('admin.attendance.config');
     $year = createAttendanceConfigYear();
@@ -52,7 +99,7 @@ test('admin can view the attendance configuration page', function () {
     $response->assertSee('Monthly School Days');
     $response->assertSee('Total School Days');
     $response->assertSee('Months Configured');
-    $response->assertSee('January through December');
+    $response->assertSee('June through March');
     $response->assertSee('2026-2027');
     $response->assertSeeInOrder(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);
     $response->assertSee('data-editing="false"', false);
@@ -60,7 +107,7 @@ test('admin can view the attendance configuration page', function () {
     $response->assertSee('id="attendanceEditButton"', false);
     $response->assertSee('startAttendanceEdit', false);
     $response->assertSee('cancelAttendanceEdit', false);
-    $response->assertSee('Save School Days');
+    $response->assertSee('Save Attendance Configuration');
     $response->assertSee('Cancel');
     $response->assertSee('name="school_days[1]"', false);
     $response->assertSee('name="school_days[6]"', false);
@@ -181,6 +228,6 @@ test('attendance configuration page shows an empty state when no academic year e
 
     $response->assertOk();
     $response->assertSee('Add an academic year first to configure monthly school days.');
-    $response->assertDontSee('Save School Days');
+    $response->assertDontSee('Save Attendance Configuration');
     $response->assertDontSee('id="attendanceEditButton"', false);
 });
