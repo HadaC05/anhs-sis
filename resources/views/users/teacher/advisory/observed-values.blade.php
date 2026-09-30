@@ -10,8 +10,19 @@
 
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'observed-values'])
 
-@if(session('status'))<div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{{ session('status') }}</div>@endif
-@if($errors->any())<div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{{ $errors->first() }}</div>@endif
+@push('toasts')
+<div id="observed-values-toasts" class="fixed right-4 top-24 z-[120] flex flex-col gap-3" style="width: min(28rem, calc(100vw - 2rem));" aria-live="polite"></div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        @if(session('status'))
+            window.showObservedToast(@json(session('status')), 'success');
+        @endif
+        @if($errors->any() || session('error'))
+            window.showObservedToast(@json($errors->first() ?: session('error')), 'error');
+        @endif
+    });
+</script>
+@endpush
 
 <div class="overflow-hidden rounded-xl border border-[#296374]/35 bg-[#eef5f7] shadow-md shadow-[#296374]/10">
 
@@ -32,13 +43,13 @@
         @foreach($groupedStatements as $coreValue => $groupStatements)
             <section data-core-panel="{{ $coreValue }}" class="{{ $activeCoreValue === $coreValue ? '' : 'hidden' }}">
                 @if(! $isObservedLocked)
-                    <div class="hidden">
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Statement</label><select data-bulk-statement data-core="{{ $coreValue }}" class="h-9 min-w-64 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select statement</option>@foreach($groupStatements as $statement)<option value="{{ $statement['key'] }}">{{ $statement['statement'] }}</option>@endforeach</select></div>
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Marking</label><select data-bulk-marking data-core="{{ $coreValue }}" class="h-9 min-w-40 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select marking</option>@foreach($markings as $code => $label)<option value="{{ $code }}">{{ $code }} — {{ $label }}</option>@endforeach</select></div>
-                        <button type="button" data-bulk-apply data-core="{{ $coreValue }}" data-period="{{ $editablePeriodKey }}" class="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Apply to selected learners</button>
+                    <div class="flex flex-wrap items-end gap-3 border-b border-gray-200 bg-slate-50 px-4 py-3 lg:px-6" data-bulk-controls data-period="{{ $editablePeriodKey }}">
+                        <label class="block min-w-0 flex-1"><span class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Bulk statement</span><select data-bulk-statement class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select statement</option>@foreach($groupStatements as $statement)<option value="{{ $statement['key'] }}">{{ $statement['statement'] }}</option>@endforeach</select></label>
+                        <label class="block"><span class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Marking</span><select data-bulk-marking class="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select marking</option>@foreach($markings as $code => $label)<option value="{{ $code }}">{{ $code }} - {{ $label }}</option>@endforeach</select></label>
+                        <p class="w-full text-xs text-gray-500">Choose a statement, marking, and learners, then click Save Progress to apply them to the current grading term.</p>
                     </div>
                 @endif
-                <div class="overflow-x-auto"><table class="w-full min-w-[980px] border-collapse border border-gray-300 text-left"><thead class="bg-[#296374] text-xs font-bold uppercase tracking-wider text-white"><tr><th rowspan="2" class="w-12 border border-[#1f4e5c] px-4 py-3 text-center"><label class="inline-flex cursor-pointer items-center" title="Select all learners"><input type="checkbox" data-select-all-core="{{ $coreValue }}" class="h-4 w-4 rounded border-white/50 text-[#296374]" @disabled($isObservedLocked)><span class="sr-only">Select all learners</span></label></th><th rowspan="2" class="min-w-52 border border-[#1f4e5c] px-4 py-3 lg:px-6">Learner</th>@foreach($groupStatements as $statement)<th colspan="{{ count($periods) }}" class="min-w-48 border border-[#1f4e5c] px-4 py-3 text-center normal-case leading-5">{{ $statement['statement'] }}</th>@endforeach</tr><tr>@foreach($groupStatements as $statement)@foreach($periods as $period)<th class="border border-[#1f4e5c] px-3 py-2 text-center">{{ $period['label'] }}</th>@endforeach@endforeach</tr>@if(! $isObservedLocked)<tr class="bg-slate-50 text-gray-700"><td colspan="{{ 2 + ($groupStatements->count() * count($periods)) }}" class="border border-gray-300 px-4 py-3"><div class="flex flex-wrap items-end gap-3"><div><label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Bulk statement</label><select data-bulk-statement data-core="{{ $coreValue }}" class="h-9 min-w-64 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700"><option value="">Select statement</option>@foreach($groupStatements as $statement)<option value="{{ $statement['key'] }}">{{ $statement['statement'] }}</option>@endforeach</select></div><div><label class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Marking</label><select data-bulk-marking data-core="{{ $coreValue }}" class="h-9 min-w-40 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700"><option value="">Select marking</option>@foreach($markings as $code => $label)<option value="{{ $code }}">{{ $code }} - {{ $label }}</option>@endforeach</select></div><button type="button" data-bulk-apply data-core="{{ $coreValue }}" data-period="{{ $editablePeriodKey }}" class="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold normal-case text-white shadow-sm transition hover:bg-emerald-700">Apply to selected learners</button></div></td></tr>@endif</thead><tbody class="divide-y divide-gray-200">
+                <div class="overflow-x-auto"><table class="w-full min-w-[980px] border-collapse border border-gray-300 text-left"><thead class="bg-[#296374] text-xs font-bold uppercase tracking-wider text-white"><tr><th rowspan="2" class="w-12 border border-[#1f4e5c] px-4 py-3 text-center"><label class="inline-flex cursor-pointer items-center" title="Select all learners"><input type="checkbox" data-select-all-core="{{ $coreValue }}" class="h-4 w-4 rounded border-white/50 text-[#296374]" @disabled($isObservedLocked)><span class="sr-only">Select all learners</span></label></th><th rowspan="2" class="min-w-52 border border-[#1f4e5c] px-4 py-3 lg:px-6">Learner</th>@foreach($groupStatements as $statement)<th colspan="{{ count($periods) }}" class="min-w-48 border border-[#1f4e5c] px-4 py-3 text-center normal-case leading-5">{{ $statement['statement'] }}</th>@endforeach</tr><tr>@foreach($groupStatements as $statement)@foreach($periods as $period)<th class="border border-[#1f4e5c] px-3 py-2 text-center">{{ $period['label'] }}</th>@endforeach@endforeach</tr></thead><tbody class="divide-y divide-gray-200">
                     @php $currentSexGroup = null; @endphp
                     @forelse($enrollments as $enrollment)
                         @php
@@ -60,7 +71,6 @@
         @endforeach
         @if($enrollments->isNotEmpty() && ! $isObservedLocked)<div class="teacher-actions flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-4 py-4 lg:px-6"><button type="submit" class="inline-flex h-10 items-center rounded-lg bg-[#296374] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f4e5c]">Save Progress</button><button type="submit" form="submit-observed-values-form" onclick="return confirm('Submit all observed values? This will lock them for editing.');" class="inline-flex h-10 items-center rounded-lg bg-amber-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">Submit Observed Values</button></div>@endif
     </form>
-    @if(! $isObservedLocked)<form id="bulk-observed-form" method="POST" action="{{ route('teacher.advisory.observed-values.bulk', $section) }}" class="hidden">@csrf</form>@endif
     @if(! $isObservedLocked)<form id="submit-observed-values-form" method="POST" action="{{ route('teacher.advisory.observed-values.submit', $section) }}" class="hidden">@csrf</form>@endif
 </div>
 
@@ -87,7 +97,11 @@
         }
 
         form.addEventListener('change', function (event) { if (event.target.matches('select')) isDirty = true; });
-        form.addEventListener('submit', function () { isDirty = false; });
+        form.addEventListener('submit', function (event) {
+            if (!applyBulkMarkings()) { event.preventDefault(); return; }
+            if (pendingCore) activeInput.value = pendingCore;
+            isDirty = false;
+        });
         window.addEventListener('beforeunload', function (event) {
             if (!isDirty) return;
             event.preventDefault();
@@ -102,7 +116,6 @@
                 modal.classList.remove('hidden'); modal.classList.add('flex');
             });
         });
-        var bulkForm = document.getElementById('bulk-observed-form');
         Array.from(document.querySelectorAll('[data-select-all-core]')).forEach(function (selectAll) {
             selectAll.addEventListener('change', function () {
                 var core = selectAll.dataset.selectAllCore;
@@ -123,40 +136,56 @@
                 }
             });
         });
-        Array.from(document.querySelectorAll('[data-bulk-apply]')).forEach(function (button) {
-            button.addEventListener('click', function () {
-                var core = button.dataset.core;
-                var statement = Array.from(document.querySelectorAll('[data-bulk-statement]')).filter(function (input) { return input.dataset.core === core; }).pop();
-                var marking = Array.from(document.querySelectorAll('[data-bulk-marking]')).filter(function (input) { return input.dataset.core === core; }).pop();
-                var learners = Array.from(document.querySelectorAll('[data-learner-checkbox]')).filter(function (input) {
-                    return input.dataset.core === core && input.checked;
-                });
+        window.showObservedToast = function (message, type) {
+            var container = document.getElementById('observed-values-toasts');
+            var toast = document.createElement('div');
+            toast.className = 'flex items-start gap-3 rounded-lg border bg-white p-4 text-sm font-medium shadow-xl ' + (type === 'error' ? 'border-red-200 text-red-800' : 'border-emerald-200 text-emerald-800');
+            toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+            var text = document.createElement('span');
+            text.textContent = message;
+            var close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'ml-auto shrink-0';
+            close.setAttribute('aria-label', 'Close notification');
+            close.textContent = '\u00d7';
+            close.addEventListener('click', function () { toast.remove(); });
+            toast.append(text, close);
+            container.appendChild(toast);
+            if (type !== 'error') {
+                var timer = setTimeout(function () { toast.remove(); }, 8000);
+                toast.addEventListener('mouseenter', function () { clearTimeout(timer); });
+                toast.addEventListener('focusin', function () { clearTimeout(timer); });
+            }
+        };
 
-                if (!statement.value || !marking.value || learners.length === 0 || !button.dataset.period) {
-                    alert('Select a statement, a marking, and at least one learner.');
-                    return;
+        function applyBulkMarkings() {
+            var updates = [];
+            for (var panel of panels) {
+                var controls = panel.querySelector('[data-bulk-controls]');
+                if (!controls) continue;
+                var statement = controls.querySelector('[data-bulk-statement]').value;
+                var marking = controls.querySelector('[data-bulk-marking]').value;
+                if (!statement && !marking) continue;
+                var learners = Array.from(panel.querySelectorAll('[data-learner-checkbox]:checked'));
+                if (!statement || !marking || !learners.length || !controls.dataset.period) {
+                    modal.classList.add('hidden'); modal.classList.remove('flex');
+                    pendingCore = null;
+                    activateCore(panel.dataset.corePanel);
+                    window.showObservedToast('Select a statement, a marking, and at least one learner for an open grading term.', 'error');
+                    return false;
                 }
-
-                if (!confirm('Apply this marking to the selected learners?')) return;
-
-                bulkForm.querySelectorAll('input[type="hidden"][data-bulk-field]').forEach(function (input) { input.remove(); });
-                [['statement_key', statement.value], ['grading_period', button.dataset.period], ['marking', marking.value]].forEach(function (field) {
-                    var input = document.createElement('input');
-                    input.type = 'hidden'; input.name = field[0]; input.value = field[1]; input.dataset.bulkField = 'true';
-                    bulkForm.appendChild(input);
-                });
                 learners.forEach(function (learner) {
-                    var input = document.createElement('input');
-                    input.type = 'hidden'; input.name = 'enrollment_ids[]'; input.value = learner.value; input.dataset.bulkField = 'true';
-                    bulkForm.appendChild(input);
+                    var name = 'markings[' + learner.value + '][' + statement + '][' + controls.dataset.period + ']';
+                    var input = form.elements.namedItem(name);
+                    if (input && !input.disabled) updates.push({ input: input, marking: marking });
                 });
-                isDirty = false;
-                bulkForm.submit();
-            });
-        });
+            }
+            updates.forEach(function (update) { update.input.value = update.marking; });
+            return true;
+        }
         document.getElementById('stay-on-core').addEventListener('click', function () { modal.classList.add('hidden'); modal.classList.remove('flex'); pendingCore = null; });
         document.getElementById('discard-core-changes').addEventListener('click', function () { isDirty = false; activateCore(pendingCore); modal.classList.add('hidden'); modal.classList.remove('flex'); pendingCore = null; });
-        document.getElementById('save-core-progress').addEventListener('click', function () { if (pendingCore) activeInput.value = pendingCore; isDirty = false; form.submit(); });
+        document.getElementById('save-core-progress').addEventListener('click', function () { form.requestSubmit(); });
     })();
 </script>
 @endsection
