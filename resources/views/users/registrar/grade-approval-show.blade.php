@@ -1,6 +1,6 @@
 @extends('users.registrar.layout')
 
-@section('title', 'Review Grade Submission')
+@section('title', ($status ?? 'submitted') === 'submitted' ? 'Review Grade Submission' : ucfirst($status).' Grade Record')
 
 @section('content')
 @php
@@ -10,11 +10,15 @@
     $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
     $teacherName = $teacher ? trim($teacher->last_name . ', ' . $teacher->first_name . ' ' . $teacher->middle_name) : 'N/A';
     $latestSubmitted = $assignment->grades->max('submitted_at');
-    $isApprovedView = ($status ?? 'submitted') === 'approved';
+    $isReadOnly = ($status ?? 'submitted') !== 'submitted';
+    $recordStatusLabel = ucfirst($status ?? 'submitted');
 @endphp
 
 <div class="mb-6">
-    <h1 class="text-xl font-bold tracking-tight text-gray-700 md:text-2xl">{{ $isApprovedView ? 'Approved Grade Record' : 'Review Grade Submission' }}</h1>
+    <h1 class="text-xl font-bold tracking-tight text-gray-700 md:text-2xl">{{ $isReadOnly ? $recordStatusLabel.' Grade Record' : 'Review Grade Submission' }}</h1>
+    @if (($status ?? '') === 'released')
+    <p class="mt-2 text-sm text-sky-700">These grades have been released by the principal.</p>
+    @endif
 </div>
 
 @if (session('status'))
@@ -43,7 +47,7 @@
         <dl class="divide-y divide-slate-100 px-6">
             <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">Subject</dt><dd class="text-right text-sm font-semibold text-[#296374]">{{ $subjectLabel }}</dd></div>
             <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">Grade Level</dt><dd class="text-sm font-semibold text-[#296374]">{{ $section?->gradeLevel?->grade_label ?? ($section?->grade_level ? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level)) : 'N/A') }}</dd></div>
-            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">{{ $isApprovedView ? 'Approved Records' : 'Submitted Records' }}</dt><dd class="text-sm font-semibold text-[#296374]">{{ $assignment->grades->count() }}</dd></div>
+            <div class="flex items-center justify-between gap-4 py-3"><dt class="text-sm text-slate-500">{{ $recordStatusLabel }} Records</dt><dd class="text-sm font-semibold text-[#296374]">{{ $assignment->grades->count() }}</dd></div>
         </dl>
     </div>
 </section>
@@ -87,7 +91,7 @@
             </tbody>
         </table>
     </div>
-    @if(! $isApprovedView)
+    @if(! $isReadOnly)
         <div class="flex flex-col justify-end gap-2 border-t border-gray-200 bg-slate-50 px-6 py-5 sm:flex-row">
             <form action="{{ route('registrar.grade-approvals.approve', $assignment) }}" method="POST">
                 @csrf
@@ -102,7 +106,7 @@
     @endif
 </div>
 
-@if (! $isApprovedView)
+@if (! $isReadOnly)
     <div id="gradeReturnModal" class="fixed inset-0 z-[130] hidden items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true" aria-labelledby="gradeReturnModalTitle">
         <form action="{{ route('registrar.grade-approvals.reject', $assignment) }}" method="POST" class="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl">
             @csrf

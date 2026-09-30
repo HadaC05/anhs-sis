@@ -48,6 +48,30 @@ connection and data; do not create a replacement just to enable imports.
 Set `APP_URL` and `ASSET_URL` to the public website URL. Do not commit `.env` or
 replace an existing `APP_KEY`. The startup script applies migrations automatically.
 
+## Registrar grade submission notifications
+
+The Docker Supervisor configuration also starts `php artisan schedule:work`
+after migrations. Check the deployment logs for `scheduler` entering the
+`RUNNING` state. No separate queue worker is needed for these in-app digests.
+
+`registrar:grade-digest` checks each minute and sends at most one notification
+per active registrar every two hours, weekdays from 08:00 up to 18:00 in
+`Asia/Manila`. Each class subject and grading term counts once per digest,
+regardless of the number of student grades. Empty digests and submissions
+already reviewed or unlocked are skipped. Clicking the alert opens submitted
+grades across all school years and terms.
+
+Pending submissions and the last delivery time are stored in the database.
+Overnight/weekend submissions wait for the next work window. If the service is
+stopped or asleep, delivery resumes when the scheduler is running within that
+window; it does not discard submissions because a scheduled check was missed.
+Existing grades are not backfilled into notifications when this feature deploys.
+
+For a non-Docker host, run Laravel's scheduler continuously or invoke
+`php artisan schedule:run` once per minute from cron/Task Scheduler after
+applying migrations. `php artisan registrar:grade-digest` can also run a check
+manually; it respects the same delivery interval and working hours.
+
 ## Free-plan limits
 
 The queue worker shares the web service's CPU and memory and runs only while the

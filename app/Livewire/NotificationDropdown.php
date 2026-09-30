@@ -12,6 +12,8 @@ use Livewire\Component;
 
 class NotificationDropdown extends Component
 {
+    public bool $autoRefresh = false;
+
     public function markAsSeen(): void
     {
         $this->notificationQuery()?->whereNull('seen_at')->update(['seen_at' => now()]);

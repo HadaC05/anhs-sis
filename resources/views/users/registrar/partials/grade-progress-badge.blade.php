@@ -2,6 +2,9 @@
     $label = $label ?? 'Ungraded';
     $classes = match ($label) {
         'Submitted' => 'bg-violet-100 text-violet-700',
+        'Partially submitted' => 'bg-sky-100 text-sky-700',
+        'No active term' => 'bg-orange-100 text-orange-800',
+        'Ungraded' => 'bg-gray-100 text-gray-600',
         'Approved' => 'bg-emerald-100 text-emerald-700',
         'Released' => 'bg-slate-200 text-slate-700',
         'Rejected' => 'bg-rose-100 text-rose-700',

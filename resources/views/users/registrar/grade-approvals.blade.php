@@ -23,7 +23,7 @@
     'principalFilters' => false,
     'filterRoute' => route('registrar.grade-approvals'),
     'filterValues' => $filters,
-    'statusOptions' => ['' => 'All statuses', 'submitted' => 'Submitted', 'approved' => 'Approved'],
+    'statusOptions' => ['' => 'All statuses', 'submitted' => 'Submitted', 'approved' => 'Approved', 'released' => 'Released'],
 ])
 
 <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -39,10 +39,15 @@
                         $subject = $assignment->curriculumSubject?->subject;
                         $teacher = $assignment->staff;
                         $grades = $assignment->grades ?? collect();
-                        $rowStatus = $grades->contains('status', 'submitted') ? 'submitted' : 'approved';
+                        $rowStatus = $grades->contains('status', 'submitted') ? 'submitted' : ($grades->contains('status', 'approved') ? 'approved' : 'released');
+                        $statusClasses = match ($rowStatus) {
+                            'submitted' => 'bg-amber-100 text-amber-800',
+                            'approved' => 'bg-emerald-100 text-emerald-800',
+                            'released' => 'bg-sky-100 text-sky-800',
+                        };
                         $teacherName = $teacher ? ($teacher->last_name . ', ' . $teacher->first_name) : '—';
                         $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : '—';
-                        $reviewUrl = $rowStatus === 'approved' ? route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => 'approved']) : route('registrar.grade-approvals.show', $assignment);
+                        $reviewUrl = route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => $rowStatus]);
                     @endphp
                     <tr class="transition-colors odd:bg-white even:bg-slate-50/70 hover:bg-[#eaf3f5]">
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td>
@@ -50,7 +55,7 @@
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $subjectLabel }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $teacherName }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $grades->count() }}</td>
-                        <td class="px-6 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $rowStatus === 'submitted' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">{{ ucfirst($rowStatus) }}</span></td>
+                        <td class="px-6 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $statusClasses }}">{{ ucfirst($rowStatus) }}</span></td>
                         <td class="px-6 py-4 text-right"><a href="{{ $reviewUrl }}" class="inline-flex items-center rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">{{ $rowStatus === 'submitted' ? 'Review' : 'View' }}</a></td>
                     </tr>
                 @empty

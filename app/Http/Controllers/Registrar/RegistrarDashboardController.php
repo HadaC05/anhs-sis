@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Registrar;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\Cluster;
+use App\Models\DocumentType;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
@@ -14,14 +15,15 @@ use App\Models\GradingTerm;
 use App\Models\LearnerType;
 use App\Models\Section;
 use App\Models\Student;
+use App\Models\StudentDocument;
 use App\Models\StudentObservedValue;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
-use App\Support\EnrollmentDashboardData;
 use App\Support\GradeRecordPeriodFilters;
 use App\Support\LearnerPermanentRecordBuilder;
+use App\Support\RegistrarDashboardData;
 use App\Support\SectionGradeSubmissionProgress;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
@@ -29,14 +31,16 @@ use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RegistrarDashboardController extends Controller
 {
     public function index(Request $request): View
     {
-        return view('users.registrar.dashboard', EnrollmentDashboardData::forRequest($request));
+        return view('users.registrar.dashboard', RegistrarDashboardData::forRequest($request));
     }
 
     public function students(Request $request): View
@@ -57,13 +61,16 @@ class RegistrarDashboardController extends Controller
 
         $students = Enrollment::query()
             ->with([
-                'student.application',
+                'student' => fn ($query) => $query->with('application')->withCount([
+                    'documents as supporting_documents_count' => fn ($documents) => $documents->where('doc_type', '!=', DocumentType::ID_PHOTO),
+                ]),
                 'section.gradeLevel',
                 'gradeLevel',
                 'cluster',
                 'academicYear',
                 'enrollmentStatus',
                 'learnerType',
+                'placementStatus',
             ])
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->when($academicYearId !== '' && $academicYearId !== 'all', function ($query) use ($academicYearId): void {
@@ -115,20 +122,26 @@ class RegistrarDashboardController extends Controller
         ]);
     }
 
-    public function show(\App\Models\Student $student): \Illuminate\View\View
+    public function show(Request $request, Student $student): View
     {
+        $request->validate(['enrollment_id' => ['nullable', 'integer']]);
         $student->load([
             'user',
             'application',
             'profile',
             'guardians',
             'addresses',
-            'documents',
+            'documents' => fn ($query) => $query->with(['documentType', 'documentStatus', 'returnReason'])
+                ->where('doc_type', '!=', DocumentType::ID_PHOTO)->latest('date_uploaded'),
             'enrollments' => function ($query) {
                 $query->with([
                     'academicYear',
                     'section',
                     'cluster',
+                    'preferredCourse',
+                    'gradeLevel',
+                    'learnerType',
+                    'placementStatus',
                     'grades.assignment.curriculumSubject.subject',
                     'grades.assignment.staff',
                     'enrollmentStatus',
@@ -136,8 +149,29 @@ class RegistrarDashboardController extends Controller
             },
         ]);
 
+        $enrollment = $request->filled('enrollment_id')
+            ? $student->enrollments->firstWhere('enrollment_ID', $request->integer('enrollment_id'))
+            : ($student->enrollments->firstWhere('SY_ID', AcademicYear::query()->where('status', true)->value('SY_ID')) ?? $student->enrollments->first());
+        abort_if($request->filled('enrollment_id') && ! $enrollment, 404);
+
         return view('users.registrar.students-show', [
             'student' => $student,
+            'enrollment' => $enrollment,
+        ]);
+    }
+
+    public function viewDocument(Student $student, StudentDocument $document): StreamedResponse|RedirectResponse
+    {
+        abort_unless((int) $document->student_ID === (int) $student->id, 404);
+
+        if (! $document->file_path || ! Storage::disk('public')->exists($document->file_path)) {
+            return redirect()->route('registrar.students.show', $student)
+                ->withErrors(['document' => 'Document file was not found.']);
+        }
+
+        return Storage::disk('public')->response($document->file_path, null, [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -249,7 +283,7 @@ class RegistrarDashboardController extends Controller
 
     private function gradeApprovalAssignments(?string $status = null, ?int $subjectId = null, ?int $gradeId = null, ?int $academicYearId = null, string $search = '', ?array $termIds = null, ?string $semester = null)
     {
-        $statuses = [GradeStatus::SUBMITTED, GradeStatus::APPROVED];
+        $statuses = [GradeStatus::SUBMITTED, GradeStatus::APPROVED, GradeStatus::RELEASED];
         $status = in_array($status, $statuses, true) ? $status : null;
 
         return TeacherSubjectAssignment::query()
@@ -292,7 +326,9 @@ class RegistrarDashboardController extends Controller
 
     public function showGradeApproval(Request $request, TeacherSubjectAssignment $assignment): View
     {
-        $status = $request->string('status')->toString() === 'approved' ? 'approved' : 'submitted';
+        $status = $request->string('status')->toString();
+        $status = in_array($status, [GradeStatus::APPROVED, GradeStatus::RELEASED], true)
+            ? $status : GradeStatus::SUBMITTED;
 
         $assignment->load([
             'section.gradeLevel',

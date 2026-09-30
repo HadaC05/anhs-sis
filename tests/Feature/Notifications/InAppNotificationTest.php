@@ -289,6 +289,37 @@ test('grade releases default to all statuses and support status filters', functi
         ->assertSessionHasErrors('status');
 });
 
+test('registrar grade approvals include released records and filter all supported statuses', function () {
+    ['registrar' => $registrar, 'assignment' => $released] = createInAppNotificationGradeAssignment(GradeStatus::RELEASED);
+    ['assignment' => $approved] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    ['assignment' => $submitted] = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
+    ['assignment' => $draft] = createInAppNotificationGradeAssignment(GradeStatus::DRAFT);
+    $filters = ['academic_year_id' => '', 'term_id' => ''];
+
+    $this->actingAs($registrar)->get(route('registrar.grade-approvals', $filters))->assertOk()
+        ->assertSee('value="released"', false)
+        ->assertViewHas('assignments', fn ($rows) => $rows->count() === 3 && ! $rows->contains($draft));
+
+    foreach (['submitted' => $submitted, 'approved' => $approved, 'released' => $released] as $status => $assignment) {
+        $this->get(route('registrar.grade-approvals', $filters + ['status' => $status]))->assertOk()
+            ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [$assignment->assignment_ID])
+            ->assertSee(route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => $status]));
+    }
+});
+
+test('registrar can view released grades without approval or return actions', function () {
+    ['registrar' => $registrar, 'assignment' => $assignment] = createInAppNotificationGradeAssignment(GradeStatus::RELEASED);
+    $this->actingAs($registrar)->get(route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => 'released']))
+        ->assertOk()->assertViewHas('status', 'released')
+        ->assertSee('Released Grade Record')->assertSee('Released Records')
+        ->assertSee('These grades have been released by the principal.')
+        ->assertSee('90.00')->assertDontSee('Approve Grades')->assertDontSee('Return to Teacher')
+        ->assertDontSee('id="gradeReturnModal"', false);
+
+    $this->post(route('registrar.grade-approvals.approve', $assignment))->assertRedirect();
+    expect($assignment->grades()->first()->status)->toBe(GradeStatus::RELEASED);
+});
+
 test('grade filters include curriculum grade mappings in both staff portals', function (string $portal, string $page) {
     $fixtures = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
     $subject = $fixtures['assignment']->curriculumSubject->subject;

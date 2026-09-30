@@ -26,6 +26,7 @@ use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
+use App\Support\RegistrarGradeDigest;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
 use App\Support\StudentCredentials;
@@ -1382,22 +1383,34 @@ class TeacherSectionController extends Controller
      */
     private function submitSavedGrades(TeacherSubjectAssignment $assignment, array $enrollmentIds, array $periodKeys): int
     {
-        return StudentSubjectGrade::query()
-            ->where('assignment_ID', $assignment->assignment_ID)
-            ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollmentIds))
-            ->whereIn('term_ID', array_map(StudentSubjectGrade::termIdForPeriodKey(...), $periodKeys))
-            ->whereStatus(GradeStatus::teacherEditableSlugs())
-            ->where(function ($query): void {
-                $query->whereNotNull('numeric_grade')
-                    ->orWhereNotNull('remarks');
-            })
-            ->update([
+        return DB::transaction(function () use ($assignment, $enrollmentIds, $periodKeys): int {
+            $grades = StudentSubjectGrade::query()
+                ->where('assignment_ID', $assignment->assignment_ID)
+                ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollmentIds))
+                ->whereIn('term_ID', array_map(StudentSubjectGrade::termIdForPeriodKey(...), $periodKeys))
+                ->whereStatus(GradeStatus::teacherEditableSlugs())
+                ->where(function ($query): void {
+                    $query->whereNotNull('numeric_grade')
+                        ->orWhereNotNull('remarks');
+                })
+                ->orderBy('grade_ID')->lockForUpdate()->get(['grade_ID', 'term_ID']);
+
+            if ($grades->isEmpty()) {
+                return 0;
+            }
+
+            $updated = StudentSubjectGrade::query()->whereKey($grades->pluck('grade_ID'))->update([
                 'grade_status_ID' => GradeStatus::idFor(GradeStatus::SUBMITTED),
                 'submitted_at' => now(),
                 'reviewed_by' => null,
                 'reviewed_at' => null,
                 'grade_return_reason_ID' => null,
             ]);
+
+            RegistrarGradeDigest::record($assignment->assignment_ID, $grades->pluck('term_ID')->unique()->sort());
+
+            return $updated;
+        });
     }
 
     public function summaryPrint(Request $request, TeacherSubjectAssignment $assignment): View

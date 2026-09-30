@@ -189,6 +189,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/registrar/students/{student}', [RegistrarDashboardController::class, 'show'])
         ->middleware('registrar')
         ->name('registrar.students.show');
+    Route::get('/registrar/students/{student}/documents/{document}/view', [RegistrarDashboardController::class, 'viewDocument'])
+        ->middleware('registrar')
+        ->name('registrar.students.documents.view');
     Route::get('/registrar/students/{student}/enrollments/{enrollment}/sf9', [RegistrarDashboardController::class, 'studentSf9'])
         ->middleware('registrar')
         ->name('registrar.students.sf9');

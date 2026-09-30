@@ -1,4 +1,5 @@
 <div
+    @if ($autoRefresh) wire:poll.60s @endif
     x-data="{ open: false }"
     @keydown.escape.window="open = false"
     class="relative"

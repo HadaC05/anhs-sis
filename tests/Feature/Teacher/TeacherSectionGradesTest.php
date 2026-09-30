@@ -402,3 +402,134 @@ it('rejects invalid teacher grade values', function (mixed $grade) {
     'negative' => -1,
     'over one hundred decimal' => 100.01,
 ]);
+
+function createGradeDigestRegistrar(string $username = 'digest.registrar', string $status = 'active'): Staff
+{
+    return Staff::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'registrar'])->id,
+        'username' => $username, 'password' => Hash::make('password'),
+        'first_name' => 'Digest', 'last_name' => 'Registrar', 'status' => $status,
+    ]);
+}
+
+function createPendingDigestGrades(TeacherSubjectAssignment $assignment, Enrollment $enrollment, int $terms = 1): void
+{
+    $roster = \App\Models\StudentSubject::query()->firstOrCreate([
+        'enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
+    for ($term = 1; $term <= $terms; $term++) {
+        $termId = StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_'.$term);
+        StudentSubjectGrade::query()->create([
+            'student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $assignment->assignment_ID,
+            'term_ID' => $termId, 'numeric_grade' => 90, 'status' => 'submitted', 'submitted_at' => now(),
+            'posted_by' => $assignment->staff_ID,
+        ]);
+        \App\Support\RegistrarGradeDigest::record($assignment->assignment_ID, [$termId]);
+    }
+}
+
+test('registrar digest groups subject terms and sends only one alert to each active registrar', function () {
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-30 10:00:00', 'Asia/Manila'));
+    \Illuminate\Support\Facades\DB::table('registrar_grade_digest_state')->update(['last_sent_at' => now()->subHours(2)]);
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $registrar = createGradeDigestRegistrar();
+    $otherRegistrar = createGradeDigestRegistrar('digest.other');
+    $inactive = createGradeDigestRegistrar('digest.inactive', 'inactive');
+    createPendingDigestGrades($assignment, $enrollment, 3);
+    $anotherStudent = Student::query()->create(['lrn' => '987654321012', 'first_name' => 'Other', 'last_name' => 'Student', 'status' => 'active']);
+    $anotherEnrollment = $enrollment->replicate();
+    $anotherEnrollment->student_ID = $anotherStudent->id;
+    $anotherEnrollment->save();
+    createPendingDigestGrades($assignment, $anotherEnrollment, 3);
+
+    $this->artisan('registrar:grade-digest')->assertSuccessful();
+    foreach ([$registrar, $otherRegistrar] as $recipient) {
+        expect($recipient->notifications()->count())->toBe(1);
+        $data = $recipient->notifications()->first()->data;
+        expect($data['submission_count'])->toBe(3)
+            ->and($data['message'])->toBe('There are 3 new grade submissions awaiting review.');
+        $this->actingAs($recipient)->get($data['url'])->assertOk();
+    }
+    expect($inactive->notifications()->count())->toBe(0)
+        ->and($teacher->notifications()->count())->toBe(0);
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    expect($registrar->notifications()->count())->toBe(1);
+    $this->actingAs($registrar)->get(route('registrar.dashboard'))->assertOk()
+        ->assertSee('data-test="notification-bell"', false)->assertSee('There are 3 new grade submissions awaiting review.');
+});
+
+test('registrar digest waits two hours and retains overnight and weekend submissions', function () {
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-02 16:00:00', 'Asia/Manila'));
+    \Illuminate\Support\Facades\DB::table('registrar_grade_digest_state')->update(['last_sent_at' => now()]);
+    ['assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $registrar = createGradeDigestRegistrar();
+    createPendingDigestGrades($assignment, $enrollment);
+    $this->travel(119)->minutes();
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    $this->travel(1)->minutes();
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-03 10:00:00', 'Asia/Manila'));
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-05 08:00:00', 'Asia/Manila'));
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(1);
+    expect($registrar->notifications()->first()->data['message'])->toBe('There is 1 new grade submission awaiting review.');
+    \App\Support\RegistrarGradeDigest::record($assignment->assignment_ID, [StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_1')]);
+    $this->travel(119)->minutes();
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    $this->travel(1)->minutes();
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(1);
+    expect($registrar->notifications()->count())->toBe(2);
+});
+
+test('registrar digest skips reviewed grades and empty digests but preserves work when no registrar is active', function () {
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-30 10:00:00', 'Asia/Manila'));
+    \Illuminate\Support\Facades\DB::table('registrar_grade_digest_state')->update(['last_sent_at' => now()->subHours(2)]);
+    ['assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    createPendingDigestGrades($assignment, $enrollment);
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    $this->assertDatabaseCount('pending_grade_submissions', 1);
+    $registrar = createGradeDigestRegistrar();
+    StudentSubjectGrade::query()->update(['grade_status_ID' => GradeStatus::idFor('approved')]);
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    $this->assertDatabaseCount('pending_grade_submissions', 0);
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
+    expect($registrar->notifications()->count())->toBe(0);
+});
+
+test('teacher grade submission records one pending digest item and retries do not duplicate it', function (bool $saveAndSubmit) {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    GradingTermSetting::current()->setSeniorHighPeriod('first', 1);
+    $assignment->curriculumSubject->curriculumGradeLevel->update(['semester_ID' => \App\Models\GradingSemester::idFor('first')]);
+    $registrar = createGradeDigestRegistrar();
+    $payload = ['grades' => [$enrollment->enrollment_ID => ['shs_sem1_term_1' => ['grade' => 90]]]];
+    $this->actingAs($teacher)->post(route('teacher.sections.grades.store', $assignment), $payload)->assertSessionHasNoErrors();
+    $this->assertDatabaseCount('pending_grade_submissions', 0);
+    $submitUrl = route($saveAndSubmit ? 'teacher.sections.grades.store' : 'teacher.sections.grades.submit', $assignment);
+    $this->post($submitUrl, $saveAndSubmit ? $payload + ['submit' => true] : [])->assertSessionHasNoErrors();
+    $this->assertDatabaseCount('pending_grade_submissions', 1);
+    $this->assertDatabaseHas('pending_grade_submissions', ['assignment_ID' => $assignment->assignment_ID, 'term_ID' => StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_1')]);
+    expect($registrar->notifications()->count())->toBe(0);
+    $this->post(route('teacher.sections.grades.submit', $assignment));
+    $this->assertDatabaseCount('pending_grade_submissions', 1);
+})->with([false, true]);
+
+test('registrar digest retries without partial delivery when notification persistence fails', function () {
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-30 10:00:00', 'Asia/Manila'));
+    \Illuminate\Support\Facades\DB::table('registrar_grade_digest_state')->update(['last_sent_at' => now()->subHours(2)]);
+    ['assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $registrar = createGradeDigestRegistrar();
+    createPendingDigestGrades($assignment, $enrollment);
+    \Illuminate\Support\Facades\Event::listen(\Illuminate\Notifications\Events\NotificationSent::class, function () {
+        throw new RuntimeException('Simulated interrupted delivery');
+    });
+    try {
+        expect(fn () => \App\Support\RegistrarGradeDigest::sendWhenDue())->toThrow(RuntimeException::class);
+        expect($registrar->notifications()->count())->toBe(0);
+        $this->assertDatabaseCount('pending_grade_submissions', 1);
+    } finally {
+        \Illuminate\Support\Facades\Event::forget(\Illuminate\Notifications\Events\NotificationSent::class);
+    }
+    expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(1);
+    expect($registrar->notifications()->count())->toBe(1);
+    $this->assertDatabaseCount('pending_grade_submissions', 0);
+});

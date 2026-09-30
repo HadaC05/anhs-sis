@@ -142,7 +142,7 @@
         </aside>
 
         <main class="app-main min-w-0 flex-1 relative">
-            <div class="teacher-content max-w-7xl mx-auto py-6 px-4 sm:py-8 lg:py-12 lg:px-8">
+            <div class="teacher-content w-full @yield('content-width', 'max-w-7xl') mx-auto py-6 px-4 sm:py-8 lg:py-12 lg:px-8">
                 @yield('content')
             </div>
         </main>

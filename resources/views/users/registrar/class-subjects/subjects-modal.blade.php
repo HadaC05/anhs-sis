@@ -27,7 +27,6 @@
                 <td class="px-4 py-4">{{ $teacher ? trim($teacher->last_name.', '.$teacher->first_name) : 'Unassigned' }}</td>
                 <td class="px-4 py-4">
                     @include('users.registrar.partials.grade-progress-badge', ['label' => $submissionLabel])
-                    <p class="mt-2 text-xs text-gray-500">{{ $activeTerm['label'] ?? 'Outside the active grading period' }}</p>
                 </td>
                 <td class="px-4 py-4 font-semibold tabular-nums">{{ number_format($studentsCount) }}</td>
                 <td class="px-4 py-4 font-semibold tabular-nums text-[#296374]">{{ number_format($submittedCount) }}</td>

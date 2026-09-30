@@ -126,6 +126,7 @@
                     <th class="border-r border-gray-200 px-5 py-4">LRN</th>
                     <th class="border-r border-gray-200 px-5 py-4">Status</th>
                     <th class="border-r border-gray-200 px-5 py-4">Enrolled</th>
+                    <th class="border-r border-gray-200 px-5 py-4">Documents</th>
                     <th class="px-5 py-4 text-right">Actions</th>
                 </tr>
             </thead>
@@ -145,10 +146,14 @@
                             'temporarily_enrolled' => 'bg-blue-50 text-blue-700 ring-blue-200',
                             default => 'bg-gray-100 text-gray-700 ring-gray-200',
                         };
+                        $studentUrl = $student ? route('registrar.students.show', ['student' => $student, 'enrollment_id' => $enrollment->enrollment_ID]) : null;
                     @endphp
                     <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                         <td class="border-r border-gray-100 px-5 py-4">
                             <p class="font-semibold text-gray-900">{{ $name }}</p>
+                            @if ($enrollment->hasPlacementStatusMark())
+                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 {{ \App\Models\PlacementStatus::badgeClasses($enrollment->placement_status) }}">{{ $enrollment->placement_status_label }}</span>
+                            @endif
                             @if ($enrollment->learner_type && $enrollment->learner_type !== \App\Models\LearnerType::REGULAR)
                                 <p class="mt-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">{{ $enrollment->learner_type_label }}</p>
                             @endif
@@ -170,10 +175,15 @@
                             </span>
                         </td>
                         <td class="border-r border-gray-100 px-5 py-4 font-medium text-gray-700">{{ $enrollment->created_at?->format('M d, Y') ?? '-' }}</td>
+                        <td class="border-r border-gray-100 px-5 py-4">
+                            @if ($student)
+                            <a href="{{ $studentUrl }}#detail-documents" class="whitespace-nowrap text-xs font-semibold text-[#296374] hover:underline" aria-label="View documents for {{ $name }}">{{ $student->supporting_documents_count }} uploaded</a>
+                            @endif
+                        </td>
                         <td class="px-5 py-4">
                             @if ($student)
                                 <div class="flex justify-end gap-1.5">
-                                    <a href="{{ route('registrar.students.show', $student) }}" title="View student record" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                    <a href="{{ $studentUrl }}" title="View student record" aria-label="View student record for {{ $name }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.46 12C3.73 7.94 7.52 5 12 5s8.27 2.94 9.54 7c-1.27 4.06-5.06 7-9.54 7S3.73 16.06 2.46 12z"></path></svg>
                                     </a>
                                 </div>
@@ -184,7 +194,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-16 text-center">
+                        <td colspan="8" class="px-6 py-16 text-center">
                             <div class="mx-auto flex max-w-sm flex-col items-center gap-3 text-gray-500">
                                 <div class="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
                                     <svg class="h-7 w-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

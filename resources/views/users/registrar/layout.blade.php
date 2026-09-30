@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     @include('users.partials.sidebar-behavior')
     @include('users.registrar.partials.responsive')
+    @livewireStyles
     <style>
         .sidebar-link {
             display: flex;
@@ -76,6 +77,7 @@
             </div>
 
             <nav class="flex items-center flex-wrap justify-center gap-4 sm:gap-6 sm:pr-6">
+                <livewire:notification-dropdown :auto-refresh="true" />
                 @include('users.partials.staff-profile-menu')
             </nav>
         </div>
@@ -141,6 +143,7 @@
     </div>
 
     <x-idle-session-timeout />
+    @livewireScripts
 </body>
 
 </html>
