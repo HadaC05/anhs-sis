@@ -116,6 +116,29 @@ test('registrar can view class subjects index', function () {
     $response->assertSee(route('registrar.classes.subjects', $section));
 });
 
+test('registrar class subjects quotes roster counts for PostgreSQL', function () {
+    ['registrar' => $registrar] = createRegistrarClassSubjectFixtures();
+    $connection = (new TeacherSubjectAssignment)->getConnection();
+    $originalGrammar = $connection->getQueryGrammar();
+    $connection->setQueryGrammar(new \Illuminate\Database\Query\Grammars\PostgresGrammar($connection));
+    $connection->enableQueryLog();
+
+    try {
+        $this->actingAs($registrar)->get(route('registrar.class-subjects.index'))->assertOk();
+
+        $countQueries = collect($connection->getQueryLog())->pluck('query')
+            ->filter(fn (string $sql) => str_contains($sql, 'COUNT(DISTINCT'));
+        expect($countQueries)->toHaveCount(2);
+        foreach ($countQueries as $sql) {
+            expect($sql)->toContain('COUNT(DISTINCT "roster"."student_subject_ID") as total');
+        }
+    } finally {
+        $connection->setQueryGrammar($originalGrammar);
+        $connection->disableQueryLog();
+        $connection->flushQueryLog();
+    }
+});
+
 test('registrar can view subject and grade status for an advisory class', function () {
     ['registrar' => $registrar, 'teacher' => $teacher, 'section' => $section, 'subject' => $subject] = createRegistrarClassSubjectFixtures();
 

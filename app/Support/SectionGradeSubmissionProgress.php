@@ -33,9 +33,11 @@ class SectionGradeSubmissionProgress
             ->whereIn('assignments.assignment_ID', $assignments->pluck('assignment_ID'))
             ->whereIn('enrollments.enrollment_status_ID', EnrollmentStatus::activeIds());
 
+        $studentSubjectColumn = $roster->getGrammar()->wrap('roster.student_subject_ID');
+
         $rosterCounts = (clone $roster)
             ->select('assignments.assignment_ID')
-            ->selectRaw('COUNT(DISTINCT roster.student_subject_ID) as total')
+            ->selectRaw("COUNT(DISTINCT {$studentSubjectColumn}) as total")
             ->groupBy('assignments.assignment_ID')
             ->pluck('total', 'assignment_ID');
 
@@ -46,7 +48,7 @@ class SectionGradeSubmissionProgress
             })
             ->whereIn('grades.grade_status_ID', GradeStatus::idsFor(GradeStatus::teacherLockedSlugs()))
             ->select('assignments.assignment_ID', 'grades.term_ID')
-            ->selectRaw('COUNT(DISTINCT roster.student_subject_ID) as total')
+            ->selectRaw("COUNT(DISTINCT {$studentSubjectColumn}) as total")
             ->groupBy('assignments.assignment_ID', 'grades.term_ID')
             ->get()->groupBy('assignment_ID');
 
