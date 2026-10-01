@@ -294,6 +294,9 @@
                                     <div class="border-t border-cyan-100 bg-white px-5 py-4">
                                         <div class="mb-3 flex items-center justify-between gap-3">
                                             <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Assigned Subjects</p>
+                                            @if ($item->gradeLevel?->category === 'Junior High School')
+                                            <a href="{{ route($managementRoutePrefix.'curriculum-config.mapeh.edit', $item) }}" class="ml-auto rounded-lg border border-[#296374]/30 px-3 py-1.5 text-xs font-bold text-[#296374]">Configure MAPEH</a>
+                                            @endif
                                             <button type="button" data-assignments='@json($assignedSubjectsPayload)' data-curriculum-name="{{ $item->name }}" onclick="event.stopPropagation(); openCurriculumSubjectModal(null, {{ $item->curriculum_ID }}, JSON.parse(this.dataset.assignments), this.dataset.curriculumName);" class="relative z-10 rounded-lg border border-[#296374]/30 bg-white px-3 py-1.5 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/5">Edit</button>
                                         </div>
                                         <div class="grid gap-2 md:grid-cols-2">

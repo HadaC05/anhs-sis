@@ -111,6 +111,9 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
         </div>
 
         <div data-grade-panel="input">
+            @if (\App\Support\MapehGrades::isComputed($assignment))
+            <div class="border-b border-gray-200 bg-cyan-50 px-6 py-3 text-sm text-[#296374]">MAPEH is now calculated from the configured component subjects. Enter or import grades through each component's grade sheet. Existing standalone records below are retained for reference; the combined results appear in the advisory grade summary and reports.</div>
+            @endif
             @if (! $canEditCurrentTerm)
             <div class="border-b border-gray-200 bg-slate-50 px-6 py-3 text-sm text-slate-700">
                 This grade sheet is locked for the current term. The values below are read-only.

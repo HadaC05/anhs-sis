@@ -293,6 +293,7 @@ class CurriculumConfigurationController extends Controller
 
     public function updateCurriculumSubject(StoreCurriculumSubjectRequest $request, CurriculumSubject $curriculumSubject): RedirectResponse
     {
+        $this->protectMapehSubject($curriculumSubject);
         $validated = $request->validated();
         $validated['subject_ID'] = $validated['subject_ID'][0];
 
@@ -303,8 +304,17 @@ class CurriculumConfigurationController extends Controller
 
     public function destroyCurriculumSubject(CurriculumSubject $curriculumSubject): RedirectResponse
     {
+        $this->protectMapehSubject($curriculumSubject);
         $curriculumSubject->delete();
 
         return back()->with('success', 'Curriculum subject removed successfully.');
+    }
+
+    private function protectMapehSubject(CurriculumSubject $subject): void
+    {
+        if (\App\Models\MapehConfiguration::where('parent_curr_subj_ID', $subject->curr_subj_ID)->exists()
+            || \App\Models\MapehComponent::where('curr_subj_ID', $subject->curr_subj_ID)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['subject_ID' => 'This subject is part of a saved MAPEH configuration. Keep its curriculum mapping to preserve school-year records.']);
+        }
     }
 }

@@ -113,6 +113,10 @@ Route::patch('/curriculum-configuration/{curriculum}/toggle-status', [Curriculum
     ->name('curriculum-config.toggle-status');
 Route::post('/curriculum-configuration/subjects', [CurriculumConfigurationController::class, 'storeCurriculumSubject'])
     ->name('curriculum-config.subjects.store');
+Route::get('/curriculum-configuration/{curriculum}/mapeh', [\App\Http\Controllers\Admin\MapehConfigurationController::class, 'edit'])
+    ->name('curriculum-config.mapeh.edit');
+Route::post('/curriculum-configuration/{curriculum}/mapeh', [\App\Http\Controllers\Admin\MapehConfigurationController::class, 'store'])
+    ->name('curriculum-config.mapeh.store');
 Route::put('/curriculum-configuration/subjects/{curriculumSubject}', [CurriculumConfigurationController::class, 'updateCurriculumSubject'])
     ->name('curriculum-config.subjects.update');
 Route::delete('/curriculum-configuration/subjects/{curriculumSubject}', [CurriculumConfigurationController::class, 'destroyCurriculumSubject'])

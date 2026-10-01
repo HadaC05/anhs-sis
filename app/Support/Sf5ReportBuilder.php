@@ -41,7 +41,7 @@ class Sf5ReportBuilder
         $grades = StudentSubjectGrade::query()->with(['studentSubject.enrollment.gradingSemester', 'term'])
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
-            ->where('grade_status_ID', GradeStatus::idFor(GradeStatus::RELEASED))->get()
+            ->get()
             ->groupBy(fn ($grade) => $grade->studentSubject->enrollment_ID);
 
         return $enrollments->map(function (Enrollment $enrollment) use ($section, $assignments, $grades, $periodsBySemester): array {
@@ -49,12 +49,22 @@ class Sf5ReportBuilder
             $byAssignment = $grades->get($enrollment->enrollment_ID, collect())->groupBy('assignment_ID');
             $subjectIds = $enrollment->studentSubjects->pluck('curr_subj_ID');
             $learnerAssignments = $assignments->whereIn('curr_subj_ID', $subjectIds);
+            $mapeh = \App\Models\MapehConfiguration::forSection($section);
+            if ($mapeh) {
+                $learnerAssignments = MapehGrades::assignments($section, $learnerAssignments);
+                $byAssignment = MapehGrades::grades($learnerAssignments, $byAssignment->map(fn ($items) => $items->keyBy('grading_period')),
+                    array_column(GradingTerm::configuredPeriods(), 'key'), true);
+                $subjectIds = $subjectIds->reject(fn ($id) => (int) $id === (int) $mapeh->parent_curr_subj_ID || in_array($id, $mapeh->inactiveComponentIds()));
+            }
             $finals = [];
             $complete = $subjectIds->isNotEmpty() && $subjectIds->diff($learnerAssignments->pluck('curr_subj_ID'))->isEmpty();
             foreach ($learnerAssignments as $assignment) {
+                if ($assignment->mapeh_component) {
+                    continue;
+                }
                 $key = GradingTerm::isSeniorHighSection($section) ? ($assignment->curriculumSubject?->semester ?? '') : 'jhs';
-                $periods = $periodsBySemester[$key];
-                $byPeriod = $byAssignment->get($assignment->assignment_ID, collect())->keyBy('grading_period');
+                $periods = $periodsBySemester[$key] ?? GradingTerm::configuredPeriods();
+                $byPeriod = $byAssignment->get($assignment->assignment_ID, collect())->filter(fn ($grade) => $grade->status === GradeStatus::RELEASED)->keyBy('grading_period');
                 $values = collect($periods)->map(fn ($period) => $byPeriod->get($period['key'])?->numeric_grade);
                 if ($values->isEmpty() || $values->containsStrict(null)) {
                     $complete = false;
@@ -66,7 +76,7 @@ class Sf5ReportBuilder
             }
 
             // SF 9 counts MAPEH as one learning area, rather than four components.
-            if (! GradingTerm::isSeniorHighSection($section)) {
+            if (! GradingTerm::isSeniorHighSection($section) && ! $mapeh) {
                 $components = collect($finals)->filter(fn ($row) => in_array(LearnerPermanentRecordBuilder::subjectSlot($row['title']), ['music', 'arts', 'pe', 'health'], true));
                 $finals = collect($finals)->reject(fn ($row) => in_array(LearnerPermanentRecordBuilder::subjectSlot($row['title']), ['music', 'arts', 'pe', 'health'], true));
                 if ($components->isNotEmpty() && ! $finals->contains(fn ($row) => LearnerPermanentRecordBuilder::subjectSlot($row['title']) === 'mapeh')) {

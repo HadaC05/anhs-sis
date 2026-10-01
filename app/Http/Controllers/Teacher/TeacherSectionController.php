@@ -222,6 +222,8 @@ class TeacherSectionController extends Controller
             ->where('SY_ID', $section->SY_ID)
             ->orderBy('curr_subj_ID')
             ->get();
+        $sourceAssignments = $assignments;
+        $assignments = \App\Support\MapehGrades::assignments($section, $assignments);
         $availableAssignments = $assignments;
 
         if ($selectedAssignmentId && ! $assignments->contains('assignment_ID', $selectedAssignmentId)) {
@@ -234,17 +236,17 @@ class TeacherSectionController extends Controller
         $grades = StudentSubjectGrade::query()
             ->with(['studentSubject', 'gradeReturnReason'])
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
-            ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
+            ->whereIn('assignment_ID', $sourceAssignments->pluck('assignment_ID'))
             ->get()
             ->groupBy(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->map(fn ($studentGrades) => $studentGrades
                 ->groupBy('assignment_ID')
                 ->map(fn ($assignmentGrades) => $assignmentGrades->keyBy('grading_period')));
 
-        $rows = $enrollments->map(function (Enrollment $enrollment) use ($assignments, $grades, $periods): array {
+        $rows = $enrollments->map(function (Enrollment $enrollment) use ($assignments, $availableAssignments, $grades, $periods): array {
             $student = $enrollment->student;
             $application = $student?->application;
-            $studentGrades = $grades->get($enrollment->enrollment_ID, collect());
+            $studentGrades = \App\Support\MapehGrades::grades($availableAssignments, $grades->get($enrollment->enrollment_ID, collect()), array_column($periods, 'key'));
             $subjects = [];
             $overallValues = [];
 
@@ -256,7 +258,9 @@ class TeacherSectionController extends Controller
                     $value = $periodGrades->get($period['key'])?->numeric_grade;
                     if ($value !== null) {
                         $values[] = (float) $value;
-                        $overallValues[] = (float) $value;
+                        if (! $assignment->mapeh_component) {
+                            $overallValues[] = (float) $value;
+                        }
                     }
                 }
 
@@ -1529,6 +1533,9 @@ class TeacherSectionController extends Controller
     /** Include registrar exceptions only for this assignment, without opening school-wide input. */
     private function assignmentGradingInputPeriods(TeacherSubjectAssignment $assignment): array
     {
+        if (\App\Support\MapehGrades::inputBlocked($assignment)) {
+            return [];
+        }
         $section = $assignment->section;
         $semester = $assignment->curriculumSubject?->semester;
         $keys = AssignmentGradeTermUnlocker::unlockedPeriodKeysFor($assignment->assignment_ID);

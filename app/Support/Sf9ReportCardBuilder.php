@@ -215,6 +215,9 @@ class Sf9ReportCardBuilder
             ));
         }
 
+        $assignments = MapehGrades::assignments($section, $assignments);
+        $gradesByAssignment = MapehGrades::grades($assignments, $gradesByAssignment, $periodKeys);
+
         return array_merge($base, self::juniorHighSubjects($assignments, $gradesByAssignment, $periodKeys));
     }
 
@@ -282,7 +285,7 @@ class Sf9ReportCardBuilder
 
         foreach ($assignments as $assignment) {
             $subject = $assignment->curriculumSubject?->subject;
-            $slot = self::juniorHighSubjectSlot((string) ($subject?->title ?? $subject?->code ?? ''));
+            $slot = $assignment->mapeh_slot ?: self::juniorHighSubjectSlot((string) ($subject?->title ?? $subject?->code ?? ''));
             $assignmentGrades = $gradesByAssignment->get($assignment->assignment_ID, collect());
             $quarterGrades = [];
             $values = [];
@@ -302,7 +305,7 @@ class Sf9ReportCardBuilder
             $subjectGrades[$slot] = [
                 'title' => $subject?->title ?? 'Subject',
                 'quarters' => $quarterGrades,
-                'final' => count($values) ? round(array_sum($values) / count($values)) : null,
+                'final' => count($values) && (! $assignment->computed_mapeh || count($values) === count($periodKeys)) ? round(array_sum($values) / count($values)) : null,
             ];
         }
 
@@ -320,7 +323,14 @@ class Sf9ReportCardBuilder
             }
         }
 
-        $rows = collect(self::juniorHighOfficialRows())->map(function (array $row) use ($subjectGrades, $periodKeys): array {
+        $officialRows = collect(self::juniorHighOfficialRows());
+        if ($assignments->contains('mapeh_slot', 'music_arts')) {
+            $officialRows = $officialRows->reject(fn ($row) => $row['child'] ?? false)->concat([
+                ['slot' => 'music_arts', 'label' => 'Music & Arts', 'child' => true],
+                ['slot' => 'pe_health', 'label' => 'Physical Education & Health', 'child' => true],
+            ]);
+        }
+        $rows = $officialRows->map(function (array $row) use ($subjectGrades, $periodKeys): array {
             $grade = $subjectGrades[$row['slot']] ?? null;
 
             return [
@@ -337,6 +347,9 @@ class Sf9ReportCardBuilder
             ->pluck('final')
             ->filter(fn ($value) => $value !== null);
         $generalAverage = $generalAverageValues->isNotEmpty() ? (int) round($generalAverageValues->avg()) : null;
+        if ($assignments->contains('computed_mapeh', true) && ($subjectGrades['mapeh']['final'] ?? null) === null) {
+            $generalAverage = null;
+        }
 
         return [
             'subjects' => $rows,

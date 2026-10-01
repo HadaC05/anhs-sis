@@ -102,12 +102,16 @@ class LearnerPermanentRecordBuilder
         $periodKeys = array_column($periods, 'key');
         $gradesByAssignment = $grades->groupBy('assignment_ID')
             ->map(fn (Collection $assignmentGrades) => $assignmentGrades->keyBy('grading_period'));
+        if ($section) {
+            $assignments = MapehGrades::assignments($section, $assignments);
+            $gradesByAssignment = MapehGrades::grades($assignments, $gradesByAssignment, $periodKeys);
+        }
 
         $subjectGrades = [];
 
         foreach ($assignments as $assignment) {
             $subject = $assignment->curriculumSubject?->subject;
-            $slot = self::subjectSlot((string) ($subject?->title ?? $subject?->code ?? ''));
+            $slot = $assignment->mapeh_slot ?: self::subjectSlot((string) ($subject?->title ?? $subject?->code ?? ''));
             $assignmentGrades = $gradesByAssignment->get($assignment->assignment_ID, collect());
             $quarterGrades = [];
             $values = [];
@@ -137,7 +141,7 @@ class LearnerPermanentRecordBuilder
             } else {
                 $subjectGrades[$slot] = [
                     'quarters' => $quarterGrades,
-                    'final' => count($values) ? round(array_sum($values) / count($values)) : null,
+                    'final' => count($values) && (! $assignment->computed_mapeh || count($values) === count($periodKeys)) ? round(array_sum($values) / count($values)) : null,
                 ];
             }
         }
@@ -173,6 +177,9 @@ class LearnerPermanentRecordBuilder
             ->pluck('final')
             ->filter(fn ($value) => $value !== null);
         $generalAverage = $generalAverageValues->isNotEmpty() ? round($generalAverageValues->avg()) : null;
+        if ($assignments->contains('computed_mapeh', true) && ($subjectGrades['mapeh']['final'] ?? null) === null) {
+            $generalAverage = null;
+        }
 
         $meta = array_merge(self::defaultSchoolMeta(), $schoolMeta);
         $adviser = $section?->adviser;

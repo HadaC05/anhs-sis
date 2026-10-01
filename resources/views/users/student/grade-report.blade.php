@@ -66,7 +66,7 @@
                         $values = $periods->keys()->map(fn ($key) => $grades->get($key)?->numeric_grade);
                         $complete = $values->isNotEmpty() && $values->every(fn ($value) => $value !== null && $value !== '');
                         $final = $complete ? round($values->avg()) : null;
-                        $finalRatings->push($final);
+                        if (! $assignment->mapeh_component) $finalRatings->push($final);
                     @endphp
                     <tr>
                         <td>{{ $assignment->curriculumSubject?->subject?->title ?? 'N/A' }}</td>

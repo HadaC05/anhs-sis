@@ -280,6 +280,10 @@ class TeacherAssignmentController extends Controller
 
         $section = Section::query()->findOrFail($validated['section_ID']);
         $curriculumSubject = CurriculumSubject::query()->findOrFail($validated['curr_subj_ID']);
+        $mapeh = \App\Models\MapehConfiguration::forSection($section);
+        if ($mapeh && ((int) $mapeh->parent_curr_subj_ID === (int) $curriculumSubject->curr_subj_ID || in_array($curriculumSubject->curr_subj_ID, $mapeh->inactiveComponentIds()))) {
+            throw ValidationException::withMessages(['curr_subj_ID' => 'MAPEH is calculated from its components for this class. Assign the teacher to Music, Arts, PE, Health, or the configured paired component.']);
+        }
         $teacher = Staff::query()
             ->where('staff_id', $validated['staff_ID'])
             ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
@@ -542,6 +546,10 @@ class TeacherAssignmentController extends Controller
 
     private function curriculumSubjectMatchesSection(Section $section, CurriculumSubject $curriculumSubject): bool
     {
+        $mapeh = \App\Models\MapehConfiguration::forSection($section);
+        if ($mapeh && ((int) $mapeh->parent_curr_subj_ID === (int) $curriculumSubject->curr_subj_ID || in_array($curriculumSubject->curr_subj_ID, $mapeh->inactiveComponentIds()))) {
+            return false;
+        }
         if ($curriculumSubject->curriculum_ID !== $section->curriculum_grade_level_ID ||
             $curriculumSubject->grade_ID !== $section->grade_ID) {
             return false;

@@ -19,6 +19,12 @@ class StudentSubjectRoster
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
 
+        $mapeh = \App\Models\MapehConfiguration::query()->where('curriculum_grade_level_ID', $curriculumId)
+            ->where('SY_ID', $enrollment->SY_ID)->first();
+        if ($mapeh) {
+            $subjectIds = array_values(array_diff($subjectIds, [$mapeh->parent_curr_subj_ID, ...$mapeh->inactiveComponentIds()]));
+        }
+
         if ($subjectIds === []) {
             return;
         }

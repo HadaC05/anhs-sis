@@ -24,8 +24,8 @@ use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
 use App\Support\StudentDocumentUploader;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -343,14 +343,20 @@ class StudentDashboardController extends Controller
             $grades = StudentSubjectGrade::query()
                 ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
                 ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
-                ->whereStatus(GradeStatus::RELEASED)
                 ->get()
-                ->groupBy('assignment_ID');
+                ->groupBy('assignment_ID')
+                ->map(fn ($items) => $items->keyBy('grading_period'));
+
+            if ($enrollment->section) {
+                $assignments = \App\Support\MapehGrades::assignments($enrollment->section, $assignments);
+                $grades = \App\Support\MapehGrades::grades($assignments, $grades,
+                    array_column(GradingTerm::periodsForSection($enrollment->section, $enrollment->semester), 'key'), true);
+            }
 
             $assignments->each(function (TeacherSubjectAssignment $assignment) use ($grades): void {
                 $assignment->setRelation(
                     'grades',
-                    $grades->get($assignment->assignment_ID, collect())
+                    $grades->get($assignment->assignment_ID, collect())->filter(fn ($grade) => $grade->status === GradeStatus::RELEASED)
                 );
             });
 

@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\DB;
 class SectionGradeSubmissionProgress
 {
     /**
-     * @param iterable<TeacherSubjectAssignment> $assignments
-     * @param array<int, list<array<string, mixed>>> $termsByAssignment
+     * @param  iterable<TeacherSubjectAssignment>  $assignments
+     * @param  array<int, list<array<string, mixed>>>  $termsByAssignment
      * @return array<int, array{submitted: int, expected: int}>
      */
     public static function forAssignments(iterable $assignments, array $termsByAssignment): array
@@ -20,6 +20,8 @@ class SectionGradeSubmissionProgress
         if ($assignments->isEmpty()) {
             return [];
         }
+        $sections = $assignments->map(fn ($assignment) => $assignment->section)->filter()->unique('section_ID');
+        $assignments = $assignments->reject(fn ($assignment) => MapehGrades::inputBlocked($assignment));
 
         $roster = DB::table('teacher_subject_assignments as assignments')
             ->join('enrollments', function ($join): void {
@@ -72,6 +74,15 @@ class SectionGradeSubmissionProgress
             }
             if ($fullySubmitted) {
                 $progress[$sectionId]['submitted']++;
+            }
+        }
+
+        foreach ($sections as $section) {
+            if ($configuration = \App\Models\MapehConfiguration::forSection($section)) {
+                $missing = $configuration->components->pluck('curr_subj_ID')
+                    ->diff($assignments->where('section_ID', $section->section_ID)->pluck('curr_subj_ID'))->count();
+                $progress[$section->section_ID] ??= ['submitted' => 0, 'expected' => 0];
+                $progress[$section->section_ID]['expected'] += $missing;
             }
         }
 

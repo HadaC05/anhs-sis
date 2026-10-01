@@ -98,8 +98,8 @@
                         $periodValues = collect($periodKeys)
                             ->mapWithKeys(fn ($periodKey) => [$periodKey => $grades->get($periodKey)?->numeric_grade]);
                         $availableGrades = $periodValues->filter(fn ($grade) => $grade !== null && $grade !== '');
-                        $finalRating = $availableGrades->isNotEmpty() ? round($availableGrades->avg()) : null;
-                        $mobileFinalRatings[] = $finalRating;
+                        $finalRating = $availableGrades->isNotEmpty() && (! $assignment->computed_mapeh || $availableGrades->count() === count($periodKeys)) ? round($availableGrades->avg()) : null;
+                        if (! $assignment->mapeh_component) $mobileFinalRatings[] = $finalRating;
                         $mobileRowId = 'mobile-grade-detail-'.$assignment->assignment_ID;
                     @endphp
                     <article class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -136,7 +136,7 @@
                 @endforeach
                 @php
                     $mobileAverageGrades = collect($mobileFinalRatings)->filter(fn ($grade) => $grade !== null);
-                    $mobileGeneralAverage = $mobileAverageGrades->isNotEmpty() ? round($mobileAverageGrades->avg()) : null;
+                    $mobileGeneralAverage = $mobileAverageGrades->isNotEmpty() && (! $enrollment->subjectAssignments->contains('computed_mapeh', true) || ! in_array(null, $mobileFinalRatings, true)) ? round($mobileAverageGrades->avg()) : null;
                 @endphp
                 <div class="flex items-center justify-between rounded-lg bg-[#eef5f8] px-4 py-3">
                     <span class="text-sm font-bold uppercase tracking-wide text-gray-700">General Average</span>
@@ -168,8 +168,8 @@
                                 $periodValues = collect($periodKeys)
                                     ->mapWithKeys(fn ($periodKey) => [$periodKey => $grades->get($periodKey)?->numeric_grade]);
                                 $availableGrades = $periodValues->filter(fn ($grade) => $grade !== null && $grade !== '');
-                                $finalRating = $availableGrades->isNotEmpty() ? round($availableGrades->avg()) : null;
-                                $finalRatings[] = $finalRating;
+                                $finalRating = $availableGrades->isNotEmpty() && (! $assignment->computed_mapeh || $availableGrades->count() === count($periodKeys)) ? round($availableGrades->avg()) : null;
+                                if (! $assignment->mapeh_component) $finalRatings[] = $finalRating;
                                 $rowId = 'grade-detail-'.$assignment->assignment_ID;
                             @endphp
                             <tr class="{{ $index % 2 === 0 ? 'bg-white' : 'bg-gray-50' }}">
@@ -210,7 +210,7 @@
                         @endforeach
                         @php
                             $generalAverageGrades = collect($finalRatings)->filter(fn ($grade) => $grade !== null);
-                            $generalAverage = $generalAverageGrades->isNotEmpty() ? round($generalAverageGrades->avg()) : null;
+                            $generalAverage = $generalAverageGrades->isNotEmpty() && (! $enrollment->subjectAssignments->contains('computed_mapeh', true) || ! in_array(null, $finalRatings, true)) ? round($generalAverageGrades->avg()) : null;
                         @endphp
                         <tr class="bg-[#eef5f8]">
                             <td colspan="5" class="border border-gray-200 px-3 py-3 text-right text-sm font-bold uppercase tracking-wide text-gray-700">
