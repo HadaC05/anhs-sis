@@ -16,12 +16,26 @@ class SectionSf2Upload extends Model
         'status',
         'parse_notes',
         'uploaded_by',
+        'report_year',
+        'source_school_year',
+        'school_days',
+        'import_rows',
+        'sf2_layout',
+        'class_dates',
+        'imported_at',
     ];
 
     protected function casts(): array
     {
         return [
             'report_month' => 'integer',
+            'report_year' => 'integer',
+            'use_section_school_year' => 'boolean',
+            'school_days' => 'integer',
+            'import_rows' => 'array',
+            'sf2_layout' => 'array',
+            'class_dates' => 'array',
+            'imported_at' => 'datetime',
         ];
     }
 

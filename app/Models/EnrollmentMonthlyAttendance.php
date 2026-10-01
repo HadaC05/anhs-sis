@@ -15,6 +15,7 @@ class EnrollmentMonthlyAttendance extends Model
         'days_present',
         'days_absent',
         'days_tardy',
+        'source_sf2_upload_id',
     ];
 
     protected function casts(): array
@@ -30,5 +31,10 @@ class EnrollmentMonthlyAttendance extends Model
     public function enrollment(): BelongsTo
     {
         return $this->belongsTo(Enrollment::class, 'enrollment_ID', 'enrollment_ID');
+    }
+
+    public function sourceUpload(): BelongsTo
+    {
+        return $this->belongsTo(SectionSf2Upload::class, 'source_sf2_upload_id');
     }
 }

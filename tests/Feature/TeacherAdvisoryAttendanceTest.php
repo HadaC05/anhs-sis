@@ -8,9 +8,12 @@ use App\Models\EnrollmentMonthlyAttendance;
 use App\Models\GradeLevel;
 use App\Models\Role;
 use App\Models\Section;
+use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Support\Sf2AttendancePdf;
+use App\Support\Sf9AttendanceSummary;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -147,7 +150,7 @@ test('advisory attendance displays admin configured school days', function () {
     $response->assertSee('School Days');
 });
 
-test('advisory teacher can upload sf2 pdf for future import', function () {
+test('unreadable sf2 is saved with a failed import status', function () {
     Storage::fake('local');
 
     ['teacher' => $teacher, 'section' => $section] = createAdvisoryAttendanceFixtures();
@@ -158,12 +161,12 @@ test('advisory teacher can upload sf2 pdf for future import', function () {
     ]);
 
     $response->assertRedirect();
-    $response->assertSessionHas('status');
+    $response->assertSessionHas('attendance_import_error');
 
     $upload = SectionSf2Upload::query()->where('section_ID', $section->section_ID)->first();
 
     expect($upload)->not->toBeNull();
-    expect($upload->status)->toBe('pending');
+    expect($upload->status)->toBe('failed');
     expect($upload->report_month)->toBe(6);
     Storage::disk('local')->assertExists($upload->storage_path);
 });
@@ -184,4 +187,244 @@ test('non adviser cannot access attendance record page', function () {
     $response = $this->actingAs($otherTeacher)->get(route('teacher.advisory.attendance', $section));
 
     $response->assertForbidden();
+});
+
+test('monthly detail shows saved counts and only reports for the selected month and section', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    EnrollmentMonthlyAttendance::query()->create([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'month' => 6,
+        'days_present' => 20,
+        'days_absent' => 0,
+    ]);
+    foreach ([6 => 'June-source.pdf', 7 => 'July-source.pdf'] as $month => $filename) {
+        SectionSf2Upload::query()->create([
+            'section_ID' => $section->section_ID,
+            'SY_ID' => $section->SY_ID,
+            'report_month' => $month,
+            'original_filename' => $filename,
+            'storage_path' => 'sf2/'.$filename,
+            'status' => 'pending',
+        ]);
+    }
+
+    $this->actingAs($teacher)->get(route('teacher.advisory.attendance', [
+        'section' => $section, 'view' => 'detailed', 'month' => 6,
+    ]))->assertOk()
+        ->assertSee('Detailed Monthly Attendance Record')
+        ->assertViewHas('selectedUpload', fn ($upload) => $upload->original_filename === 'June-source.pdf')
+        ->assertDontSee('July-source.pdf')
+        ->assertDontSee('Uploaded attendance records')
+        ->assertDontSee('Saved monthly counts')
+        ->assertViewHas('rows', fn ($rows) => $rows->first()['records']->get(6)->days_absent === 0);
+
+    $this->get(route('teacher.advisory.attendance', [
+        'section' => $section, 'view' => 'detailed', 'month' => 99,
+    ]))->assertOk()->assertViewHas('selectedMonth', 6);
+
+    $this->get(route('teacher.advisory.attendance', [
+        'section' => $section, 'view' => 'detailed', 'month' => 8,
+    ]))->assertOk()->assertSee('No attendance record uploaded for');
+});
+
+test('uploaded sf2 opens in monthly detail and its pdf is restricted to the adviser and section', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section] = createAdvisoryAttendanceFixtures();
+    $this->actingAs($teacher)->post(route('teacher.advisory.attendance.sf2', $section), [
+        'report_month' => 7,
+        'sf2_file' => UploadedFile::fake()->create('July.pdf', 10, 'application/pdf'),
+    ])->assertRedirect(route('teacher.advisory.attendance', [
+        'section' => $section, 'view' => 'detailed', 'month' => 7, 'upload' => SectionSf2Upload::query()->firstOrFail()->id,
+    ]));
+
+    $upload = SectionSf2Upload::query()->firstOrFail();
+    $url = route('teacher.advisory.attendance.sf2.view', ['section' => $section, 'upload' => $upload]);
+    $this->get($url)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+
+    $otherSection = $section->replicate();
+    $otherSection->name = 'Other section';
+    $otherSection->save();
+    $this->get(route('teacher.advisory.attendance.sf2.view', [
+        'section' => $otherSection, 'upload' => $upload,
+    ]))->assertNotFound();
+
+    $section->update(['staff_ID' => null]);
+    $this->get($url)->assertForbidden();
+    $section->update(['staff_ID' => $teacher->staff_id]);
+    Storage::disk('local')->delete($upload->storage_path);
+    $this->get($url)->assertNotFound();
+});
+
+function sampleSf2ImportReport(): array
+{
+    static $report;
+
+    return $report ??= (new Sf2AttendancePdf)->read(base_path('tests/Fixtures/sf2-september-2026-sample.pdf'));
+}
+
+function createSf2ImportFixtures(): array
+{
+    $fixtures = createAdvisoryAttendanceFixtures();
+    $fixtures['section']->update(['name' => 'G7-A']);
+    foreach (sampleSf2ImportReport()['rows'] as $index => $row) {
+        [$last, $given] = explode(', ', $row['name'], 2);
+        $parts = explode(' ', $given);
+        $middle = array_pop($parts);
+        $attributes = [
+            'lrn' => (string) (900000000000 + $index),
+            'first_name' => implode(' ', $parts),
+            'middle_name' => $index === 0 ? 'Garcia' : $middle,
+            'last_name' => $last,
+            'status' => 'active',
+        ];
+        if ($index === 0) {
+            $fixtures['enrollment']->student->update($attributes);
+        } else {
+            $student = Student::query()->create($attributes);
+            $enrollment = $fixtures['enrollment']->replicate();
+            $enrollment->student_ID = $student->id;
+            $enrollment->save();
+        }
+    }
+
+    return $fixtures;
+}
+
+function uploadSampleSf2($test, Staff $teacher, Section $section, array $extra = [])
+{
+    return $test->actingAs($teacher)->post(route('teacher.advisory.attendance.sf2', $section), $extra + [
+        'report_month' => 9,
+        'sf2_file' => new UploadedFile(base_path('tests/Fixtures/sf2-september-2026-sample.pdf'), 'September-SF2.pdf', 'application/pdf', null, true),
+    ]);
+}
+
+test('sf2 import populates monthly detail overview and printable sf9 with source counts', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createSf2ImportFixtures();
+    AcademicYearAttendanceSetting::factory()->create(['SY_ID' => $section->SY_ID, 'month' => 9, 'school_days' => 20]);
+
+    uploadSampleSf2($this, $teacher, $section)->assertRedirect()->assertSessionHas('status');
+    $upload = SectionSf2Upload::query()->firstOrFail();
+    expect($upload->status)->toBe('imported')
+        ->and($upload->school_days)->toBe(22)
+        ->and($upload->import_rows)->toHaveCount(15)
+        ->and($upload->imported_at)->not->toBeNull()
+        ->and(EnrollmentMonthlyAttendance::query()->count())->toBe(15);
+    $record = EnrollmentMonthlyAttendance::query()->where('enrollment_ID', $enrollment->enrollment_ID)->firstOrFail();
+    expect($record->days_present)->toBe(21)
+        ->and($record->days_absent)->toBe(1)
+        ->and($record->source_sf2_upload_id)->toBe($upload->id);
+    expect(Sf9AttendanceSummary::schoolDaysForSection($section)[9])->toBe(22)
+        ->and(Sf9AttendanceSummary::schoolDaysForAcademicYear($section->SY_ID)[9])->toBe(20);
+
+    $this->get(route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => 9]))
+        ->assertOk()->assertSee('Recreated from September-SF2.pdf')->assertSee('Santos, Adrian Mae A.')
+        ->assertDontSee('Uploaded attendance records')->assertDontSee('Saved monthly counts')
+        ->assertSee('Daily Attendance Report of Learners')
+        ->assertSee('Combined total present per day')
+        ->assertDontSee('sf2-monthly-summary-title')
+        ->assertDontSee('View month</button>', false)
+        ->assertSee('Monthly attendance highlights')
+        ->assertSee('Average daily attendance')
+        ->assertSee('data-test="attendance-upload-status"', false)
+        ->assertSee('96.06%')->assertSee('14.41')
+        ->assertSee('Late arrival');
+    $this->get(route('teacher.advisory.attendance', $section))
+        ->assertOk()->assertViewHas('rows', fn ($rows) => $rows->sum(fn ($row) => $row['summary']['total_present']) === 317);
+    $this->get(route('teacher.advisory.sf9', $section))
+        ->assertOk()->assertSee('22')->assertSee('21');
+    $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, Sf9AttendanceSummary::schoolDaysForSection($section));
+    expect($summary['days_present'][9])->toBe(21)->and($summary['days_absent'][9])->toBe(1)->and($summary['total_school_days'])->toBe(22);
+});
+
+test('corrected uploads replace monthly counts without duplicate records and keep old source snapshots', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createSf2ImportFixtures();
+    uploadSampleSf2($this, $teacher, $section);
+    $original = SectionSf2Upload::query()->firstOrFail();
+    $report = sampleSf2ImportReport();
+    $report['rows'][0]['days_present'] = 22;
+    $report['rows'][0]['days_absent'] = 0;
+    $this->mock(Sf2AttendancePdf::class)->shouldReceive('read')->once()->andReturn($report);
+
+    uploadSampleSf2($this, $teacher, $section)->assertSessionHas('status');
+    $latest = SectionSf2Upload::query()->latest('id')->firstOrFail();
+    $record = EnrollmentMonthlyAttendance::query()->where('enrollment_ID', $enrollment->enrollment_ID)->firstOrFail();
+    expect(EnrollmentMonthlyAttendance::query()->count())->toBe(15)
+        ->and($record->days_present)->toBe(22)->and($record->days_absent)->toBe(0)
+        ->and($record->source_sf2_upload_id)->toBe($latest->id)
+        ->and($original->fresh()->import_rows[0]['days_absent'])->toBe(1);
+    $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, Sf9AttendanceSummary::schoolDaysForSection($section));
+    expect($summary['days_absent'][9])->toBe(0)->and($summary['total_absent'])->toBe(0);
+});
+
+test('report month section and school year mismatches leave attendance unchanged', function (string $mismatch) {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section] = createSf2ImportFixtures();
+    $report = sampleSf2ImportReport();
+    $report[$mismatch] = match ($mismatch) {
+        'month' => 8,
+        'section' => '7-B',
+        'school_year' => '2025-2026',
+        'year' => 2025,
+    };
+    $this->mock(Sf2AttendancePdf::class)->shouldReceive('read')->once()->andReturn($report);
+    uploadSampleSf2($this, $teacher, $section)->assertSessionHas('attendance_import_error');
+    expect(SectionSf2Upload::query()->firstOrFail()->status)->toBe('failed')
+        ->and(EnrollmentMonthlyAttendance::query()->count())->toBe(0)
+        ->and(SectionAttendanceSetting::query()->count())->toBe(0);
+})->with(['month', 'section', 'school_year', 'year']);
+
+test('the removed school year override cannot bypass matching the section school year', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section] = createSf2ImportFixtures();
+    $section->academicYear->update(['school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31']);
+    $this->mock(Sf2AttendancePdf::class)->shouldReceive('read')->once()->andReturn(sampleSf2ImportReport());
+    $this->actingAs($teacher)->get(route('teacher.advisory.attendance', $section))
+        ->assertOk()->assertDontSee('name="use_section_school_year"', false);
+    uploadSampleSf2($this, $teacher, $section, ['use_section_school_year' => '1'])->assertSessionHas('attendance_import_error');
+    $upload = SectionSf2Upload::query()->firstOrFail();
+    expect($upload->status)->toBe('failed')
+        ->and($upload->use_section_school_year)->toBeFalse()
+        ->and($upload->parse_notes)->toContain('Upload a PDF with the matching school year')
+        ->and(EnrollmentMonthlyAttendance::query()->count())->toBe(0);
+});
+
+test('unmatched and ambiguous names are visible and never assigned to another learner', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createSf2ImportFixtures();
+    $duplicate = $enrollment->student->replicate();
+    $duplicate->lrn = '999999999999';
+    $duplicate->save();
+    $duplicateEnrollment = $enrollment->replicate();
+    $duplicateEnrollment->student_ID = $duplicate->id;
+    $duplicateEnrollment->save();
+    $report = sampleSf2ImportReport();
+    $report['rows'][1]['name'] = 'Unknown, Learner Q.';
+    $this->mock(Sf2AttendancePdf::class)->shouldReceive('read')->once()->andReturn($report);
+
+    uploadSampleSf2($this, $teacher, $section)->assertSessionHas('status');
+    $upload = SectionSf2Upload::query()->firstOrFail();
+    expect($upload->status)->toBe('partial')
+        ->and($upload->import_rows[0]['match_status'])->toContain('Ambiguous')
+        ->and($upload->import_rows[1]['match_status'])->toContain('No matching')
+        ->and(EnrollmentMonthlyAttendance::query()->count())->toBe(13)
+        ->and(EnrollmentMonthlyAttendance::query()->where('enrollment_ID', $enrollment->enrollment_ID)->exists())->toBeFalse();
+    $this->get(route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => 9]))
+        ->assertOk()->assertSee('Unknown, Learner Q.')
+        ->assertViewHas('selectedUpload', fn ($upload) => $upload->status === 'partial');
+});
+
+test('no matching names leaves existing records and class days unchanged', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    $section->update(['name' => 'G7-A']);
+    EnrollmentMonthlyAttendance::query()->create(['enrollment_ID' => $enrollment->enrollment_ID, 'month' => 9, 'days_present' => 18, 'days_absent' => 2]);
+    $this->mock(Sf2AttendancePdf::class)->shouldReceive('read')->once()->andReturn(sampleSf2ImportReport());
+
+    uploadSampleSf2($this, $teacher, $section)->assertSessionHas('attendance_import_error');
+    $upload = SectionSf2Upload::query()->firstOrFail();
+    expect($upload->status)->toBe('failed')->and($upload->import_rows[0]['match_status'])->toContain('No matching')
+        ->and(EnrollmentMonthlyAttendance::query()->firstOrFail()->days_present)->toBe(18)
+        ->and(SectionAttendanceSetting::query()->count())->toBe(0);
 });

@@ -5,11 +5,12 @@
 @section('content')
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'attendance'])
 
-@if(session('status'))
-    <div class="mb-5 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-        <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        <span>{{ session('status') }}</span>
-    </div>
+@push('toasts')
+    <x-password-reset-toasts :include-errors="false" test-prefix="attendance-upload" />
+@endpush
+
+@if(session('attendance_import_error'))
+    <div role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{{ session('attendance_import_error') }}</div>
 @endif
 
 @if($errors->any())
@@ -24,74 +25,26 @@
 @endphp
 
 <div>
-    <aside class="hidden">
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-100 bg-gray-50/60 px-4 py-3">
-                <h3 class="flex items-center gap-2 text-sm font-bold text-[#296374]">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                    Upload SF2
-                </h3>
-            </div>
-            <form action="{{ route('teacher.advisory.attendance.sf2', $section) }}" method="POST" enctype="multipart/form-data" class="space-y-4 p-4">
-                @csrf
-                <div>
-                    <label for="report_month" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Report Month</label>
-                    <select id="report_month" name="report_month" required class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#296374] focus:outline-none focus:ring-2 focus:ring-[#296374]/20">
-                        @foreach($months as $monthKey => $monthLabel)
-                            <option value="{{ $monthKey }}" @selected((int) old('report_month') === (int) $monthKey)>{{ $monthLabel }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="sf2_file" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">SF2 PDF</label>
-                    <input id="sf2_file" type="file" name="sf2_file" accept="application/pdf,.pdf" required class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-[#296374]/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#296374] hover:file:bg-[#296374]/15">
-                </div>
-                <p class="text-[11px] leading-relaxed text-gray-500">Upload the DepEd SF2 Daily Attendance Report. Counts will appear in the summary once SF2 import is processed.</p>
-                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#296374] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e4d5c]">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    Upload SF2
-                </button>
-            </form>
-        </div>
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="Attendance views" class="inline-flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
+            @foreach(['overview' => 'Overview', 'detailed' => 'Detailed Monthly Record'] as $viewKey => $viewLabel)
+                <a href="{{ route('teacher.advisory.attendance', ['section' => $section, 'view' => $viewKey, 'month' => $selectedMonth]) }}" @if($attendanceView === $viewKey) aria-current="page" @endif class="rounded-md px-4 py-2 text-sm font-semibold {{ $attendanceView === $viewKey ? 'bg-[#296374] text-white' : 'text-gray-600 hover:bg-gray-100' }}">{{ $viewLabel }}</a>
+            @endforeach
+        </nav>
+        <button type="button" id="attendance-upload-trigger" class="inline-flex h-10 items-center rounded-lg bg-[#296374] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#1f4e5c]">Upload Attendance Record</button>
+    </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-100 bg-gray-50/60 px-4 py-3">
-                <h3 class="text-sm font-bold text-gray-700">Recent SF2 Uploads</h3>
-            </div>
-            <div class="divide-y divide-gray-100">
-                @forelse($sf2Uploads as $upload)
-                    <div class="px-4 py-3">
-                        <p class="truncate text-xs font-semibold text-gray-800" title="{{ $upload->original_filename }}">{{ $upload->original_filename }}</p>
-                        <div class="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
-                            @if($upload->report_month)
-                                <span>{{ $months[$upload->report_month] ?? 'Month '.$upload->report_month }}</span>
-                            @endif
-                            <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-wide text-amber-700">{{ $upload->status }}</span>
-                        </div>
-                        @if($upload->parse_notes)
-                            <p class="mt-1 text-[10px] leading-relaxed text-gray-400">{{ $upload->parse_notes }}</p>
-                        @endif
-                    </div>
-                @empty
-                    <p class="px-4 py-6 text-center text-xs text-gray-400">No SF2 files uploaded yet.</p>
-                @endforelse
-            </div>
-        </div>
-
-        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p class="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">SF9 Attendance</p>
-            <p class="text-xs leading-relaxed text-gray-600">Monthly counts below are derived from uploaded SF2 reports and reflected on School Form 9 when you print learner records.</p>
-        </div>
-    </aside>
-
+    @if($attendanceView === 'detailed')
+        @include('users.teacher.advisory.partials.attendance-detail')
+    @else
     <div class="overflow-hidden rounded-xl border border-[#296374]/35 bg-[#eef5f7] shadow-md shadow-[#296374]/10">
         <div class="border-b border-gray-100 bg-gray-50/60 px-4 py-4 lg:px-6">
-            <h2 class="hidden">
-                <svg class="h-5 w-5 text-[#296374]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <h2 class="text-base font-bold text-[#296374]">
+                <svg class="hidden h-5 w-5 text-[#296374]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 Monthly Attendance Summary
             </h2>
-            <p class="hidden">School days are set by the administrator.</p>
-            <div class="flex justify-end"><button type="button" id="attendance-upload-trigger" class="inline-flex h-10 items-center rounded-lg bg-[#296374] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#1f4e5c]">Upload Attendance Record</button></div>
+            <p class="mt-1 text-xs text-gray-500">School days are set by the administrator until an SF2 is imported for this section and month. Imported class days and learner counts are also used in SF9.</p>
+
         </div>
 
         <div class="overflow-x-auto">
@@ -100,7 +53,7 @@
                     <tr class="border-b border-gray-200 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
                         <th class="sticky left-0 z-20 min-w-[180px] bg-gray-50 px-3 py-3 text-left">Learner</th>
                         @foreach($months as $monthKey => $monthLabel)
-                            <th colspan="2" class="border-l border-gray-200 px-2 py-3 text-center">{{ $monthLabel }}</th>
+                            <th colspan="2" class="border-l border-gray-200 px-2 py-3 text-center"><a class="underline decoration-dotted underline-offset-4 hover:text-[#296374]" href="{{ route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => $monthKey]) }}" title="View {{ $monthLabel }} attendance records">{{ $monthLabel }}</a></th>
                         @endforeach
                         <th colspan="2" class="border-l border-gray-200 px-2 py-3 text-center">Total</th>
                     </tr>
@@ -156,10 +109,10 @@
                                     $absentValue = (int) ($record?->days_absent ?? 0);
                                 @endphp
                                 <td class="border-l border-gray-100 px-2 py-2 text-center font-medium text-emerald-700">
-                                    {{ $presentValue > 0 ? $presentValue : '—' }}
+                                    {{ $record ? $presentValue : '—' }}
                                 </td>
                                 <td class="px-2 py-2 text-center font-medium text-red-600">
-                                    {{ $absentValue > 0 ? $absentValue : '—' }}
+                                    {{ $record ? $absentValue : '—' }}
                                 </td>
                             @endforeach
                             <td class="border-l border-gray-100 px-2 py-2 text-center font-semibold text-emerald-700">{{ $summary['total_present'] ?: '—' }}</td>
@@ -174,13 +127,15 @@
             </table>
         </div>
     </div>
+    @endif
 </div>
 
-<div id="attendance-upload-modal" class="{{ $errors->has('sf2_file') ? 'flex' : 'hidden' }} fixed inset-0 z-[100] items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true">
+<div id="attendance-upload-modal" class="{{ $errors->hasAny(['sf2_file', 'report_month']) ? 'flex' : 'hidden' }} fixed inset-0 z-[100] items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true">
     <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl"><form action="{{ route('teacher.advisory.attendance.sf2', $section) }}" method="POST" enctype="multipart/form-data" id="attendance-upload-form">@csrf
-        <div class="mb-4 flex items-center justify-between"><h2 class="text-base font-bold text-gray-800">Upload Attendance Record</h2><button type="button" id="attendance-upload-cancel" class="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</button></div>
-        <label for="attendance-report-month" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Report Month</label><select id="attendance-report-month" name="report_month" required class="mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">@foreach($months as $monthKey => $monthLabel)<option value="{{ $monthKey }}" @selected((int) old('report_month') === (int) $monthKey)>{{ $monthLabel }}</option>@endforeach</select>
-        <input id="attendance-sf2-file" type="file" name="sf2_file" accept="application/pdf,.pdf" required class="sr-only"><div id="attendance-dropzone" class="cursor-pointer rounded-xl border-2 border-dashed border-[#4bb878]/45 bg-[#f8fcfb] px-6 py-10 text-center transition hover:border-[#4bb878] hover:bg-[#f1faf6]"><svg class="mx-auto h-11 w-11 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 16V4m0 0L8 8m4-4 4 4M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 13h16v4H4z"></path></svg><p class="mt-4 text-sm font-medium text-[#4bb878]">Drag and drop the SF2 PDF here</p><p class="mt-1 text-xs text-gray-400">— OR —</p><button type="button" id="browse-attendance-file" class="mt-4 inline-flex h-9 items-center rounded-md bg-[#4bb878] px-5 text-xs font-bold text-white">Browse Files</button><p id="attendance-file-name" class="mt-4 text-xs font-medium text-gray-600">PDF only · Max 15 MB</p></div>
+        <div class="mb-4 flex items-center justify-between"><h2 class="text-base font-bold text-gray-800">Upload SF2 Attendance Record</h2><button type="button" id="attendance-upload-cancel" class="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</button></div>
+        <label for="attendance-report-month" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Report Month</label><select id="attendance-report-month" name="report_month" required class="mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">@foreach($months as $monthKey => $monthLabel)<option value="{{ $monthKey }}" @selected((int) old('report_month', $selectedMonth) === (int) $monthKey)>{{ $monthLabel }}</option>@endforeach</select>
+        <p class="mb-3 text-xs text-gray-500">Upload a text-based SF2 PDF. Monthly counts are matched to enrolled learners by name and used in SF9. Scanned images and fractional totals are not supported.</p>
+        <input id="attendance-sf2-file" type="file" name="sf2_file" accept="application/pdf,.pdf" required class="sr-only"><div id="attendance-dropzone" class="cursor-pointer rounded-xl border-2 border-dashed border-[#4bb878]/45 bg-[#f8fcfb] px-6 py-10 text-center transition hover:border-[#4bb878] hover:bg-[#f1faf6]"><svg class="mx-auto h-11 w-11 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 16V4m0 0L8 8m4-4 4 4M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 13h16v4H4z"></path></svg><p class="mt-4 text-sm font-medium text-[#4bb878]">Drag and drop the SF2 PDF here</p><p class="mt-1 text-xs text-gray-400">— OR —</p><button type="button" id="browse-attendance-file" class="mt-4 inline-flex h-9 items-center rounded-md bg-[#4bb878] px-5 text-xs font-bold text-white">Browse Files</button><p id="attendance-file-name" class="mt-4 text-xs font-medium text-gray-600">PDF only · Max 10 MB</p></div>
         @error('sf2_file')<p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
         <div id="attendance-submit-row" class="mt-4 hidden justify-end gap-2"><button type="submit" class="h-9 rounded-lg bg-[#296374] px-4 text-xs font-bold text-white">Upload File</button></div>
     </form></div>

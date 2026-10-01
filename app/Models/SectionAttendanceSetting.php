@@ -12,6 +12,7 @@ class SectionAttendanceSetting extends Model
         'SY_ID',
         'month',
         'school_days',
+        'source_sf2_upload_id',
     ];
 
     protected function casts(): array

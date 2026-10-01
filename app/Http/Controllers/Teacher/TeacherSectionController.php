@@ -27,6 +27,7 @@ use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
 use App\Support\RegistrarGradeDigest;
+use App\Support\Sf2AttendanceImporter;
 use App\Support\Sf9AttendanceSummary;
 use App\Support\Sf9ReportCardBuilder;
 use App\Support\StudentCredentials;
@@ -34,6 +35,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -515,6 +517,11 @@ class TeacherSectionController extends Controller
 
         $section->load(['academicYear', 'cluster', 'gradeLevel']);
         $months = $section->academicYear->attendanceMonths();
+        $attendanceView = $request->query('view') === 'detailed' ? 'detailed' : 'overview';
+        $selectedMonth = (int) $request->query('month', array_key_first($months));
+        if (! array_key_exists($selectedMonth, $months)) {
+            $selectedMonth = (int) array_key_first($months);
+        }
         $schoolDays = array_intersect_key(Sf9AttendanceSummary::schoolDaysForSection($section), $months);
 
         $enrollments = Enrollment::query()
@@ -529,6 +536,7 @@ class TeacherSectionController extends Controller
             ->get();
 
         $attendanceRecords = EnrollmentMonthlyAttendance::query()
+            ->with('sourceUpload')
             ->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID'))
             ->get()
             ->groupBy('enrollment_ID')
@@ -551,9 +559,12 @@ class TeacherSectionController extends Controller
         $sf2Uploads = SectionSf2Upload::query()
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
+            ->where('report_month', $selectedMonth)
             ->latest()
-            ->limit(10)
+            ->orderByDesc('id')
             ->get();
+
+        $selectedUpload = $sf2Uploads->firstWhere('id', (int) $request->query('upload')) ?? $sf2Uploads->first();
 
         return view('users.teacher.advisory.attendance', [
             'section' => $section,
@@ -561,6 +572,22 @@ class TeacherSectionController extends Controller
             'schoolDays' => $schoolDays,
             'rows' => $rows,
             'sf2Uploads' => $sf2Uploads,
+            'attendanceView' => $attendanceView,
+            'selectedMonth' => $selectedMonth,
+            'selectedUpload' => $selectedUpload,
+        ]);
+    }
+
+    public function viewAdvisorySf2(Request $request, Section $section, SectionSf2Upload $upload): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $this->authorizeAdvisorySection($request, $section);
+        abort_unless((int) $upload->section_ID === (int) $section->section_ID && (int) $upload->SY_ID === (int) $section->SY_ID, 404);
+        abort_unless(Storage::disk('local')->exists($upload->storage_path), 404);
+
+        return response()->file(Storage::disk('local')->path($upload->storage_path), [
+            'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -599,7 +626,7 @@ class TeacherSectionController extends Controller
                         'SY_ID' => $section->SY_ID,
                         'month' => (int) $month,
                     ],
-                    ['school_days' => (int) ($schoolDays ?? 0)]
+                    ['school_days' => (int) ($schoolDays ?? 0), 'source_sf2_upload_id' => null]
                 );
             }
 
@@ -633,6 +660,7 @@ class TeacherSectionController extends Controller
                         [
                             'days_present' => $present,
                             'days_absent' => $absent,
+                            'source_sf2_upload_id' => null,
                         ]
                     );
                 }
@@ -658,18 +686,27 @@ class TeacherSectionController extends Controller
             'local'
         );
 
-        SectionSf2Upload::query()->create([
+        $upload = SectionSf2Upload::query()->create([
             'section_ID' => $section->section_ID,
             'SY_ID' => $section->SY_ID,
             'report_month' => (int) $validated['report_month'],
             'original_filename' => $file->getClientOriginalName(),
             'storage_path' => $path,
-            'status' => 'pending',
-            'parse_notes' => 'Queued for SF2 import. Automatic counting will be enabled in a future update.',
+            'status' => 'processing',
             'uploaded_by' => $request->user()?->staff_id,
         ]);
 
-        return back()->with('status', 'SF2 file uploaded successfully. Attendance import from SF2 will be available soon.');
+        app(Sf2AttendanceImporter::class)->import($upload);
+        $upload->refresh();
+
+        return redirect()->route('teacher.advisory.attendance', [
+            'section' => $section,
+            'view' => 'detailed',
+            'month' => (int) $validated['report_month'],
+            'upload' => $upload->id,
+        ])->with($upload->status === 'failed' ? 'attendance_import_error' : 'status', $upload->status === 'failed'
+            ? 'The PDF was saved, but attendance was not imported. '.$upload->parse_notes
+            : 'SF2 attendance imported into the overview and SF9. '.$upload->parse_notes);
     }
 
     public function advisorySf9(Request $request, Section $section): View
