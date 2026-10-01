@@ -288,6 +288,13 @@ class TeacherSectionController extends Controller
         ]);
     }
 
+    public function downloadAdvisorySf1(Request $request, Section $section): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $this->authorizeAdvisorySection($request, $section);
+
+        return \App\Support\Sf1Export::download($section);
+    }
+
     public function advisoryClassList(Request $request, Section $section): View
     {
         $this->authorizeAdvisorySection($request, $section);
@@ -1697,7 +1704,7 @@ class TeacherSectionController extends Controller
             str_contains($normalized, 'last name') || str_contains($normalized, 'surname') => 'last_name',
             str_contains($normalized, 'extension') || str_contains($normalized, 'suffix') => 'suffix',
             str_starts_with($normalized, 'sex') || str_contains($normalized, 'gender') => 'sex',
-            str_contains($normalized, 'birth date') || str_contains($normalized, 'date of birth') => 'birthdate',
+            str_contains($normalized, 'birthdate') || str_contains($normalized, 'birth date') || str_contains($normalized, 'date of birth') => 'birthdate',
             str_contains($normalized, 'mother tongue') => 'mother_tongue',
             str_contains($normalized, 'ethnic group') || str_contains($normalized, 'indigenous cultural community') => 'ip_community',
             str_contains($normalized, 'house') || str_contains($normalized, 'street') || str_contains($normalized, 'sitio') || str_contains($normalized, 'purok') => 'house_no',

@@ -161,6 +161,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/teacher/advisory/{section}/class-list', [TeacherSectionController::class, 'advisoryClassList'])
         ->middleware('teacher')
         ->name('teacher.advisory.class-list.index');
+    Route::get('/teacher/advisory/{section}/class-list/sf1', [TeacherSectionController::class, 'downloadAdvisorySf1'])
+        ->middleware('teacher')
+        ->name('teacher.advisory.class-list.sf1');
     Route::get('/teacher/advisory/{section}', [TeacherSectionController::class, 'advisoryShow'])
         ->middleware('teacher')
         ->name('teacher.advisory.show');

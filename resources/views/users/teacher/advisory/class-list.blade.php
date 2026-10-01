@@ -79,7 +79,10 @@
                 @endif
             </form>
         </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('teacher.advisory.class-list.sf1', $section) }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-[#296374] bg-white px-4 text-sm font-bold text-[#296374] transition hover:bg-[#eef5f7]" title="Download the complete active class register">Download SF1 Excel</a>
         <button type="button" id="import-students-trigger" @disabled($latestImport && in_array($latestImport->status, ['queued', 'processing'], true)) class="inline-flex h-10 items-center justify-center rounded-lg bg-[#296374] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#1f4e5c] disabled:cursor-not-allowed disabled:opacity-60">Import Students</button>
+        </div>
     </div>
     <div id="student-import-panel" class="{{ $errors->has('class_list') ? 'flex' : 'hidden' }} fixed inset-0 z-[100] items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true">
         <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
