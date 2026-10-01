@@ -121,6 +121,39 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             </div>
             @endif
 
+            @if ($canEditCurrentTerm && $enrollments->isNotEmpty())
+            <form id="classRecordImportForm" action="{{ route('teacher.sections.grades.import', $assignment) }}" method="POST" enctype="multipart/form-data" class="space-y-3 border-b border-gray-200 bg-slate-50 px-6 py-4">
+                @csrf
+                <div class="flex flex-wrap items-end gap-3">
+                    <div>
+                        <label for="classRecordPeriod" class="mb-1 block text-sm font-semibold text-gray-700">Import into term</label>
+                        <select id="classRecordPeriod" name="period" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                            @foreach ($inputPeriods as $period)
+                            <option value="{{ $period['key'] }}" @selected($period['key'] === $editablePeriodKey)>{{ $period['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="classRecordFile" class="mb-1 block text-sm font-semibold text-gray-700">E-Class Record (.xlsx)</label>
+                        <input id="classRecordFile" name="class_record" type="file" accept=".xlsx" required class="block max-w-full text-sm text-gray-600" aria-describedby="classRecordImportHelp">
+                    </div>
+                    <button type="submit" id="classRecordImportButton" class="rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Import Class Record</button>
+                </div>
+                <p id="classRecordImportHelp" class="text-xs text-gray-500">Reads only the selected TERM sheet's Term Grade column and matches learner names. Matching editable inputs will be replaced; review them, then Save Grades or Submit. Recalculate and save the completed workbook in Excel before uploading (maximum 10 MB).</p>
+                <div id="classRecordImportResult" class="hidden space-y-2 text-sm text-gray-700" aria-live="polite">
+                    <p id="classRecordImportSummary"></p>
+                    <details id="classRecordImportDetails" class="hidden">
+                        <summary class="cursor-pointer font-semibold">Records that were not imported</summary>
+                        <ul id="classRecordImportIssues" class="mt-2 max-h-52 list-disc space-y-1 overflow-y-auto pl-5 text-xs"></ul>
+                    </details>
+                </div>
+            </form>
+            <div id="classRecordImportToast" role="status" aria-live="polite" class="hidden fixed right-5 top-5 z-[120] w-[calc(100%-2.5rem)] max-w-sm rounded-xl border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-800 shadow-xl">
+                <button type="button" class="float-right ml-3" aria-label="Close import notification" onclick="this.parentElement.classList.add('hidden')">&times;</button>
+                <span></span>
+            </div>
+            @endif
+
             <form id="gradeForm" action="{{ route('teacher.sections.grades.store', $assignment) }}" method="POST">
                 @csrf
                 <input type="hidden" name="submit" id="submitGradesInput" value="0">
@@ -351,6 +384,74 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             const subjectLabel = @json($subjectLabel);
             const gradeInputs = gradeForm ? gradeForm.querySelectorAll('[data-grade-input]') : [];
             let pendingAction = null;
+
+            const importForm = document.getElementById('classRecordImportForm');
+            let importToastTimer;
+            importForm?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const button = document.getElementById('classRecordImportButton');
+                if (button.disabled) return;
+                const formData = new FormData(importForm);
+                const controls = [button, saveGradesButton, submitGradesButton, ...importForm.querySelectorAll('input[type="file"], select')].filter(Boolean);
+                const controlStates = controls.map(control => control.disabled);
+                const inputStates = [...gradeInputs].map(input => input.readOnly);
+                controls.forEach(control => control.disabled = true);
+                gradeInputs.forEach(input => input.readOnly = true);
+                button.textContent = 'Reading class record…';
+                const result = document.getElementById('classRecordImportResult');
+                const summary = document.getElementById('classRecordImportSummary');
+                const details = document.getElementById('classRecordImportDetails');
+                const issues = document.getElementById('classRecordImportIssues');
+                let message;
+                issues.replaceChildren();
+                details.classList.add('hidden');
+                details.open = false;
+                try {
+                    const response = await fetch(importForm.action, {
+                        method: 'POST', body: formData,
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'same-origin',
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(Object.values(data.errors ?? {}).flat()[0] ?? 'The class record could not be imported. Refresh the page and try again.');
+                    }
+                    let imported = 0;
+                    data.grades.forEach(record => {
+                        const input = gradeForm.elements.namedItem(`grades[${record.enrollment_id}][${data.period}][grade]`);
+                        if (input && !input.disabled) {
+                            input.value = record.grade;
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            imported++;
+                        }
+                    });
+                    const periodLabel = document.getElementById('classRecordPeriod').selectedOptions[0].text;
+                    message = imported
+                        ? `${imported} grades filled for ${periodLabel}. Review and save or submit to keep these changes.`
+                        : `No grades were imported for ${periodLabel}. Existing inputs were kept.`;
+                    summary.textContent = `${message} ${data.unchanged} learner inputs unchanged.`;
+                    data.issues.forEach(issue => {
+                        const item = document.createElement('li');
+                        item.textContent = issue;
+                        issues.appendChild(item);
+                    });
+                    details.classList.toggle('hidden', data.issues.length === 0);
+                    details.open = imported === 0 && data.issues.length > 0;
+                } catch (error) {
+                    message = error.message || 'The upload failed. Please try again.';
+                    summary.textContent = message;
+                } finally {
+                    result.classList.remove('hidden');
+                    controls.forEach((control, index) => control.disabled = controlStates[index]);
+                    gradeInputs.forEach((input, index) => input.readOnly = inputStates[index]);
+                    button.textContent = 'Import Class Record';
+                    const toast = document.getElementById('classRecordImportToast');
+                    toast.querySelector('span').textContent = message;
+                    toast.classList.remove('hidden');
+                    clearTimeout(importToastTimer);
+                    importToastTimer = setTimeout(() => toast.classList.add('hidden'), 7000);
+                }
+            });
 
             function constrainGradeInput(input) {
                 if (input.disabled) {

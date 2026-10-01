@@ -111,6 +111,98 @@ function teacherSectionGradeField(int $enrollmentId): string
     return "grades.{$enrollmentId}.shs_sem1_term_1.grade";
 }
 
+test('class record import fills only the open term and can then be saved as a draft', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $this->actingAs($teacher)->get(route('teacher.sections.show', $assignment))->assertOk()->assertSee('Import Class Record');
+    $response = $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1',
+        'class_record' => \Tests\Support\EClassRecordFixture::upload(),
+    ])->assertOk()->assertJsonPath('period', 'shs_sem1_term_1')
+        ->assertJsonPath('grades.0.enrollment_id', $enrollment->enrollment_ID)
+        ->assertJsonPath('grades.0.grade', 87)->assertJsonCount(1, 'grades')->assertJsonCount(0, 'issues');
+    expect(StudentSubjectGrade::count())->toBe(0);
+    $this->post(route('teacher.sections.grades.store', $assignment), [
+        'grades' => [$enrollment->enrollment_ID => [$response->json('period') => ['grade' => $response->json('grades.0.grade')]]],
+    ])->assertSessionHasNoErrors();
+    expect(StudentSubjectGrade::sole()->numeric_grade)->toEqual(87)
+        ->and(StudentSubjectGrade::sole()->status)->toBe('draft');
+});
+
+test('class record import supports the junior high open term', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $assignment->section->update(['grade_ID' => GradeLevel::idForValue('grade_7')]);
+    $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'term_1', 'class_record' => \Tests\Support\EClassRecordFixture::upload(),
+    ])->assertOk()->assertJsonPath('grades.0.grade', 87)->assertJsonPath('period', 'term_1');
+});
+
+test('class record import rejects a closed or forged term', function (string $period) {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => $period, 'class_record' => \Tests\Support\EClassRecordFixture::upload(),
+    ])->assertUnprocessable()->assertJsonValidationErrors('period');
+    expect(StudentSubjectGrade::count())->toBe(0);
+})->with(['shs_sem1_term_2', 'shs_sem2_term_1', 'term_1', 'invalid']);
+
+test('class record import requires the assigned teacher', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $other = $teacher->replicate();
+    $other->username = 'another.teacher';
+    $other->save();
+    $this->actingAs($other)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1', 'class_record' => \Tests\Support\EClassRecordFixture::upload(),
+    ])->assertForbidden();
+});
+
+test('class record import leaves locked and missing grades unchanged', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $this->actingAs($teacher)->post(route('teacher.sections.grades.store', $assignment), [
+        'grades' => [$enrollment->enrollment_ID => ['shs_sem1_term_1' => ['grade' => 80]]],
+    ]);
+    StudentSubjectGrade::sole()->update(['status' => 'submitted']);
+    $this->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1', 'class_record' => \Tests\Support\EClassRecordFixture::upload(),
+    ])->assertOk()->assertJsonCount(0, 'grades')->assertJsonPath('unchanged', 1)
+        ->assertJsonPath('issues.0', 'Row 18 — Santos, Ana: grade is locked.');
+    expect(StudentSubjectGrade::sole()->numeric_grade)->toEqual(80);
+});
+
+test('class record import reports invalid blank duplicate and unmatched learner records', function (array $rows, string $issue) {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $response = $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1', 'class_record' => \Tests\Support\EClassRecordFixture::upload(['TERM 1' => $rows]),
+    ])->assertOk()->assertJsonCount(0, 'grades');
+    expect(implode(' ', $response->json('issues')))->toContain($issue);
+})->with([
+    'blank cached formula' => [[['Santos, Ana', '']], 'Term Grade is blank'],
+    'formula error' => [[['Santos, Ana', '#VALUE!']], 'not a valid number'],
+    'out of range' => [[['Santos, Ana', '101']], 'between 0 and 100'],
+    'duplicate' => [[['Santos, Ana', '87'], ['Santos, Ana', '90']], 'more than once'],
+    'unmatched' => [[['Unknown, Learner', '88']], 'no matching learner'],
+]);
+
+test('class record import refuses names shared by multiple enrolled learners', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $student = $enrollment->student->replicate();
+    $student->lrn = '555555555555';
+    $student->save();
+    $duplicate = $enrollment->replicate();
+    $duplicate->student_ID = $student->id;
+    $duplicate->save();
+    $response = $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1', 'class_record' => \Tests\Support\EClassRecordFixture::upload(),
+    ])->assertOk()->assertJsonCount(0, 'grades');
+    expect($response->json('issues.0'))->toContain('more than one learner');
+});
+
+test('class record import does not fall back to another sheet when the term is missing', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1',
+        'class_record' => \Tests\Support\EClassRecordFixture::upload(['TERM 2' => [['Santos, Ana', '99']]]),
+    ])->assertUnprocessable()->assertJsonValidationErrors('class_record');
+});
+
 test('teacher subject list identifies subjects with no grade records as ungraded', function () {
     ['teacher' => $teacher] = createTeacherSectionGradeFixtures();
 

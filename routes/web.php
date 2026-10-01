@@ -179,6 +179,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/teacher/sections/{assignment}/grades', [TeacherSectionController::class, 'storeGrades'])
         ->middleware('teacher')
         ->name('teacher.sections.grades.store');
+    Route::post('/teacher/sections/{assignment}/grades/import', [TeacherSectionController::class, 'importGrades'])
+        ->middleware('teacher')
+        ->name('teacher.sections.grades.import');
     Route::post('/teacher/sections/{assignment}/grades/submit', [TeacherSectionController::class, 'submitGrades'])
         ->middleware('teacher')
         ->name('teacher.sections.grades.submit');

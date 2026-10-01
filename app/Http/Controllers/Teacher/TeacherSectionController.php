@@ -1155,6 +1155,33 @@ class TeacherSectionController extends Controller
         ]);
     }
 
+    public function importGrades(Request $request, TeacherSubjectAssignment $assignment): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeAssignment($request, $assignment);
+        $data = $request->validate([
+            'class_record' => ['required', 'file', 'mimes:xlsx', 'extensions:xlsx', 'max:10240'],
+            'period' => ['required', 'string'],
+        ]);
+        $assignment->load('section.gradeLevel', 'curriculumSubject');
+        $periods = $this->assignmentGradingInputPeriods($assignment);
+        if (! in_array($data['period'], array_column($periods, 'key'), true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['period' => 'This term is not open for grade input. Refresh the grade sheet and select an editable term.']);
+        }
+        if (! preg_match('/term_(\d+)$/', $data['period'], $match)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['period' => 'This grading period cannot be mapped to a TERM worksheet.']);
+        }
+        try {
+            $records = \App\Support\EClassRecord::read($request->file('class_record')->getRealPath(), (int) $match[1]);
+        } catch (\RuntimeException $exception) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['class_record' => $exception->getMessage()]);
+        }
+        $enrollments = Enrollment::query()->with('student')
+            ->where('section_ID', $assignment->section_ID)
+            ->where('SY_ID', $assignment->SY_ID)->get();
+
+        return response()->json(\App\Support\EClassRecordGrades::match($records, $enrollments, $assignment, $data['period']));
+    }
+
     public function storeGrades(StoreTeacherSectionGradesRequest $request, TeacherSubjectAssignment $assignment): RedirectResponse
     {
         $this->authorizeAssignment($request, $assignment);
