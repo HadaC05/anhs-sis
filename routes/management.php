@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CurriculumConfigurationController;
 use App\Http\Controllers\Admin\DocumentReturnReasonConfigurationController;
 use App\Http\Controllers\Admin\GradingTermConfigurationController;
 use App\Http\Controllers\Admin\MovementReasonConfigurationController;
+use App\Http\Controllers\Admin\RoomConfigurationController;
 use App\Http\Controllers\Admin\SectionConfigurationController;
 use App\Http\Controllers\Admin\SubjectConfigurationController;
 use App\Http\Controllers\Admin\TeacherAssignmentController;
@@ -71,6 +72,9 @@ Route::put('/grading-term-configuration/{term}', [GradingTermConfigurationContro
     ->name('grading-term-config.update');
 Route::get('/section-configuration', [SectionConfigurationController::class, 'index'])
     ->name('section-config.index');
+Route::get('/rooms', [RoomConfigurationController::class, 'index'])->name('room-config.index');
+Route::post('/rooms', [RoomConfigurationController::class, 'store'])->name('room-config.store');
+Route::put('/rooms/{room}', [RoomConfigurationController::class, 'update'])->name('room-config.update');
 Route::post('/section-configuration', [SectionConfigurationController::class, 'store'])
     ->name('section-config.store');
 Route::post('/section-configuration/copy', [SectionConfigurationController::class, 'copy'])

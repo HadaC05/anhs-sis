@@ -10,20 +10,40 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('pending_grade_submissions', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedInteger('assignment_ID');
-            $table->unsignedInteger('term_ID');
-            $table->timestamp('submitted_at');
-            $table->unique(['assignment_ID', 'term_ID']);
-            $table->foreign('assignment_ID')->references('assignment_ID')->on('teacher_subject_assignments')->cascadeOnDelete();
-            $table->foreign('term_ID')->references('term_ID')->on('grading_terms')->cascadeOnDelete();
-        });
-        Schema::create('registrar_grade_digest_state', function (Blueprint $table) {
-            $table->unsignedInteger('id')->primary();
-            $table->timestamp('last_sent_at');
-        });
-        DB::table('registrar_grade_digest_state')->insert(['id' => 1, 'last_sent_at' => now()]);
+        if (! Schema::hasTable('pending_grade_submissions')) {
+            Schema::create('pending_grade_submissions', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedInteger('assignment_ID');
+                $table->unsignedBigInteger('term_ID');
+                $table->timestamp('submitted_at');
+                $table->unique(['assignment_ID', 'term_ID']);
+            });
+        }
+
+        // MySQL may retain the table after a foreign-key creation failure.
+        // Repair that partial migration in place without discarding queued rows.
+        $foreignKeys = collect(Schema::getForeignKeys('pending_grade_submissions'));
+        if (! $foreignKeys->contains(fn (array $key): bool => $key['columns'] === ['assignment_ID'])) {
+            Schema::table('pending_grade_submissions', function (Blueprint $table) {
+                $table->foreign('assignment_ID')->references('assignment_ID')->on('teacher_subject_assignments')->cascadeOnDelete();
+            });
+        }
+        if (! $foreignKeys->contains(fn (array $key): bool => $key['columns'] === ['term_ID'])) {
+            Schema::table('pending_grade_submissions', function (Blueprint $table) {
+                $table->unsignedBigInteger('term_ID')->change();
+            });
+            Schema::table('pending_grade_submissions', function (Blueprint $table) {
+                $table->foreign('term_ID')->references('term_ID')->on('grading_terms')->cascadeOnDelete();
+            });
+        }
+
+        if (! Schema::hasTable('registrar_grade_digest_state')) {
+            Schema::create('registrar_grade_digest_state', function (Blueprint $table) {
+                $table->unsignedInteger('id')->primary();
+                $table->timestamp('last_sent_at');
+            });
+        }
+        DB::table('registrar_grade_digest_state')->insertOrIgnore(['id' => 1, 'last_sent_at' => now()]);
         DB::table('notification_types')->updateOrInsert(
             ['slug' => NotificationType::GRADE_SUBMISSIONS_DIGEST],
             ['name' => 'New grade submissions', 'sort_order' => 9, 'created_at' => now(), 'updated_at' => now()],

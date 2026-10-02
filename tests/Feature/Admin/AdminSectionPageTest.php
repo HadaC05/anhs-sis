@@ -10,6 +10,16 @@ use App\Models\Section;
 use App\Models\Staff;
 use Illuminate\Support\Facades\Hash;
 
+test('renaming a room preserves existing section assignments', function () {
+    ['admin' => $admin, 'section' => $section] = createSectionPageFixtures('admin.room.rename');
+    $section->update(['status' => false]);
+    $room = Room::query()->where('name', $section->room)->firstOrFail();
+    $this->actingAs($admin)->put(route('admin.room-config.update', $room), ['name' => 'New Room Name'])
+        ->assertSessionHasNoErrors();
+    expect($section->fresh()->room)->toBe('New Room Name')
+        ->and($room->fresh()->sections()->whereKey($section->section_ID)->exists())->toBeTrue();
+});
+
 test('section rooms are selected from the lookup and unknown rooms are rejected', function () {
     ['admin' => $admin, 'section' => $section, 'academicYear' => $year, 'curriculum' => $curriculum] = createSectionPageFixtures('admin.rooms');
     Room::query()->create(['name' => 'Science Laboratory']);

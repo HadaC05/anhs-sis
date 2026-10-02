@@ -174,6 +174,12 @@
                             </svg>
                             <span class="font-semibold">Sections</span>
                         </a>
+                        <a href="{{ route('admin.room-config.index') }}" class="sidebar-link {{ request()->routeIs('admin.room-config.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V3h14v18M9 21v-6h6v6M9 7h1m4 0h1M9 11h1m4 0h1"></path>
+                            </svg>
+                            <span class="font-semibold">Rooms</span>
+                        </a>
                         <a href="{{ route('admin.movement-reason-config.index') }}" class="sidebar-link {{ request()->routeIs('admin.movement-reason-config.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
