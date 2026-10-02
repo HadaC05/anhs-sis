@@ -161,6 +161,10 @@ class Sf9ReportCardBuilder
         $adviser = $section->adviser;
         $periodKeys = array_column($periods, 'key');
         $observedPeriods = $isSeniorHigh ? self::seniorHighObservedPeriods() : $periods;
+        $academicYear = $section->academicYear ?? $enrollment->academicYear;
+        $attendanceMonths = $academicYear
+            ? array_keys($academicYear->attendanceMonths())
+            : Sf9AttendanceSummary::monthKeys();
 
         $school = \App\Models\SchoolInformation::current();
 
@@ -189,9 +193,7 @@ class Sf9ReportCardBuilder
             'school_district' => $school->district,
             'school_logo' => $school->logoDataUri(),
             'performance_descriptors' => $isSeniorHigh ? self::seniorHighPerformanceDescriptors() : [],
-            'attendance_months' => $isSeniorHigh
-                ? self::seniorHighAttendanceMonthKeys()
-                : Sf9AttendanceSummary::monthKeys(),
+            'attendance_months' => $attendanceMonths,
             'observed_periods' => $observedPeriods,
             'senior_high_terms' => $isSeniorHigh ? GradingTerm::seniorHighTerms() : [],
             'signature_labels' => $isSeniorHigh
@@ -203,7 +205,7 @@ class Sf9ReportCardBuilder
                 ),
             'observed_values' => self::observedRows($observedValues, $isSeniorHigh, $periodKeys),
             'attendance' => $schoolDaysByMonth !== []
-                ? Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, $schoolDaysByMonth)
+                ? Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, $schoolDaysByMonth, $attendanceMonths)
                 : Sf9AttendanceSummary::empty(),
         ];
 

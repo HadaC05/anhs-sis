@@ -68,6 +68,36 @@ test('adviser downloads a complete sf1 workbook matching the sample register col
     }
 });
 
+test('management can export the section sf1 from section details', function (string $role) {
+    ['section' => $section] = sf1Fixtures();
+    $manager = Staff::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => $role])->id,
+        'username' => 'sf1.'.$role,
+        'password' => 'password',
+        'first_name' => 'School',
+        'last_name' => 'Manager',
+        'status' => 'active',
+    ]);
+    $url = route($role.'.section-config.sf1', $section);
+    $this->actingAs($manager)->get(route($role.'.section-config.index', ['tab' => 'details', 'section' => $section->section_ID]))
+        ->assertOk()->assertSee('Export SF1 Excel')->assertSee($url);
+    $response = $this->get($url);
+    $response->assertOk()->assertDownload('SF1-11-a-2026-2027.xlsx')
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    $path = $response->baseResponse->getFile()->getPathname();
+    try {
+        $rows = ClassListSpreadsheet::rowsFromPath($path, 'xlsx');
+        expect(collect($rows)->filter(fn ($row) => preg_match('/^\d{12}$/', (string) ($row[0] ?? ''))))->toHaveCount(3);
+    } finally {
+        unlink($path);
+    }
+})->with(['admin', 'principal']);
+
+test('teachers cannot use management sf1 export routes', function (string $role) {
+    ['teacher' => $teacher, 'section' => $section] = sf1Fixtures();
+    $this->actingAs($teacher)->get(route($role.'.section-config.sf1', $section))->assertForbidden();
+})->with(['admin', 'principal']);
+
 test('sf1 export remains restricted to the assigned adviser', function () {
     ['teacher' => $teacher, 'section' => $section] = sf1Fixtures();
     $other = $teacher->replicate();

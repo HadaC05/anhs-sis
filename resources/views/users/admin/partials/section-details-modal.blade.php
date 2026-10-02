@@ -32,8 +32,9 @@
                     @endif
                 </div>
             @endif
-            <div class="mb-4 flex justify-end">
+            <div class="mb-4 flex flex-wrap justify-end gap-2">
                 <button type="button" id="sectionImportTrigger" @disabled($importPending) class="rounded-lg px-4 py-2 text-sm font-bold text-white disabled:opacity-50" style="background:#296374">Import Students</button>
+                <a href="{{ route($managementRoutePrefix.'section-config.sf1', $selectedSection) }}" class="inline-flex items-center justify-center rounded-lg border border-[#296374] bg-white px-4 py-2 text-sm font-bold text-[#296374] transition hover:bg-[#eef5f7]" title="Download the complete active class register">Export SF1 Excel</a>
             </div>
             <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="w-full text-left text-[13px]">

@@ -765,7 +765,7 @@
                     <h2 style="margin-top: 8mm;">Attendance Record</h2>
                     @php
                         $attendance = $card['attendance'] ?? \App\Support\Sf9AttendanceSummary::empty();
-                        $attendanceMonths = \App\Support\Sf9AttendanceSummary::monthKeys();
+                        $attendanceMonths = $card['attendance_months'] ?? \App\Support\Sf9AttendanceSummary::monthKeys();
                     @endphp
                     <table class="attendance">
                         <thead>

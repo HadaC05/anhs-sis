@@ -1,19 +1,23 @@
 <?php
 
 use App\Models\AcademicYear;
+use App\Models\AcademicYearAttendanceSetting;
 use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\Enrollment;
+use App\Models\EnrollmentMonthlyAttendance;
 use App\Models\GradeLevel;
 use App\Models\PreferredCourse;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
+use App\Support\Sf9ReportCardBuilder;
 use Illuminate\Support\Facades\Hash;
 
 function createAdvisorySf9Fixtures(bool $isSeniorHigh = true): array
@@ -133,10 +137,15 @@ function createAdvisorySf9Fixtures(bool $isSeniorHigh = true): array
         'enrollment_status' => 'enrolled',
     ]);
 
-    StudentSubjectGrade::query()->create([
+    $studentSubject = StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
+        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+    ]);
+
+    StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $studentSubject->student_subject_ID,
         'assignment_ID' => $assignment->assignment_ID,
-        'grading_period' => $isSeniorHigh ? 'shs_sem1_term_1' : 'term_1',
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey($isSeniorHigh ? 'shs_sem1_term_1' : 'term_1'),
         'numeric_grade' => 91,
         'posted_by' => $teacher->staff_id,
     ]);
@@ -159,6 +168,49 @@ test('advisory teacher can print the junior high sf9 layout', function () {
     $response->assertDontSee('Track / Strand');
     $response->assertDontSee('Semester Final Grade');
 });
+
+test('sf9 attendance uses the configured school year months and totals', function (bool $isSeniorHigh, array $months) {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisorySf9Fixtures($isSeniorHigh);
+    $section->academicYear->update([
+        'attendance_start_month' => $months[0],
+        'attendance_end_month' => $months[array_key_last($months)],
+    ]);
+
+    // June is outside both configured ranges, but still has historical records.
+    foreach ([$months[0], $months[array_key_last($months)], 6] as $month) {
+        AcademicYearAttendanceSetting::factory()->create([
+            'SY_ID' => $section->SY_ID,
+            'month' => $month,
+            'school_days' => 20,
+        ]);
+        EnrollmentMonthlyAttendance::query()->create([
+            'enrollment_ID' => $enrollment->enrollment_ID,
+            'month' => $month,
+            'days_present' => 18,
+            'days_absent' => 2,
+        ]);
+    }
+
+    $response = $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section));
+    $response->assertOk();
+    $card = $response->viewData('cards')->first();
+    expect($card['attendance_months'])->toBe($months)
+        ->and($card['attendance']['total_school_days'])->toBe(40)
+        ->and($card['attendance']['total_present'])->toBe(36)
+        ->and($card['attendance']['total_absent'])->toBe(4);
+
+    $labels = \App\Models\Month::labels();
+    $headers = array_map(fn (int $month): string => $isSeniorHigh
+        ? '<th>'.Sf9ReportCardBuilder::attendanceMonthAbbreviation($month).'</th>'
+        : '<th class="month">'.$labels[$month].'</th>', $months);
+    $response->assertSeeInOrder($headers, false);
+    $response->assertDontSee($isSeniorHigh ? '<th>Jun</th>' : '<th class="month">June</th>', false);
+})->with([
+    'junior high across calendar years' => [false, [8, 9, 10, 11, 12, 1, 2, 3, 4, 5]],
+    'senior high across calendar years' => [true, [8, 9, 10, 11, 12, 1, 2, 3, 4, 5]],
+    'junior high within one calendar year' => [false, [2, 3, 4, 5]],
+    'senior high within one calendar year' => [true, [2, 3, 4, 5]],
+]);
 
 test('advisory teacher can print the senior high sf9 performance report layout', function () {
     ['teacher' => $teacher, 'section' => $section] = createAdvisorySf9Fixtures();

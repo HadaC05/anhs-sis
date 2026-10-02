@@ -125,6 +125,11 @@ class SectionConfigurationController extends Controller
         ]);
     }
 
+    public function downloadSf1(Section $section): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        return \App\Support\Sf1Export::download($section);
+    }
+
     public function importStudents(Request $request, Section $section): RedirectResponse
     {
         return app(\App\Support\SectionStudentImport::class)->importAdvisoryClassList($request, $section);
