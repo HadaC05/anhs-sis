@@ -3,6 +3,10 @@
 @section('title', ($status ?? 'submitted') === 'submitted' ? 'Review Grade Submission' : ucfirst($status).' Grade Record')
 
 @section('content')
+<a href="{{ route('registrar.grade-approvals') }}" class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+    <span aria-hidden="true">&larr;</span> Back to Grade Approvals
+</a>
+
 @php
     $section = $assignment->section;
     $subject = $assignment->curriculumSubject?->subject;

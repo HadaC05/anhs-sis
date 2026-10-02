@@ -3,6 +3,10 @@
 @section('title', 'Student Details')
 
 @section('content')
+<a href="{{ route('registrar.students') }}" class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+    <span aria-hidden="true">&larr;</span> Back to Masterlist
+</a>
+
 @php
     $application = $student->application;
     $profile = $student->profile;
@@ -39,7 +43,6 @@
         <h1 class="text-xl font-bold tracking-tight text-gray-700 md:text-2xl">Student Details</h1>
         <p class="mt-1 text-sm text-gray-500">{{ $fullName ?: 'Unnamed student' }} &middot; LRN {{ $student->lrn ?: '—' }}</p>
     </div>
-    <a href="{{ route('registrar.students') }}" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50">Back to Masterlist</a>
 </div>
 @if ($errors->any())
 <div role="alert" class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{{ $errors->first() }}</div>
