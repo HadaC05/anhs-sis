@@ -61,6 +61,29 @@ function mapehDisplay(array $f, bool $releasedOnly = false): array
     return [$display, MapehGrades::grades($display, $grades, ['term_1'], $releasedOnly)];
 }
 
+test('promotion accepts complete released MAPEH components without a manually entered parent grade', function (string $mode) {
+    $f = mapehFixtures();
+    MapehSetup::save($f['curriculum'], array_replace($f['data'], ['mode' => $mode]));
+    foreach (GradingTerm::configuredPeriods() as $period) {
+        mapehComponentGrades($f, $mode === 'paired' ? [88, 92] : [88, 90, 86, 92], 'released', $period['key']);
+    }
+    GradingTerm::closeAllJuniorHighTerms();
+
+    $evaluation = \App\Support\PromotionEligibility::evaluate($f['enrollment']->fresh());
+    expect($evaluation['status'])->toBe('eligible')
+        ->and($evaluation['subject_averages'])->toHaveCount(1);
+    $batch = \App\Support\PromotionEligibility::synchronizeMany(Enrollment::whereKey($f['enrollment']->getKey())->get());
+    expect($batch[$f['enrollment']->getKey()])->toBe($evaluation);
+    $this->actingAs($f['teacher'])->get(route('teacher.advisory.promotions.index', $f['section']))
+        ->assertOk()->assertSee('General Average')->assertSee('Eligible for Promotion')
+        ->assertSee($mode === 'paired' ? '>90</td>' : '>89</td>', false);
+
+    StudentSubjectGrade::firstOrFail()->update(['status' => 'draft']);
+    expect(\App\Support\PromotionEligibility::evaluate($f['enrollment']->fresh())['status'])->toBe('pending');
+    $batch = \App\Support\PromotionEligibility::synchronizeMany(Enrollment::whereKey($f['enrollment']->getKey())->get());
+    expect($batch[$f['enrollment']->getKey()]['status'])->toBe('pending');
+})->with(['four', 'paired']);
+
 test('admin and principal configure MAPEH components with roster backfill', function (string $role, string $mode, int $count) {
     $f = mapehFixtures($role);
     $this->actingAs($f['manager'])->get(route($role.'.curriculum-config.mapeh.edit', $f['curriculum']))->assertOk()->assertSee('Save MAPEH Configuration');

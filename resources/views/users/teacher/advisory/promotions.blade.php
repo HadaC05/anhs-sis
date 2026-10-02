@@ -57,6 +57,7 @@
                     <th class="w-12 px-5 py-3 text-center"><input type="checkbox" data-select-all class="h-4 w-4 rounded border-gray-300 text-[#296374]"></th>
                     <th class="px-5 py-3">Learner</th>
                     <th class="px-5 py-3">LRN</th>
+                    <th class="px-5 py-3">General Average</th>
                     <th class="px-5 py-3">Eligibility</th>
                     <th class="px-5 py-3">Action</th>
                 </tr>
@@ -68,6 +69,8 @@
                         $name = $student?->application ? trim($student->application->last_name.', '.$student->application->first_name.' '.$student->application->middle_name) : ($student?->name ?? 'Learner');
                         $evaluation = $evaluations[$enrollment->enrollment_ID];
                         $status = $evaluation['status'];
+                        $subjectAverages = collect($evaluation['subject_averages'])->map(fn ($average) => round($average));
+                        $generalAverage = $subjectAverages->isNotEmpty() ? round($subjectAverages->avg()) : null;
                         $badge = match ($status) { 'eligible', 'promoted' => 'bg-emerald-100 text-emerald-800', 'retained' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' };
                         $label = match ($status) { 'eligible' => 'Eligible for Promotion', 'promoted' => 'Promoted', 'conditionally_promoted' => 'Conditionally Promoted', 'retained' => 'Not Eligible', default => 'Pending Requirements' };
                         $isGradeTwelve = $section->getRelation('gradeLevel')?->grade_label === 'Grade 12';
@@ -82,6 +85,7 @@
                         </td>
                         <td class="px-5 py-4 font-semibold text-gray-800">{{ $name }}</td>
                         <td class="px-5 py-4 text-gray-600">{{ $student?->lrn ?? '—' }}</td>
+                        <td class="px-5 py-4 font-semibold text-gray-800">{{ $generalAverage === null ? '—' : number_format($generalAverage, 0) }}</td>
                         <td class="px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $badge }}">{{ $label }}</span></td>
                         <td class="px-5 py-4">
                             @if ($canPromote)
@@ -101,7 +105,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-12 text-center text-gray-500">No active learners match the selected filters in this advisory section.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-12 text-center text-gray-500">No active learners match the selected filters in this advisory section.</td></tr>
                 @endforelse
             </tbody>
         </table>

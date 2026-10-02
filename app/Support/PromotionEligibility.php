@@ -29,7 +29,7 @@ class PromotionEligibility
             ->get()->groupBy('section_ID');
         $grades = StudentSubjectGrade::query()->with('studentSubject')
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->modelKeys()))
-            ->where('grade_status_ID', GradeStatus::idFor(GradeStatus::RELEASED))->get()
+            ->get()
             ->groupBy(fn ($grade) => $grade->studentSubject->enrollment_ID);
         $closed = GradingTerm::areJuniorHighTermsClosed();
         $statusIds = PromotionStatus::query()->pluck('promotion_status_ID', 'slug')->all();
@@ -132,7 +132,7 @@ class PromotionEligibility
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
             ->whereIn('curr_subj_ID', $studentSubjectIds)
-            ->get(['assignment_ID']);
+            ->get();
         $periodKeys = $batch['periods']['keys'] ?? collect(GradingTerm::isSeniorHighSection($section)
             ? GradingTerm::seniorHighPeriods($enrollment->semester)
             : GradingTerm::configuredPeriods())
@@ -143,13 +143,24 @@ class PromotionEligibility
         }
 
         $grades = $batch !== null ? $batch['grades']->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
-            ->whereIn('term_ID', $batch['periods']['ids'])->groupBy('assignment_ID') : StudentSubjectGrade::query()
+            ->whereIn('term_ID', $batch['periods']['ids']) : StudentSubjectGrade::query()
             ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->whereIn('term_ID', $periodKeys->map(fn (string $key) => StudentSubjectGrade::termIdForPeriodKey($key)))
-            ->where('grade_status_ID', GradeStatus::idFor(GradeStatus::RELEASED))
-            ->get()
-            ->groupBy('assignment_ID');
+            ->get();
+
+        // Use the same calculated MAPEH subject as reports. Keep unreleased
+        // component entries visible to the calculator so they block legacy fallback.
+        $assignments = MapehGrades::assignments($section, $assignments);
+        $grades = MapehGrades::grades(
+            $assignments,
+            $grades->groupBy('assignment_ID')->map(fn ($items) => $items->keyBy('grading_period')),
+            $periodKeys->all(),
+            true,
+        );
+        $assignments = $assignments->reject(fn ($assignment) => $assignment->mapeh_component);
+        $grades = $grades->only($assignments->pluck('assignment_ID')->all())
+            ->map(fn ($items) => $items->filter(fn ($grade) => $grade->status === GradeStatus::RELEASED));
 
         $averages = [];
         foreach ($assignments as $assignment) {
