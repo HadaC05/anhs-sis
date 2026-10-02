@@ -342,6 +342,10 @@
     </section>
 </div>
 
+@endsection
+
+{{-- Render outside the main content stacking context so overlays cover the navigation. --}}
+@push('modals')
 <div id="assignAdvisoryModal" role="dialog" aria-modal="true" aria-labelledby="assignAdvisoryModalTitle" data-open="{{ $assignAdvisoryModalOpen ? 'true' : 'false' }}" class="fixed inset-0 z-[100] {{ $assignAdvisoryModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4 pt-24">
     <div class="mx-auto w-full max-w-3xl overflow-visible rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div class="border-b border-gray-300 bg-[#296374] px-6 py-4"><div class="flex items-start justify-between gap-4"><div><p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">School management</p><h3 id="assignAdvisoryModalTitle" class="mt-1 text-xl font-bold tracking-tight text-white">Assign Adviser</h3></div><button type="button" onclick="closeAssignAdvisoryModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10" aria-label="Close">×</button></div></div>
@@ -1028,4 +1032,4 @@
 
     refreshBulkFilters();
 </script>
-@endsection
+@endpush
