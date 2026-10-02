@@ -20,7 +20,7 @@ class StoreTeacherSectionGradesRequest extends FormRequest
         return [
             'submit' => ['nullable', 'boolean'],
             'grades' => ['nullable', 'array'],
-            'grades.*.*.grade' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'grades.*.*.grade' => ['nullable', 'numeric', 'min:60', 'max:100'],
             'grades.*.*.remarks' => ['nullable', 'string', 'max:255'],
         ];
     }
@@ -32,8 +32,8 @@ class StoreTeacherSectionGradesRequest extends FormRequest
     {
         return [
             'grades.*.*.grade.numeric' => 'Grades must be numeric.',
-            'grades.*.*.grade.min' => 'Grades must be between 0 and 100.',
-            'grades.*.*.grade.max' => 'Grades must be between 0 and 100.',
+            'grades.*.*.grade.min' => 'Grades must be between 60 and 100.',
+            'grades.*.*.grade.max' => 'Grades must be between 60 and 100.',
         ];
     }
 }

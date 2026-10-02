@@ -184,9 +184,9 @@ test('student grades advisory SF10 and SF5 use the combined MAPEH grade', functi
     foreach (GradingTerm::configuredPeriods() as $period) {
         StudentSubjectGrade::create(['student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $mathAssignment->assignment_ID, 'term_ID' => StudentSubjectGrade::termIdForPeriodKey($period['key']), 'numeric_grade' => 75, 'status' => 'released', 'posted_by' => $f['teacher']->staff_id]);
     }
-    $this->actingAs($f['student'])->get(route('student.grades'))->assertOk()->assertSee('MAPEH')->assertSee('89');
+    $this->actingAs($f['student'])->get(route('student.grades'))->assertOk()->assertDontSee('MAPEH 7')->assertSee('MAPEH - Music')->assertSee('82');
     $this->get(route('student.grades', ['session' => $f['enrollment']->enrollment_ID, 'report' => 1]))->assertOk()->assertSee('89')->assertSee('82');
-    $this->actingAs($f['teacher'])->get(route('teacher.advisory.show', $f['section']))->assertOk()->assertSee('89')->assertSee('82');
+    $this->actingAs($f['teacher'])->get(route('teacher.advisory.show', $f['section']))->assertOk()->assertDontSee('MAPEH7')->assertSee('82');
     $assignments = TeacherSubjectAssignment::with('curriculumSubject.subject')->get();
     $record = \App\Support\LearnerPermanentRecordBuilder::buildScholasticRecord($f['enrollment'], $f['section']->fresh(), $assignments, StudentSubjectGrade::get(), GradingTerm::configuredPeriods());
     expect(collect($record['subjects'])->firstWhere('label', 'MAPEH')['final'])->toBe(89.0)
@@ -219,4 +219,29 @@ test('unassigned MAPEH components keep class submission progress incomplete', fu
     $terms = $assignments->mapWithKeys(fn ($assignment) => [$assignment->assignment_ID => [['term_ID' => StudentSubjectGrade::termIdForPeriodKey('term_1')]]])->all();
     $progress = \App\Support\SectionGradeSubmissionProgress::forAssignments($assignments, $terms);
     expect($progress[$f['section']->section_ID])->toBe(['submitted' => 3, 'expected' => 4]);
+});
+
+test('configured parent MAPEH is hidden from assignment and student subject lists without deleting history', function () {
+    $this->withoutMiddleware(\App\Http\Middleware\EnsureStudent::class);
+    $f = mapehFixtures();
+    $f['student']->update(['username' => 'mapeh.student', 'password' => 'password', 'change_password' => false]);
+    MapehSetup::save($f['curriculum'], $f['data']);
+    mapehComponentGrades($f, [88, 90, 86, 92], 'released');
+    $response = $this->actingAs($f['manager'])->get(route('admin.teacher-assignments.index', ['SY_ID' => $f['year']->SY_ID]));
+    $response->assertOk();
+    expect($response->viewData('assignments')->getCollection()->pluck('curr_subj_ID'))->not->toContain($f['parent']->curr_subj_ID)
+        ->and($response->viewData('subjectRows')->getCollection()->pluck('subject.subject_ID'))->not->toContain($f['parent']->subject_ID)
+        ->and($response->viewData('mapehExcludedBySection')[$f['section']->section_ID])->toContain($f['parent']->curr_subj_ID);
+    $this->actingAs($f['teacher'])->get(route('teacher.sections.index'))->assertOk()->assertDontSee('MAPEH 7')->assertSee('MAPEH - Music');
+    $this->get(route('teacher.sections.show', $f['assignment']))->assertRedirect(route('teacher.sections.index'));
+    $this->actingAs($f['student'])->get(route('student.subjects'))->assertOk()->assertDontSee('MAPEH 7')->assertSee('MAPEH - Music');
+    expect(TeacherSubjectAssignment::find($f['assignment']->assignment_ID))->not->toBeNull()
+        ->and(StudentSubject::where('enrollment_ID', $f['enrollment']->enrollment_ID)->where('curr_subj_ID', $f['parent']->curr_subj_ID)->exists())->toBeTrue();
+    $year = AcademicYear::create(['school_year' => '2024-2025', 'start_date' => '2024-06-01', 'end_date' => '2025-03-31', 'status' => false]);
+    $section = $f['section']->replicate();
+    $section->SY_ID = $year->SY_ID;
+    $section->save();
+    $historical = TeacherSubjectAssignment::create(['section_ID' => $section->section_ID, 'curr_subj_ID' => $f['parent']->curr_subj_ID, 'staff_ID' => $f['teacher']->staff_id, 'SY_ID' => $year->SY_ID]);
+    expect(TeacherSubjectAssignment::withoutMapehParents()->whereKey($historical->assignment_ID)->exists())->toBeTrue();
+    $this->actingAs($f['teacher'])->get(route('teacher.sections.index', ['SY_ID' => $year->SY_ID]))->assertOk()->assertSee('MAPEH 7');
 });

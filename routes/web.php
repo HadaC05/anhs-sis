@@ -113,6 +113,10 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/teacher/advisory', [TeacherSectionController::class, 'advisoryIndex'])
         ->middleware('teacher')
         ->name('teacher.advisory.index');
+    Route::get('/teacher/advisory/{section}/at-risk', [\App\Http\Controllers\Teacher\AdvisoryRiskController::class, 'index'])
+        ->middleware('teacher')->name('teacher.advisory.at-risk');
+    Route::post('/teacher/advisory/{section}/at-risk/{enrollment}/notify', [\App\Http\Controllers\Teacher\AdvisoryRiskController::class, 'notify'])
+        ->middleware('teacher')->name('teacher.advisory.at-risk.notify');
     Route::get('/teacher/advisory/{section}/observed-values', [TeacherSectionController::class, 'advisoryObservedValues'])
         ->middleware('teacher')
         ->name('teacher.advisory.observed-values');

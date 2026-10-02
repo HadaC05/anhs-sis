@@ -287,6 +287,7 @@ class RegistrarDashboardController extends Controller
         $status = in_array($status, $statuses, true) ? $status : null;
 
         return TeacherSubjectAssignment::query()
+            ->withoutMapehParents()
             ->with([
                 'section.gradeLevel',
                 'curriculumSubject.subject',

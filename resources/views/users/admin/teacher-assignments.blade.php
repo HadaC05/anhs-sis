@@ -854,6 +854,7 @@
         });
     });
 
+    var mapehExcludedBySection = @json($mapehExcludedBySection);
     var sectionSelect = document.getElementById('section_ID');
     var subjectSelect = document.getElementById('curr_subj_ID');
 
@@ -880,7 +881,9 @@
             if (clusterId && clusterId !== '') {
                 matchesCluster = opt.getAttribute('data-cluster') === clusterId;
             }
-            opt.hidden = !(matchesCurriculum && matchesGrade && matchesCluster);
+            var blocked = (mapehExcludedBySection[sectionSelect.value] || []).map(String).includes(opt.value);
+            opt.hidden = !(matchesCurriculum && matchesGrade && matchesCluster) || blocked;
+            opt.disabled = opt.hidden;
         });
 
         var currentOption = Array.from(subjectSelect.options).find(function (opt) {
@@ -928,6 +931,7 @@
             })
             .map(function (input) {
                 return {
+                    id: input.value,
                     grade: input.getAttribute('data-grade') || '',
                     curriculum: input.getAttribute('data-curriculum') || '',
                     cluster: input.getAttribute('data-cluster') || ''
@@ -949,7 +953,9 @@
                 matchesCluster = section.cluster === subjectCluster;
             }
 
-            return matchesGrade && matchesCurriculum && matchesCluster;
+            var subjectId = subjectOption.value || subjectOption.querySelector('input')?.value;
+            var blocked = (mapehExcludedBySection[section.id] || []).map(String).includes(String(subjectId));
+            return matchesGrade && matchesCurriculum && matchesCluster && !blocked;
         });
     }
 

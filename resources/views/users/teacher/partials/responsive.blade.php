@@ -26,7 +26,7 @@
         .teacher-content [class~="lg:flex-row"] { flex-direction: column; align-items: stretch; }
         .teacher-content .teacher-advisory-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .teacher-advisory-tabs > a { border-bottom: 1px solid #2963744d; }
-        .teacher-advisory-tabs > a:last-child { grid-column: span 2; border-bottom: 0; }
+        .teacher-advisory-tabs > a:nth-last-child(-n+2) { border-bottom: 0; }
     }
     @media (max-width: 639px) {
         .teacher-layout [data-test="notification-dropdown"],

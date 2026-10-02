@@ -569,6 +569,7 @@ class PrincipalDashboardController extends Controller
     private function gradeReleaseAssignments(array $filters): Collection
     {
         return TeacherSubjectAssignment::query()
+            ->withoutMapehParents()
             ->with([
                 'section.gradeLevel',
                 'section.academicYear',

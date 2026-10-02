@@ -13,11 +13,16 @@ $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
 $lockedPeriodKeys = $lockedPeriodKeys ?? [];
 $studentCount = $enrollments->count();
 $inputColspan = 3 + count($inputPeriods);
-$summaryColspan = 4 + count($periods);
+$summaryColspan = 3 + count($periods);
 $gradeReturnReasons = $gradeReturnReasons ?? collect();
+$currentTermLabel = \App\Models\GradingTerm::currentEditablePeriodLabelForSection($section, $assignment->curriculumSubject?->semester);
+$termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorHighSection($section)
+    ? \App\Models\GradingTerm::isCurrentSeniorHighPeriodOpen()
+    : \App\Models\GradingTerm::isCurrentJuniorHighPeriodOpen());
 @endphp
 
 <div class="space-y-5">
+    <a href="{{ route('teacher.sections.index') }}" class="inline-flex items-center gap-1 text-sm text-gray-500 transition hover:text-[#296374]">&larr; My Sections</a>
     @if (session('status'))
     <div id="teacherGradeToast" role="status" aria-live="polite" class="fixed right-5 top-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-semibold text-emerald-800 shadow-xl">
         <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -85,19 +90,12 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight text-gray-800">Grade Sheet</h1>
-                    <p class="mt-1 text-sm text-gray-500">
-                        @if ($canEditCurrentTerm)
-                        Enter grades for <strong class="text-[#296374]">{{ $editablePeriodLabel }}</strong>. Earlier terms opened by the admin are read-only.
-                        @else
-                        {{ $editablePeriodLabel ? $editablePeriodLabel.' grades are locked.' : 'No grading term is currently open for input.' }}
-                        @endif
-                    </p>
                 </div>
-                @if ($canEditCurrentTerm)
-                <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">{{ $editablePeriodLabel ?? 'Open' }}</span>
-                @else
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-gray-600">Locked</span>
-                @endif
+                <div class="flex flex-wrap justify-end gap-2">
+                    <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold {{ $termIsOpen ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' }}">
+                        {{ $currentTermLabel ?? 'Grade editing' }} <span>{{ $termIsOpen ? 'Open' : 'Closed' }}</span>
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -118,31 +116,11 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             <div class="border-b border-gray-200 bg-slate-50 px-6 py-3 text-sm text-slate-700">
                 This grade sheet is locked for the current term. The values below are read-only.
             </div>
-            @elseif (count($lockedPeriodKeys) > 0)
-            <div class="border-b border-gray-200 bg-amber-50 px-6 py-3 text-sm text-amber-800">
-                Editing is available for {{ $editablePeriodLabel }}. Other terms remain locked.
-            </div>
             @endif
 
             @if ($canEditCurrentTerm && $enrollments->isNotEmpty())
-            <form id="classRecordImportForm" action="{{ route('teacher.sections.grades.import', $assignment) }}" method="POST" enctype="multipart/form-data" class="space-y-3 border-b border-gray-200 bg-slate-50 px-6 py-4">
-                @csrf
-                <div class="flex flex-wrap items-end gap-3">
-                    <div>
-                        <label for="classRecordPeriod" class="mb-1 block text-sm font-semibold text-gray-700">Import into term</label>
-                        <select id="classRecordPeriod" name="period" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
-                            @foreach ($inputPeriods as $period)
-                            <option value="{{ $period['key'] }}" @selected($period['key'] === $editablePeriodKey)>{{ $period['label'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="classRecordFile" class="mb-1 block text-sm font-semibold text-gray-700">E-Class Record (.xlsx)</label>
-                        <input id="classRecordFile" name="class_record" type="file" accept=".xlsx" required class="block max-w-full text-sm text-gray-600" aria-describedby="classRecordImportHelp">
-                    </div>
-                    <button type="submit" id="classRecordImportButton" class="rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Import Class Record</button>
-                </div>
-                <p id="classRecordImportHelp" class="text-xs text-gray-500">Reads only the selected TERM sheet's Term Grade column and matches learner names. Matching editable inputs will be replaced; review them, then Save Grades or Submit. Recalculate and save the completed workbook in Excel before uploading (maximum 10 MB).</p>
+            <div class="border-b border-gray-200 px-6 py-4">
+                <button type="button" id="classRecordImportTrigger" class="rounded-md bg-[#296374] px-4 py-2 text-sm font-semibold text-white" aria-haspopup="dialog" aria-controls="classRecordImportModal">Import Class Record</button>
                 <div id="classRecordImportResult" class="hidden space-y-2 text-sm text-gray-700" aria-live="polite">
                     <p id="classRecordImportSummary"></p>
                     <details id="classRecordImportDetails" class="hidden">
@@ -150,7 +128,7 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                         <ul id="classRecordImportIssues" class="mt-2 max-h-52 list-disc space-y-1 overflow-y-auto pl-5 text-xs"></ul>
                     </details>
                 </div>
-            </form>
+            </div>
             <div id="classRecordImportToast" role="status" aria-live="polite" class="hidden fixed right-5 top-5 z-[120] w-[calc(100%-2.5rem)] max-w-sm rounded-xl border border-gray-200 bg-white p-4 text-sm font-semibold text-gray-800 shadow-xl">
                 <button type="button" class="float-right ml-3" aria-label="Close import notification" onclick="this.parentElement.classList.add('hidden')">&times;</button>
                 <span></span>
@@ -161,14 +139,22 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                 @csrf
                 <input type="hidden" name="submit" id="submitGradesInput" value="0">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full border-collapse text-sm text-gray-800">
+                    <table class="w-full min-w-[640px] table-fixed border-collapse text-sm text-gray-800" aria-label="Learner grade input">
+                        <colgroup>
+                            <col class="w-14">
+                            <col class="w-44">
+                            <col>
+                            @foreach ($inputPeriods as $period)
+                                <col class="w-36">
+                            @endforeach
+                        </colgroup>
                         <thead>
-                            <tr class="bg-[#dbeaf1] text-left text-xs font-bold uppercase tracking-wide text-gray-700">
-                                <th class="border border-gray-200 px-3 py-3 text-center">#</th>
-                                <th class="border border-gray-200 px-3 py-3">LRN</th>
-                                <th class="border border-gray-200 px-3 py-3">Student</th>
+                            <tr class="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                                <th scope="col" class="border-b border-gray-200 px-3 py-4 text-center">#</th>
+                                <th scope="col" class="border-b border-gray-200 px-4 py-4">LRN</th>
+                                <th scope="col" class="border-b border-gray-200 px-4 py-4">Student</th>
                                 @foreach ($inputPeriods as $period)
-                                <th class="border border-gray-200 px-3 py-3 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
+                                <th scope="col" class="border-b border-l border-gray-200 bg-[#dbeaf1]/60 px-4 py-4 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
                                 @endforeach
                             </tr>
                         </thead>
@@ -189,8 +175,8 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                             @php
                             $currentSexGroup = $sexGroup;
                             @endphp
-                            <tr class="bg-[#dbeaf1]/60">
-                                <td colspan="{{ $inputColspan }}" class="border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-700">
+                            <tr class="bg-slate-50">
+                                <td colspan="{{ $inputColspan }}" class="border-y border-gray-200 px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#296374]">
                                     {{ $sexGroup }}
                                 </td>
                             </tr>
@@ -198,28 +184,29 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                             @php
                             $rowNumber++;
                             @endphp
-                            <tr class="{{ $rowNumber % 2 === 0 ? 'bg-gray-50' : 'bg-white' }}">
-                                <td class="border border-gray-200 px-3 py-2.5 text-center">{{ $rowNumber }}</td>
-                                <td class="border border-gray-200 px-3 py-2.5 font-mono text-xs">{{ $student?->lrn ?? 'N/A' }}</td>
-                                <td class="border border-gray-200 px-3 py-2.5">{{ $name }}</td>
+                            <tr class="transition-colors hover:bg-slate-50 focus-within:bg-cyan-50/40 {{ $rowNumber % 2 === 0 ? 'bg-slate-50/50' : 'bg-white' }}">
+                                <td class="border-b border-gray-100 px-3 py-3 text-center text-slate-400">{{ $rowNumber }}</td>
+                                <td class="border-b border-gray-100 px-4 py-3 font-mono text-xs text-slate-500">{{ $student?->lrn ?? 'N/A' }}</td>
+                                <td class="break-words border-b border-gray-100 px-4 py-3 font-medium text-slate-800">{{ $name }}</td>
                                 @foreach ($inputPeriods as $period)
                                 @php
                                 $gradeRecord = $gradeSet->get($period['key']);
                                 $isCellLocked = in_array($period['key'], $lockedPeriodKeys, true) || $gradeRecord?->isTeacherLocked() || ! $canEditCurrentTerm;
                                 @endphp
-                                <td class="border border-gray-200 px-3 py-2 text-center" data-period-column="{{ $period['key'] }}">
+                                <td class="border-b border-l border-gray-100 px-4 py-2 text-center" data-period-column="{{ $period['key'] }}">
                                     <input
                                         type="number"
                                         inputmode="decimal"
                                         step="0.01"
-                                        min="0"
+                                        min="60"
                                         max="100"
+                                        aria-label="{{ $period['label'] }} grade for {{ $name }}"
                                         data-grade-input
-                                        class="mx-auto w-20 rounded-md border px-2 py-1.5 text-center text-sm outline-none transition {{ $isCellLocked ? 'border-gray-200 bg-gray-50 text-gray-500' : 'border-gray-300 bg-white text-gray-800 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15' }}"
+                                        class="mx-auto block h-10 w-24 rounded-lg border px-3 text-center text-sm font-semibold tabular-nums outline-none transition [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none {{ $isCellLocked ? 'border-gray-200 bg-gray-50 text-gray-500' : 'border-gray-300 bg-white text-gray-800 focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15' }}"
                                         name="grades[{{ $enrollment->enrollment_ID }}][{{ $period['key'] }}][grade]"
                                         value="{{ old('grades.'.$enrollment->enrollment_ID.'.'.$period['key'].'.grade', $gradeRecord?->numeric_grade) }}"
                                         placeholder="—"
-                                        title="Enter a number from 0 to 100"
+                                        title="Enter a number from 60 to 100"
                                         @disabled($isCellLocked) />
                                 </td>
                                 @endforeach
@@ -242,32 +229,31 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                 <button type="button" id="saveGradesButton" class="inline-flex items-center justify-center rounded-md px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:opacity-90" style="background-color: #296374;">
                     Save Grades
                 </button>
-                <button type="button" id="submitGradesButton" class="inline-flex items-center justify-center rounded-md bg-amber-500 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:bg-amber-600">
-                    Submit
-                </button>
             </div>
             @endif
         </div>
 
         <div data-grade-panel="summary" class="hidden">
             <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-sm text-gray-500">Average computed from available periods.</p>
+                <div>
+                    <h2 id="gradeSummaryHeading" class="text-sm font-bold text-gray-900">Class grade summary</h2>
+                    <p id="gradeSummaryDescription" class="mt-1 text-xs leading-relaxed text-gray-500">{{ $studentCount }} {{ Str::plural('student', $studentCount) }} &middot; Averages use available periods. Unrecorded grades appear as &mdash;.</p>
+                </div>
                 <a href="{{ route('teacher.sections.summary.print', $assignment) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-[#296374]/40 hover:text-[#296374]">
                     Print Summary
                 </a>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full border-collapse text-sm text-gray-800">
+            <div class="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#296374]" role="region" aria-labelledby="gradeSummaryHeading" tabindex="0">
+                <table class="w-full border-collapse text-sm text-gray-800" aria-labelledby="gradeSummaryHeading" aria-describedby="gradeSummaryDescription">
                     <thead>
-                        <tr class="bg-[#dbeaf1] text-left text-xs font-bold uppercase tracking-wide text-gray-700">
-                            <th class="border border-gray-200 px-3 py-3 text-center">#</th>
-                            <th class="border border-gray-200 px-3 py-3">LRN</th>
-                            <th class="border border-gray-200 px-3 py-3">Student</th>
+                        <tr class="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                            <th scope="col" class="w-14 border-b border-gray-200 px-3 py-4 text-center">#</th>
+                            <th scope="col" class="min-w-64 border-b border-gray-200 px-4 py-4">Student <span class="ml-1 font-medium normal-case text-slate-500">/ LRN</span></th>
                             @foreach ($periods as $period)
-                            <th class="border border-gray-200 px-3 py-3 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
+                            <th scope="col" class="min-w-28 border-b border-gray-200 px-4 py-4 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
                             @endforeach
-                            <th class="border border-gray-200 px-3 py-3 text-center">Average</th>
+                            <th scope="col" class="w-32 min-w-28 border-b border-l border-[#296374]/15 bg-[#296374]/10 px-4 py-4 text-center text-[#296374]">Average</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -290,8 +276,8 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                         @php
                         $currentSummarySexGroup = $sexGroup;
                         @endphp
-                        <tr class="bg-[#dbeaf1]/60">
-                            <td colspan="{{ $summaryColspan }}" class="border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-700">
+                        <tr class="bg-slate-50">
+                            <td colspan="{{ $summaryColspan }}" class="border-b border-gray-200 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                 {{ $sexGroup }}
                             </td>
                         </tr>
@@ -299,41 +285,45 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                         @php
                         $summaryRowNumber++;
                         @endphp
-                        <tr class="{{ $summaryRowNumber % 2 === 0 ? 'bg-gray-50' : 'bg-white' }}">
-                            <td class="border border-gray-200 px-3 py-2.5 text-center">{{ $summaryRowNumber }}</td>
-                            <td class="border border-gray-200 px-3 py-2.5 font-mono text-xs">{{ $student?->lrn ?? 'N/A' }}</td>
-                            <td class="border border-gray-200 px-3 py-2.5">{{ $name }}</td>
+                        <tr class="bg-white transition-colors hover:bg-slate-50">
+                            <td class="border-b border-gray-100 px-3 py-3.5 text-center text-xs tabular-nums text-slate-400">{{ $summaryRowNumber }}</td>
+                            <th scope="row" class="border-b border-gray-100 px-4 py-3.5 text-left font-medium">
+                                <span class="block break-words text-gray-900">{{ $name }}</span>
+                                <span class="mt-1 block font-mono text-xs font-normal tracking-wide text-slate-500">{{ $student?->lrn ?? 'N/A' }}</span>
+                            </th>
                             @foreach ($periods as $period)
                             @php
                             $periodGrade = $gradeSet->get($period['key'])?->numeric_grade;
                             @endphp
-                            <td class="border border-gray-200 px-3 py-2.5 text-center" data-period-column="{{ $period['key'] }}">
+                            <td class="border-b border-gray-100 px-4 py-3.5 text-center font-medium tabular-nums text-slate-600" data-summary-enrollment="{{ $enrollment->enrollment_ID }}" data-period-column="{{ $period['key'] }}">
                                 {{ $periodGrade !== null ? $periodGrade : '—' }}
                             </td>
                             @endforeach
-                            <td class="border border-gray-200 px-3 py-2.5 text-center {{ $averageClass }}">
+                            <td class="border-b border-l border-gray-100 bg-[#296374]/5 px-4 py-3.5 text-center text-base tabular-nums {{ $averageClass }}" data-summary-average>
                                 {{ $average !== null ? $average : '—' }}
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="{{ $summaryColspan }}" class="border border-gray-200 px-6 py-12 text-center text-gray-500">No records.</td>
+                            <td colspan="{{ $summaryColspan }}" class="px-6 py-16 text-center">
+                                <p class="font-semibold text-gray-700">No students to display</p>
+                                <p class="mt-1 text-sm text-gray-500">Grades will appear here once students are enrolled in this section.</p>
+                            </td>
                         </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
+            @if ($enrollments->isNotEmpty() && $canEditCurrentTerm)
+            <div class="teacher-actions flex justify-end border-t border-gray-200 px-6 py-4">
+                <button type="button" id="submitGradesButton" class="inline-flex items-center justify-center rounded-md bg-amber-500 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:bg-amber-600">
+                    Submit
+                </button>
+            </div>
+            @endif
         </div>
     </div>
 
-    <div class="flex justify-center pt-1">
-        <a href="{{ route('teacher.sections.index') }}" class="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:opacity-90" style="background-color: #296374;">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-            </svg>
-            Back to My Sections
-        </a>
-    </div>
 </div>
 
 <script>
@@ -343,6 +333,39 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
 </script>
 
 @push('modals')
+@if ($canEditCurrentTerm && $enrollments->isNotEmpty())
+<div id="classRecordImportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true" aria-labelledby="classRecordImportTitle">
+    <div class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
+        <form id="classRecordImportForm" action="{{ route('teacher.sections.grades.import', $assignment) }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <h2 id="classRecordImportTitle" class="text-base font-bold text-gray-800">Import Class Record</h2>
+                <button type="button" id="classRecordImportClose" class="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</button>
+            </div>
+            <label for="classRecordPeriod" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Term</label>
+            <select id="classRecordPeriod" name="period" required class="mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
+                @foreach ($inputPeriods as $period)
+                    <option value="{{ $period['key'] }}" @selected($period['key'] === $editablePeriodKey)>{{ $period['label'] }}</option>
+                @endforeach
+            </select>
+            <p id="classRecordImportHelp" class="mb-3 text-xs text-gray-500">Upload a completed Excel class record. Grades from the selected TERM sheet are matched to learners by name. Recalculate and save the workbook in Excel before uploading, then review and save the imported grades.</p>
+            <input id="classRecordFile" name="class_record" type="file" accept=".xlsx" required class="sr-only" aria-label="Excel class record" aria-describedby="classRecordImportHelp">
+            <div id="classRecordDropzone" class="cursor-pointer rounded-xl border-2 border-dashed border-[#4bb878]/45 bg-[#f8fcfb] px-6 py-10 text-center transition hover:border-[#4bb878] hover:bg-[#f1faf6]">
+                <svg class="mx-auto h-11 w-11 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 16V4m0 0L8 8m4-4 4 4M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 13h16v4H4z"></path></svg>
+                <p class="mt-4 text-sm font-medium text-[#4bb878]">Drag and drop the class record here</p>
+                <p class="mt-1 text-xs text-gray-400">&mdash; OR &mdash;</p>
+                <button type="button" id="classRecordBrowse" class="mt-4 inline-flex h-9 items-center rounded-md bg-[#4bb878] px-5 text-xs font-bold text-white">Browse Files</button>
+                <p id="classRecordFileName" class="mt-4 text-xs font-medium text-gray-600">XLSX only &middot; Max 10 MB</p>
+            </div>
+            <p id="classRecordFileError" class="mt-2 text-xs text-red-600" role="alert"></p>
+            <div id="classRecordSubmitRow" class="mt-4 hidden justify-end">
+                <button type="submit" id="classRecordImportButton" class="h-9 rounded-lg bg-[#296374] px-4 text-xs font-bold text-white disabled:opacity-50">Import Class Record</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
+
 <div id="gradeConfirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/70 p-4" role="dialog" aria-modal="true" aria-labelledby="gradeConfirmTitle">
     <div class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
         <div id="gradeConfirmHeader" class="border-b border-gray-300 bg-[#296374] px-6 py-4">
@@ -389,11 +412,70 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
             let pendingAction = null;
 
             const importForm = document.getElementById('classRecordImportForm');
+            const importModal = document.getElementById('classRecordImportModal');
+            const importTrigger = document.getElementById('classRecordImportTrigger');
+            const importFile = document.getElementById('classRecordFile');
+            const importZone = document.getElementById('classRecordDropzone');
+            let importBusy = false;
+            let previousBodyOverflow;
+            function closeImportModal() {
+                if (importBusy || !importModal) return;
+                importModal.classList.add('hidden');
+                importModal.classList.remove('flex');
+                document.body.style.overflow = previousBodyOverflow ?? '';
+                importTrigger?.focus();
+            }
+            importTrigger?.addEventListener('click', () => {
+                previousBodyOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                importModal.classList.remove('hidden');
+                importModal.classList.add('flex');
+                document.getElementById('classRecordPeriod').focus();
+            });
+            document.getElementById('classRecordImportClose')?.addEventListener('click', closeImportModal);
+            importModal?.addEventListener('click', event => {
+                if (event.target === importModal) closeImportModal();
+            });
+            importModal?.addEventListener('keydown', event => {
+                if (event.key === 'Escape') closeImportModal();
+                if (event.key !== 'Tab') return;
+                const focusable = [...importModal.querySelectorAll('button, select')].filter(el => !el.disabled && el.getClientRects().length);
+                const first = focusable[0], last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault(); last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault(); first?.focus();
+                }
+            });
+            function selectImportFile() {
+                const file = importFile.files[0];
+                const valid = file && /\.xlsx$/i.test(file.name) && file.size <= 10 * 1024 * 1024;
+                document.getElementById('classRecordFileName').textContent = file?.name ?? 'XLSX only · Max 10 MB';
+                document.getElementById('classRecordFileError').textContent = file && !valid ? 'Choose an XLSX file no larger than 10 MB.' : '';
+                document.getElementById('classRecordSubmitRow').classList.toggle('hidden', !valid);
+                document.getElementById('classRecordSubmitRow').classList.toggle('flex', !!valid);
+                importFile.setCustomValidity(file && !valid ? 'Choose an XLSX file no larger than 10 MB.' : '');
+            }
+            document.getElementById('classRecordBrowse')?.addEventListener('click', event => {
+                event.stopPropagation();
+                if (!importBusy) importFile.click();
+            });
+            importZone?.addEventListener('click', () => { if (!importBusy) importFile.click(); });
+            importFile?.addEventListener('change', selectImportFile);
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(type => importZone?.addEventListener(type, event => {
+                event.preventDefault();
+                importZone.classList.toggle('border-[#4bb878]', type === 'dragenter' || type === 'dragover');
+                if (type === 'drop' && !importBusy && event.dataTransfer.files.length) {
+                    importFile.files = event.dataTransfer.files;
+                    selectImportFile();
+                }
+            }));
             let importToastTimer;
             importForm?.addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const button = document.getElementById('classRecordImportButton');
                 if (button.disabled) return;
+                importBusy = true;
                 const formData = new FormData(importForm);
                 const controls = [button, saveGradesButton, submitGradesButton, ...importForm.querySelectorAll('input[type="file"], select')].filter(Boolean);
                 const controlStates = controls.map(control => control.disabled);
@@ -430,7 +512,7 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                     });
                     const periodLabel = document.getElementById('classRecordPeriod').selectedOptions[0].text;
                     message = imported
-                        ? `${imported} grades filled for ${periodLabel}. Review and save or submit to keep these changes.`
+                        ? `${imported} grades filled for ${periodLabel}. Review and save, or submit from Grade Summary.`
                         : `No grades were imported for ${periodLabel}. Existing inputs were kept.`;
                     summary.textContent = `${message} ${data.unchanged} learner inputs unchanged.`;
                     data.issues.forEach(issue => {
@@ -440,10 +522,14 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
                     });
                     details.classList.toggle('hidden', data.issues.length === 0);
                     details.open = imported === 0 && data.issues.length > 0;
+                    importBusy = false;
+                    closeImportModal();
                 } catch (error) {
                     message = error.message || 'The upload failed. Please try again.';
                     summary.textContent = message;
+                    document.getElementById('classRecordFileError').textContent = message;
                 } finally {
+                    importBusy = false;
                     result.classList.remove('hidden');
                     controls.forEach((control, index) => control.disabled = controlStates[index]);
                     gradeInputs.forEach((input, index) => input.readOnly = inputStates[index]);
@@ -493,8 +579,9 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
 
                     const numeric = Number(input.value);
 
-                    if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
-                        input.setCustomValidity('Enter a number from 0 to 100.');
+                    if (!Number.isFinite(numeric) || numeric < 60 || numeric > 100) {
+                        document.querySelector('[data-grade-tab="input"]')?.click();
+                        input.setCustomValidity('Enter a number from 60 to 100.');
                         input.reportValidity();
                         input.focus();
 
@@ -675,6 +762,22 @@ $gradeReturnReasons = $gradeReturnReasons ?? collect();
         const panels = document.querySelectorAll('[data-grade-panel]');
 
         function activateTab(name) {
+            if (name === 'summary') {
+                document.querySelectorAll('[data-summary-enrollment]').forEach(cell => {
+                    const input = document.getElementById('gradeForm')?.elements.namedItem(`grades[${cell.dataset.summaryEnrollment}][${cell.dataset.periodColumn}][grade]`);
+                    if (input && !input.disabled) cell.textContent = input.value === '' ? '—' : input.value;
+                });
+                document.querySelectorAll('[data-summary-average]').forEach(cell => {
+                    const values = [...cell.parentElement.querySelectorAll('[data-summary-enrollment]')]
+                        .map(item => item.textContent.trim()).filter(value => value !== '' && Number.isFinite(Number(value))).map(Number);
+                    const average = values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length * 100) / 100 : null;
+                    cell.textContent = average === null ? '—' : average;
+                    cell.classList.toggle('text-gray-400', average === null);
+                    cell.classList.toggle('font-bold', average !== null);
+                    cell.classList.toggle('text-emerald-700', average !== null && average >= 75);
+                    cell.classList.toggle('text-red-700', average !== null && average < 75);
+                });
+            }
             tabs.forEach((tab) => {
                 const isActive = tab.dataset.gradeTab === name;
                 tab.classList.toggle('border-[#296374]', isActive);

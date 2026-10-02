@@ -391,7 +391,7 @@ test('teacher subject list uses term rather than semester for junior high sectio
         ->assertDontSee('Full year');
 });
 
-test('teacher grade input only accepts numeric values up to 100', function () {
+test('teacher grade input only accepts numeric values from 60 to 100', function () {
     ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
 
     $response = $this->actingAs($teacher)->get(route('teacher.sections.show', $assignment));
@@ -401,7 +401,7 @@ test('teacher grade input only accepts numeric values up to 100', function () {
     $response->assertSee('ENG11 - English 11');
     $response->assertSee('Grade Sheet');
     $response->assertSee('type="number"', false);
-    $response->assertSee('min="0"', false);
+    $response->assertSee('min="60"', false);
     $response->assertSee('max="100"', false);
     $response->assertSee('data-grade-input', false);
 });
@@ -434,9 +434,9 @@ test('teacher can save a numeric grade that does not exceed 100', function () {
     $response->assertSessionHas('status', 'Grades saved successfully.');
 
     $grade = StudentSubjectGrade::query()
-        ->where('enrollment_ID', $enrollment->enrollment_ID)
+        ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
         ->where('assignment_ID', $assignment->assignment_ID)
-        ->where('grading_period', 'shs_sem1_term_1')
+        ->forPeriodKey('shs_sem1_term_1')
         ->first();
 
     expect($grade?->numeric_grade)->toEqual(88)
@@ -446,13 +446,13 @@ test('teacher can save a numeric grade that does not exceed 100', function () {
         ->and($grade->status)->toBe('draft');
 });
 
-test('teacher can save a grade of 100', function () {
+test('teacher can save a grade at either boundary', function (int $numericGrade) {
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
 
     $response = $this->actingAs($teacher)->post(route('teacher.sections.grades.store', $assignment), [
         'grades' => [
             $enrollment->enrollment_ID => [
-                'shs_sem1_term_1' => ['grade' => 100],
+                'shs_sem1_term_1' => ['grade' => $numericGrade],
             ],
         ],
     ]);
@@ -462,11 +462,11 @@ test('teacher can save a grade of 100', function () {
 
     expect(
         StudentSubjectGrade::query()
-            ->where('enrollment_ID', $enrollment->enrollment_ID)
+            ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
             ->where('assignment_ID', $assignment->assignment_ID)
             ->value('numeric_grade')
-    )->toEqual(100);
-});
+    )->toEqual($numericGrade);
+})->with([60, 100]);
 
 it('rejects invalid teacher grade values', function (mixed $grade) {
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
@@ -484,7 +484,7 @@ it('rejects invalid teacher grade values', function (mixed $grade) {
 
     expect(
         StudentSubjectGrade::query()
-            ->where('enrollment_ID', $enrollment->enrollment_ID)
+            ->whereHas('studentSubject', fn ($query) => $query->where('enrollment_ID', $enrollment->enrollment_ID))
             ->where('assignment_ID', $assignment->assignment_ID)
             ->exists()
     )->toBeFalse();
@@ -492,6 +492,9 @@ it('rejects invalid teacher grade values', function (mixed $grade) {
     'letters' => 'abc',
     'over one hundred' => 101,
     'negative' => -1,
+    'zero' => 0,
+    'below sixty' => 59,
+    'below sixty decimal' => 59.99,
     'over one hundred decimal' => 100.01,
 ]);
 

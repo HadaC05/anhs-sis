@@ -4,6 +4,9 @@
 
 @section('content')
 @php
+    $averageAssignments = $assignments;
+    $assignments = $assignments->reject(fn ($assignment) => $assignment->computed_mapeh)->values();
+    $availableAssignments = $availableAssignments->reject(fn ($assignment) => $assignment->computed_mapeh)->values();
     $selectedTerm = request('term', 'all');
     $availablePeriodKeys = collect($periods)->pluck('key')->take(4)->values();
     $periodKeys = $selectedTerm !== 'all' && $availablePeriodKeys->contains($selectedTerm) ? collect([$selectedTerm]) : $availablePeriodKeys;
@@ -45,6 +48,11 @@
                 $sexGroup = strtolower((string) $student?->sex) === 'female' ? 'Female' : (strtolower((string) $student?->sex) === 'male' ? 'Male' : 'Unspecified');
                 $sexGroupCounts[$sexGroup] = ($sexGroupCounts[$sexGroup] ?? 0) + 1;
                 $subjectFinals = [];
+                foreach ($averageAssignments->where('computed_mapeh', true) as $combined) {
+                    $combinedGrades = $row['subjects'][$combined->assignment_ID]['periods'] ?? collect();
+                    $combinedValues = $periodKeys->map(fn ($key) => $combinedGrades->get($key)?->numeric_grade);
+                    $subjectFinals[] = $combinedValues->isNotEmpty() && ! $combinedValues->containsStrict(null) ? round($combinedValues->avg()) : null;
+                }
             @endphp
             @if($currentSexGroup !== $sexGroup)@php $currentSexGroup = $sexGroup; @endphp<tr><td colspan="{{ 3 + ($assignments->count() * $subjectColumnSpan) }}" class="border border-gray-200 bg-[#296374]/10 px-3 py-2 text-left text-xs font-extrabold uppercase text-[#296374]">{{ $sexGroup }}</td></tr>@endif
             <tr class="hover:bg-gray-50"><td class="border border-gray-200 px-2 py-2 text-center font-semibold">{{ $sexGroupCounts[$sexGroup] }}</td><td class="border border-gray-200 px-3 py-2 font-semibold uppercase">{{ $row['name'] }}</td>@foreach($assignments as $assignment)@php $subjectGrades = $row['subjects'][$assignment->assignment_ID] ?? null; $periodValues = $periodKeys->map(fn ($periodKey) => $subjectGrades ? $subjectGrades['periods']->get($periodKey)?->numeric_grade : null)->filter(fn ($value) => $value !== null && $value !== ''); $finalGrade = $periodValues->isNotEmpty() && (! $assignment->computed_mapeh || $periodValues->count() === $periodKeys->count()) ? round($periodValues->avg()) : null; if (! $assignment->mapeh_component && ($finalGrade !== null || $assignment->computed_mapeh)) $subjectFinals[] = $finalGrade; @endphp@forelse($periodKeys as $periodKey)@php $grade = $subjectGrades ? $subjectGrades['periods']->get($periodKey)?->numeric_grade : null; @endphp<td class="border border-gray-200 px-2 py-2 text-center font-semibold {{ $periodKey === $activePeriodKey ? $gradeColor($grade) : '' }}">{{ $grade === null || $grade === '' ? '' : number_format((float) $grade, 0) }}</td>@empty<td class="border border-gray-200 px-2 py-2"></td>@endforelse<td class="border border-gray-200 bg-gray-50 px-2 py-2 text-center font-bold {{ $gradeColor($finalGrade) }}">{{ $finalGrade === null ? '' : number_format((float) $finalGrade, 0) }}</td>@endforeach<td class="border border-gray-200 bg-gray-50 px-2 py-2 text-center font-extrabold">

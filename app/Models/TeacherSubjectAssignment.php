@@ -32,6 +32,16 @@ class TeacherSubjectAssignment extends Model
         return 'assignment_ID';
     }
 
+    /** Hide superseded parent assignments only in the configured school year. */
+    public function scopeWithoutMapehParents(Builder $query): Builder
+    {
+        return $query->whereNotExists(function ($subquery): void {
+            $subquery->selectRaw('1')->from('mapeh_configurations')
+                ->whereColumn('mapeh_configurations.parent_curr_subj_ID', 'teacher_subject_assignments.curr_subj_ID')
+                ->whereColumn('mapeh_configurations.SY_ID', 'teacher_subject_assignments.SY_ID');
+        });
+    }
+
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class, 'section_ID', 'section_ID');

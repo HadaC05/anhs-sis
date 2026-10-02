@@ -12,20 +12,22 @@
     <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ $errors->first() }}</div>
 @endif
 
-<form method="GET" action="{{ route('teacher.advisory.promotions.index', $section) }}" class="mb-5 flex flex-wrap items-end gap-3">
-    <label class="text-sm text-gray-600">Learner / LRN
-        <input type="search" name="search" value="{{ request('search') }}" class="block rounded-lg border-gray-300" placeholder="Name or LRN">
+<form method="GET" action="{{ route('teacher.advisory.promotions.index', $section) }}" class="mb-5 grid grid-cols-1 gap-4 rounded-xl border border-[#296374]/25 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
+    <label for="promotion-search" class="block lg:col-span-2"><span class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500">Learner / LRN</span>
+        <input id="promotion-search" type="search" name="search" value="{{ request('search') }}" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm focus:border-[#296374] focus:outline-none focus:ring-2 focus:ring-[#296374]/20" placeholder="Search by name or LRN">
     </label>
-    <label class="text-sm text-gray-600">Status
-        <select name="eligibility" class="block rounded-lg border-gray-300">
+    <label for="promotion-status" class="block"><span class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500">Status</span>
+        <select id="promotion-status" name="eligibility" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm focus:border-[#296374] focus:outline-none focus:ring-2 focus:ring-[#296374]/20">
             <option value="all">All statuses</option>
             @foreach (\App\Models\PromotionStatus::definitions() as $status)
                 <option value="{{ $status['slug'] }}" @selected(request('eligibility') === $status['slug'])>{{ $status['name'] }}</option>
             @endforeach
         </select>
     </label>
-    <button class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white">Apply</button>
-    <a href="{{ route('teacher.advisory.promotions.index', $section) }}" class="px-4 py-2 text-sm text-gray-600">Reset</a>
+    <div class="flex items-center gap-2">
+        <button type="submit" class="inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-[#296374] px-4 text-sm font-semibold text-white transition hover:bg-[#1f4e5c]">Apply filters</button>
+        <a href="{{ route('teacher.advisory.promotions.index', $section) }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+    </div>
 </form>
 
 <form method="POST" action="{{ route('teacher.advisory.promotions.sf5', $section) }}" class="mb-5">

@@ -8,6 +8,10 @@
             ->count();
 @endphp
 
+<a href="{{ route('teacher.advisory.index', ['SY_ID' => $section->SY_ID]) }}" class="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+    <span aria-hidden="true">&larr;</span> Back to Advisory
+</a>
+
 <section class="mb-6 overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm">
     <div class="flex flex-col divide-y divide-slate-200 sm:flex-row sm:divide-x sm:divide-y-0">
         <div class="min-w-0 px-5 py-4 sm:flex-1"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Advisory Class</p><h1 class="mt-1 break-words text-xl font-semibold tracking-tight text-slate-900">{{ $section->name }}</h1></div>
@@ -17,7 +21,7 @@
     </div>
 </section>
 
-<div class="teacher-advisory-tabs mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-[#296374]/40 bg-white shadow-sm sm:grid-cols-5">
+<div class="teacher-advisory-tabs mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-[#296374]/40 bg-white shadow-sm sm:grid-cols-6">
     <a href="{{ route('teacher.advisory.class-list.index', $section) }}"
         class="flex min-w-0 items-center justify-center gap-2 border-b border-r border-[#296374]/30 px-3 py-3 text-center text-sm font-semibold transition sm:border-b-0 {{ ($active ?? 'grades') === 'class-list' ? 'bg-[#296374] text-white' : 'bg-white text-[#296374] hover:bg-[#296374]/10' }}">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-5a4 4 0 11-8 0 4 4 0z"></path></svg>
@@ -39,8 +43,9 @@
         Attendance Record
     </a>
     <a href="{{ route('teacher.advisory.promotions.index', $section) }}"
-        class="col-span-2 flex min-w-0 items-center justify-center gap-2 px-3 py-3 text-center text-sm font-semibold transition sm:col-span-1 {{ ($active ?? 'grades') === 'promotions' ? 'bg-[#296374] text-white' : 'bg-white text-[#296374] hover:bg-[#296374]/10' }}">
+        class="flex min-w-0 items-center justify-center gap-2 border-r border-[#296374]/30 px-3 py-3 text-center text-sm font-semibold transition {{ ($active ?? 'grades') === 'promotions' ? 'bg-[#296374] text-white' : 'bg-white text-[#296374] hover:bg-[#296374]/10' }}">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h6m0 0v6m0-6-8 8-4-4-4 4"></path></svg>
         Promotion
     </a>
+    <a href="{{ route('teacher.advisory.at-risk', $section) }}" class="flex min-w-0 items-center justify-center px-3 py-3 text-center text-sm font-semibold transition {{ ($active ?? 'grades') === 'at-risk' ? 'bg-[#296374] text-white' : 'bg-white text-[#296374] hover:bg-[#296374]/10' }}">At-risk Students</a>
 </div>

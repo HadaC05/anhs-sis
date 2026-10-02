@@ -23,6 +23,8 @@ class NotificationType extends Model
 
     public const GRADES_RELEASED = 'grades_released';
 
+    public const ACADEMIC_SUPPORT = 'academic_support';
+
     public const GRADING_TERM_OPENED = 'grading_term_opened';
 
     public const GRADES_UNLOCKED = 'grades_unlocked';
@@ -70,6 +72,7 @@ class NotificationType extends Model
             ['slug' => self::GRADES_UNLOCKED, 'name' => 'Grades unlocked', 'sort_order' => 7],
             ['slug' => self::DOCUMENT_STATUS_UPDATED, 'name' => 'Document status updated', 'sort_order' => 8],
             ['slug' => self::GRADE_SUBMISSIONS_DIGEST, 'name' => 'New grade submissions', 'sort_order' => 9],
+            ['slug' => self::ACADEMIC_SUPPORT, 'name' => 'Academic support reminder', 'sort_order' => 10],
         ];
     }
 

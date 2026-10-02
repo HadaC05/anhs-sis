@@ -46,6 +46,7 @@ class TeacherAssignmentController extends Controller
         $advisorySearch = trim($request->string('advisory_search')->toString());
 
         $assignments = TeacherSubjectAssignment::query()
+            ->withoutMapehParents()
             ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff.role'])
             ->withCount([
                 'grades as locked_grades_count' => function ($query): void {
@@ -110,6 +111,7 @@ class TeacherAssignmentController extends Controller
             ->get();
 
         $subjectAssignmentRows = TeacherSubjectAssignment::query()
+            ->withoutMapehParents()
             ->with(['section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
@@ -124,7 +126,17 @@ class TeacherAssignmentController extends Controller
             ->get()
             ->groupBy('curr_subj_ID');
 
+        $mapehExcludedBySection = $sections->mapWithKeys(function ($section): array {
+            $config = \App\Models\MapehConfiguration::forSection($section);
+
+            return [$section->section_ID => $config ? [$config->parent_curr_subj_ID, ...$config->inactiveComponentIds()] : []];
+        });
+        $configuredParents = \App\Models\MapehConfiguration::query()
+            ->when($schoolYearId !== '', fn ($query) => $query->where('SY_ID', $schoolYearId))
+            ->pluck('parent_curr_subj_ID');
         $subjectRows = $curriculumSubjects
+            ->reject(fn ($subject) => $configuredParents->contains($subject->curr_subj_ID)
+                && $subjectAssignmentRows->get($subject->curr_subj_ID, collect())->isEmpty())
             ->when($gradeLevel !== '', fn ($items) => $items->where('grade_ID', $gradeId))
             ->when($clusterId !== '', fn ($items) => $items->where('cluster_ID', $clusterId))
             ->groupBy('subject_ID')
@@ -165,6 +177,7 @@ class TeacherAssignmentController extends Controller
         return view('users.admin.teacher-assignments', [
             'assignments' => $assignments,
             'subjectRows' => $subjectRows,
+            'mapehExcludedBySection' => $mapehExcludedBySection,
             'sections' => $sections,
             'advisorySections' => $advisorySections,
             'curriculumSubjects' => $curriculumSubjects,
@@ -176,7 +189,7 @@ class TeacherAssignmentController extends Controller
             'advisoryPerPage' => $advisoryPerPage,
             'advisoryCount' => Section::query()->whereNotNull('staff_ID')->count(),
             'unassignedSectionCount' => Section::query()->whereNull('staff_ID')->count(),
-            'assignmentCount' => TeacherSubjectAssignment::query()->count(),
+            'assignmentCount' => TeacherSubjectAssignment::query()->withoutMapehParents()->count(),
             'teacherCount' => $teachers->count(),
             'advisoryGradeLevel' => $advisoryGradeLevel,
             'advisorySchoolYearId' => $advisorySchoolYearId,

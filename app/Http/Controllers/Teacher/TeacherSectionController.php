@@ -62,7 +62,7 @@ class TeacherSectionController extends Controller
             $gradeStatusIds = GradeStatus::idsBySlug();
 
             $assignmentScope = function ($query) use ($staff, $gradeStatusIds): void {
-                $query->with(['curriculumSubject.subject'])
+                $query->withoutMapehParents()->with(['curriculumSubject.subject'])
                     ->where('staff_ID', $staff->staff_id)
                     ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
                     ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
@@ -94,7 +94,7 @@ class TeacherSectionController extends Controller
                     $subQuery->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
                 }])
                 ->whereHas('teacherSubjectAssignments', function ($query) use ($staff, $search): void {
-                    $query->where('staff_ID', $staff->staff_id)
+                    $query->withoutMapehParents()->where('staff_ID', $staff->staff_id)
                         ->when($search !== '', function ($assignmentQuery) use ($search): void {
                             $assignmentQuery->where(function ($inner) use ($search): void {
                                 $inner->whereHas('section', function ($sectionQuery) use ($search): void {
@@ -226,7 +226,8 @@ class TeacherSectionController extends Controller
         $assignments = \App\Support\MapehGrades::assignments($section, $assignments);
         $availableAssignments = $assignments;
 
-        if ($selectedAssignmentId && ! $assignments->contains('assignment_ID', $selectedAssignmentId)) {
+        if ($selectedAssignmentId && (! $assignments->contains('assignment_ID', $selectedAssignmentId)
+            || $assignments->firstWhere('assignment_ID', $selectedAssignmentId)?->computed_mapeh)) {
             $selectedAssignmentId = 0;
         }
         if ($selectedAssignmentId) {
@@ -1097,9 +1098,12 @@ class TeacherSectionController extends Controller
         return back()->with('status', 'Observed values submitted and locked.');
     }
 
-    public function show(Request $request, TeacherSubjectAssignment $assignment): View
+    public function show(Request $request, TeacherSubjectAssignment $assignment): View|RedirectResponse
     {
         $this->authorizeAssignment($request, $assignment);
+        if (\App\Support\MapehGrades::isComputed($assignment)) {
+            return redirect()->route('teacher.sections.index')->with('status', 'MAPEH grades are handled through the component subjects.');
+        }
 
         $assignment->load(['section.academicYear', 'section.cluster', 'section.gradeLevel', 'curriculumSubject.subject']);
         $section = $assignment->section;

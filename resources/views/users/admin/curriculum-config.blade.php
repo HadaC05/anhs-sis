@@ -169,7 +169,7 @@
                             <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $curriculum->cluster?->name ?? '—' }}</td>
                             <td class="border-r border-gray-100 px-5 py-4 font-semibold text-gray-900">{{ $curriculum->name }}</td>
                             <td class="border-r border-gray-100 px-5 py-4">
-                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $curriculum->status ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">
+                                <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $curriculum->status ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200' }}">
                                     {{ $curriculum->status ? 'Active' : 'Inactive' }}
                                 </span>
                             </td>

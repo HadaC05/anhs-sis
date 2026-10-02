@@ -197,7 +197,7 @@ test('dashboard shows only five ungraded subjects while preserving full counts',
         ->assertDontSee('Dashboard subject 6')->assertDontSee('Dashboard subject 7')
         ->assertDontSee('Your teaching workspace')->assertDontSee('Welcome,')
         ->assertDontSee('Start with your classroom.')
-        ->assertSeeInOrder(['Advisory quick access', 'Subject assignments', 'My subject grades'])
+        ->assertSeeInOrder(['Subject assignments', 'Advisory classes', 'Active learners', 'Returned grades', 'Advisory quick access', 'My subject grades'])
         ->assertSee('teacher-content w-full max-w-none', false)
         ->assertViewHas('assignments', fn ($items) => $items->count() === 7)
         ->assertViewHas('ungradedAssignments', fn ($items) => $items->count() === 7);

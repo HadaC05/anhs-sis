@@ -439,6 +439,11 @@ class StudentDashboardController extends Controller
                 ->get()
             : collect();
 
+        if ($selectedEnrollment?->section && ($mapeh = \App\Models\MapehConfiguration::forSection($selectedEnrollment->section))) {
+            $studentSubjects = $studentSubjects->reject(fn ($row) => (int) $row->curr_subj_ID === (int) $mapeh->parent_curr_subj_ID
+                || in_array($row->curr_subj_ID, $mapeh->inactiveComponentIds()))->values();
+        }
+
         return view('users.student.subjects', [
             'student' => $student,
             'application' => $student?->application,
