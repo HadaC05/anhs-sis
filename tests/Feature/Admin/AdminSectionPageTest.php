@@ -5,9 +5,51 @@ use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\GradeLevel;
 use App\Models\Role;
+use App\Models\Room;
 use App\Models\Section;
 use App\Models\Staff;
 use Illuminate\Support\Facades\Hash;
+
+test('section rooms are selected from the lookup and unknown rooms are rejected', function () {
+    ['admin' => $admin, 'section' => $section, 'academicYear' => $year, 'curriculum' => $curriculum] = createSectionPageFixtures('admin.rooms');
+    Room::query()->create(['name' => 'Science Laboratory']);
+
+    $this->actingAs($admin)->get(route('admin.section-config.index'))
+        ->assertOk()->assertSee('<select id="section_room"', false)
+        ->assertSee('Science Laboratory');
+
+    $payload = [
+        'name' => $section->name,
+        'grade_level' => 'grade_7',
+        'SY_ID' => $year->SY_ID,
+        'curriculum_grade_level_ID' => $curriculum->curriculum_ID,
+        'capacity' => 40,
+        'room' => 'Science Laboratory',
+    ];
+
+    $this->put(route('admin.section-config.update', $section), $payload)->assertSessionHasNoErrors();
+    expect($section->fresh()->room)->toBe('Science Laboratory');
+
+    $payload['room'] = 'Unknown room';
+    $this->put(route('admin.section-config.update', $section), $payload)->assertSessionHasErrors('room');
+    expect($section->fresh()->room)->toBe('Science Laboratory');
+    $payload['name'] = 'New section';
+    $this->post(route('admin.section-config.store'), $payload)->assertSessionHasErrors('room');
+});
+
+test('rooms migration imports existing names and rollback preserves section assignments', function () {
+    ['section' => $section] = createSectionPageFixtures('admin.rooms.migration');
+    $section->update(['room' => 'West Wing 12', 'status' => false]);
+    $migration = require database_path('migrations/2026_10_02_000002_create_rooms_table.php');
+    $migration->down();
+    $migration->up();
+
+    expect(Room::query()->pluck('name')->all())->toBe(['West Wing 12']);
+    expect($section->fresh()->room)->toBe('West Wing 12');
+    $migration->down();
+    expect($section->fresh()->room)->toBe('West Wing 12');
+    $migration->up();
+});
 
 function createSectionPageAdmin(string $username): Staff
 {
@@ -31,6 +73,7 @@ function createSectionPageAdmin(string $username): Staff
 function createSectionPageFixtures(string $username, array $sectionOverrides = []): array
 {
     $admin = createSectionPageAdmin($username);
+    Room::query()->firstOrCreate(['name' => 'Room 201']);
     $adviser = Staff::query()->create([
         'role_id' => $admin->role_id,
         'username' => $username.'.adviser',
@@ -333,7 +376,6 @@ test('management imports students through the shared teacher worker and preserve
     $this->get($url)->assertForbidden();
 })->with(['admin', 'principal']);
 
-
 test('both management tables sort grades numerically and details display availability', function (string $tab) {
     ['admin' => $admin, 'section' => $section] = createSectionPageFixtures('ordered.'.$tab);
     foreach ([12, 10, 8, 11, 9] as $grade) {
@@ -348,7 +390,6 @@ test('both management tables sort grades numerically and details display availab
             ->assertDontSee('>Capacity</th>', false)->assertDontSee('>Status</th>', false);
     }
 })->with(['creation', 'details']);
-
 
 test('management section sorting quotes mixed case columns for PostgreSQL', function (string $role, string $tab) {
     ['admin' => $user] = createSectionPageFixtures('quoted.'.$role.'.'.$tab);

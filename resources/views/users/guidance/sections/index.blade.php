@@ -222,7 +222,12 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label for="section_room" class="mb-1 block text-sm font-semibold text-gray-700">Room</label>
-                    <input id="section_room" name="room" type="text" value="{{ old('room') }}" class="w-full rounded-lg border border-gray-300 px-4 py-2">
+                    <select id="section_room" name="room" class="w-full rounded-lg border border-gray-300 px-4 py-2">
+                        <option value="">No room assigned</option>
+                        @foreach ($rooms as $room)
+                            <option value="{{ $room->name }}" @selected(old('room') === $room->name)>{{ $room->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label for="section_capacity" class="mb-1 block text-sm font-semibold text-gray-700">Capacity</label>

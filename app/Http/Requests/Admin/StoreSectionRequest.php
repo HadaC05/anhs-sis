@@ -64,7 +64,7 @@ class StoreSectionRequest extends FormRequest
             'staff_ID' => ['nullable', 'integer', Rule::exists('staffs', 'staff_id')],
             'SY_ID' => ['required', 'integer', Rule::exists('academic_years', 'SY_ID')],
             'curriculum_grade_level_ID' => ['required', 'integer', Rule::exists('curriculum_grade_levels', 'curriculum_ID')],
-            'room' => ['nullable', 'string', 'max:255'],
+            'room' => ['nullable', 'string', 'max:255', Rule::exists('rooms', 'name')],
             'capacity' => ['required', 'integer', 'digits_between:1,3', 'min:1', 'max:100'],
         ];
     }

@@ -9,6 +9,7 @@ use App\Models\AcademicYear;
 use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\GradeLevel;
+use App\Models\Room;
 use App\Models\Section;
 use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
@@ -113,6 +114,7 @@ class SectionConfigurationController extends Controller
             'enrollments' => $enrollments,
             'latestImport' => $latestImport,
             'sections' => $sections,
+            'rooms' => Room::query()->orderBy('name')->get(['name']),
             'clusters' => $clusters,
             'academicYears' => $academicYears,
             'curriculums' => $curriculums,

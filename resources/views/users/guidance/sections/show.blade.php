@@ -381,7 +381,12 @@
 
             <div>
                 <label for="settings_room" class="mb-1 block text-sm font-semibold text-gray-700">Room</label>
-                <input id="settings_room" name="room" type="text" value="{{ old('room', $section->room) }}" class="w-full rounded-lg border border-gray-300 px-4 py-2" placeholder="e.g. Room 201">
+                <select id="settings_room" name="room" class="w-full rounded-lg border border-gray-300 px-4 py-2">
+                    <option value="">No room assigned</option>
+                    @foreach ($rooms as $room)
+                        <option value="{{ $room->name }}" @selected(old('room', $section->room) === $room->name)>{{ $room->name }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <div>

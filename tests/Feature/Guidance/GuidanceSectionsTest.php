@@ -4,9 +4,31 @@ use App\Models\AcademicYear;
 use App\Models\Curriculum;
 use App\Models\GradeLevel;
 use App\Models\Role;
+use App\Models\Room;
 use App\Models\Section;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+
+test('guidance room selectors reject unknown names on create and update', function () {
+    $user = createGuidanceCounselor();
+    ['academicYear' => $year] = createSectioningFixtures();
+    $section = Section::query()->firstOrFail();
+
+    $this->actingAs($user)->get(route('guidance.sections.index'))
+        ->assertOk()->assertSee('<select id="section_room"', false)->assertSee('Room 201');
+    $this->get(route('guidance.sections.show', $section))
+        ->assertOk()->assertSee('<select id="settings_room"', false)->assertSee('Room 201');
+
+    $this->post(route('guidance.sections.store'), [
+        'name' => 'Unknown room section', 'grade_level' => 'grade_7',
+        'SY_ID' => $year->SY_ID, 'capacity' => 40, 'room' => 'Unknown room',
+    ])->assertSessionHasErrors('room');
+
+    $this->patch(route('guidance.sections.update', $section), [
+        'capacity' => 40, 'room' => 'Unknown room',
+    ])->assertSessionHasErrors('room');
+    expect($section->fresh()->room)->toBeNull();
+});
 
 function createGuidanceCounselor(): User
 {
@@ -24,6 +46,7 @@ function createGuidanceCounselor(): User
 
 function createSectioningFixtures(): array
 {
+    Room::query()->firstOrCreate(['name' => 'Room 201']);
     $academicYear = AcademicYear::query()->create([
         'school_year' => '2026-2027',
         'start_date' => '2026-06-01',
@@ -34,7 +57,8 @@ function createSectioningFixtures(): array
     $curriculum = Curriculum::query()->create([
         'name' => 'Grade 7',
         'description' => 'Junior High School Grade 7 curriculum',
-        'status' => true,
+        'data_status_ID' => \App\Models\DataStatus::query()->where('key', 'active')->value('data_status_ID'),
+        'grade_ID' => GradeLevel::idForValue('grade_7'),
     ]);
 
     $gradeLevel = GradeLevel::query()->where('grade_label', 'Grade 7')->firstOrFail();

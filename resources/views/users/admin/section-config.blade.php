@@ -319,8 +319,12 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label for="section_room" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Room</label>
-                        <input id="section_room" name="room" type="text" value="{{ old('room') }}"
-                            class="{{ $fieldClass }} {{ $errors->has('room') ? 'border-red-300' : 'border-gray-200' }}">
+                        <select id="section_room" name="room" class="{{ $fieldClass }} {{ $errors->has('room') ? 'border-red-300' : 'border-gray-200' }}">
+                            <option value="">No room assigned</option>
+                            @foreach ($rooms as $room)
+                                <option value="{{ $room->name }}" @selected(old('room') === $room->name)>{{ $room->name }}</option>
+                            @endforeach
+                        </select>
                         @error('room')
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
                         @enderror

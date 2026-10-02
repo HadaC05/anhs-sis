@@ -53,7 +53,7 @@ class StoreSectionRequest extends FormRequest
             'grade_level' => ['required', Rule::in(['grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12'])],
             'staff_ID' => ['nullable', 'integer', Rule::exists('staffs', 'staff_id')],
             'SY_ID' => ['required', 'integer', Rule::exists('academic_years', 'SY_ID')],
-            'room' => ['nullable', 'string', 'max:255'],
+            'room' => ['nullable', 'string', 'max:255', Rule::exists('rooms', 'name')],
             'capacity' => ['required', 'integer', 'digits_between:1,3', 'min:1', 'max:100'],
         ];
     }

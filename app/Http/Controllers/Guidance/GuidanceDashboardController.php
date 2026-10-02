@@ -21,6 +21,7 @@ use App\Models\GradeLevel;
 use App\Models\LearnerType;
 use App\Models\PlacementStatus;
 use App\Models\PromotionStatus;
+use App\Models\Room;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\StudentDocument;
@@ -765,6 +766,7 @@ class GuidanceDashboardController extends Controller
         $showClusterColumn = in_array($gradeLevel, ['grade_11', 'grade_12'], true);
 
         return view('users.guidance.sections.index', [
+            'rooms' => Room::query()->orderBy('name')->get(['name']),
             'activeYear' => $activeYear,
             'sections' => $sections,
             'gradeLevels' => $gradeLevels,
@@ -834,6 +836,7 @@ class GuidanceDashboardController extends Controller
         $clusters = Cluster::query()->orderBy('name')->get(['cluster_ID', 'name']);
 
         return view('users.guidance.sections.show', [
+            'rooms' => Room::query()->orderBy('name')->get(['name']),
             'section' => $section,
             'targetSections' => $targetSections,
             'staffs' => $staffs,
@@ -844,7 +847,7 @@ class GuidanceDashboardController extends Controller
     public function updateSection(Request $request, Section $section): RedirectResponse
     {
         $validated = $request->validate([
-            'room' => ['nullable', 'string', 'max:255'],
+            'room' => ['nullable', 'string', 'max:255', Rule::exists('rooms', 'name')],
             'capacity' => ['required', 'integer', 'digits_between:1,3', 'min:1', 'max:100'],
             'staff_ID' => ['nullable', 'integer', Rule::exists('staffs', 'staff_id')],
             'cluster_ID' => ['nullable', 'integer', Rule::exists('clusters', 'cluster_ID')],
