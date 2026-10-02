@@ -134,6 +134,34 @@ test('attendance summary displays imported monthly counts', function () {
     $response->assertSee('School days are set by the administrator');
 });
 
+test('attendance overview shows zero total absences once every month has a record', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    $section->academicYear->update(['attendance_start_month' => 6, 'attendance_end_month' => 7]);
+
+    EnrollmentMonthlyAttendance::query()->create([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'month' => 6,
+        'days_present' => 20,
+        'days_absent' => 0,
+    ]);
+
+    $this->actingAs($teacher)->get(route('teacher.advisory.attendance', $section))
+        ->assertOk()
+        ->assertSee('data-test="attendance-total-absent">—</td>', false);
+
+    EnrollmentMonthlyAttendance::query()->create([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'month' => 7,
+        'days_present' => 22,
+        'days_absent' => 0,
+    ]);
+
+    $this->get(route('teacher.advisory.attendance', $section))
+        ->assertOk()
+        ->assertViewHas('rows', fn ($rows) => $rows->first()['has_complete_attendance'] === true)
+        ->assertSee('data-test="attendance-total-absent">0</td>', false);
+});
+
 test('advisory attendance displays admin configured school days', function () {
     ['teacher' => $teacher, 'section' => $section] = createAdvisoryAttendanceFixtures();
 
@@ -162,6 +190,12 @@ test('unreadable sf2 is saved with a failed import status', function () {
 
     $response->assertRedirect();
     $response->assertSessionHas('attendance_import_error');
+    $response->assertSessionHas('error');
+
+    $this->get($response->headers->get('Location'))
+        ->assertOk()
+        ->assertSee('data-test="attendance-upload-error"', false)
+        ->assertDontSee('data-test="attendance-upload-status"', false);
 
     $upload = SectionSf2Upload::query()->where('section_ID', $section->section_ID)->first();
 
@@ -327,6 +361,8 @@ test('sf2 import populates monthly detail overview and printable sf9 with source
         ->assertSee('Monthly attendance highlights')
         ->assertSee('Average daily attendance')
         ->assertSee('data-test="attendance-upload-status"', false)
+        ->assertSee('SF2 attendance uploaded successfully.')
+        ->assertDontSee('learner records imported')
         ->assertSee('96.06%')->assertSee('14.41')
         ->assertSee('Late arrival');
     $this->get(route('teacher.advisory.attendance', $section))

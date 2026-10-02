@@ -502,10 +502,10 @@ class PrincipalDashboardController extends Controller
         request()->attributes->set('audit_description', "Released {$released} approved grade record(s) to students.");
 
         if ($released === 0) {
-            return back()->with('status', 'No approved grades were found for release.');
+            return back()->with('error', 'No approved grades were found for release.');
         }
 
-        TeacherGradeNotifier::released($assignment);
+        TeacherGradeNotifier::released($assignment, $released);
         StudentGradeNotifier::released($assignment, $students);
 
         return redirect()->route('principal.grade-releases')->with('status', "{$released} grade record(s) released to students.");
@@ -528,6 +528,9 @@ class PrincipalDashboardController extends Controller
         $studentsByAssignment = $assignments->mapWithKeys(fn (TeacherSubjectAssignment $assignment): array => [
             $assignment->assignment_ID => $this->studentsWithApprovedGrades($assignment),
         ]);
+        $gradeCountsByAssignment = $assignments->mapWithKeys(fn (TeacherSubjectAssignment $assignment): array => [
+            $assignment->assignment_ID => $assignment->grades()->whereStatus(GradeStatus::APPROVED)->count(),
+        ]);
 
         $released = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
@@ -537,8 +540,8 @@ class PrincipalDashboardController extends Controller
         $request->attributes->set('audit_description', "Released {$released} approved grade record(s) to students in bulk.");
 
         if ($released > 0) {
-            $assignments->each(function (TeacherSubjectAssignment $assignment) use ($studentsByAssignment): void {
-                TeacherGradeNotifier::released($assignment);
+            $assignments->each(function (TeacherSubjectAssignment $assignment) use ($studentsByAssignment, $gradeCountsByAssignment): void {
+                TeacherGradeNotifier::released($assignment, $gradeCountsByAssignment->get($assignment->assignment_ID, 1));
                 StudentGradeNotifier::released($assignment, $studentsByAssignment->get($assignment->assignment_ID, collect()));
             });
         }

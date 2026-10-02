@@ -5,8 +5,7 @@
 @section('content')
 <div class="mb-6"><h1 class="text-xl md:text-2xl font-bold text-gray-700 tracking-tight">Grade Releases</h1></div>
 
-@if (session('status')) <div class="mb-6 rounded-lg border border-green-400 bg-green-100 px-4 py-3 text-green-700">{{ session('status') }}</div> @endif
-@if ($errors->any()) <div class="mb-6 rounded-lg border border-red-300 bg-red-100 px-4 py-3 text-red-700">{{ $errors->first() }}</div> @endif
+@include('users.principal.partials.grade-release-toasts')
 
 @include('users.partials.grade-record-filters', [
     'principalFilters' => true,

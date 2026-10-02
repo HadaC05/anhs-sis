@@ -367,7 +367,7 @@ test('teacher subject list displays the configured grade status from its status 
     StudentSubjectGrade::query()->create([
         'student_subject_ID' => $studentSubject->student_subject_ID,
         'assignment_ID' => $assignment->assignment_ID,
-        'term_ID' => GradingTerm::query()->where('key', 'term_1')->value('term_ID'),
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_1'),
         'numeric_grade' => 90,
         'grade_status_ID' => GradeStatus::idFor(GradeStatus::SUBMITTED),
         'posted_by' => $teacher->staff_id,
@@ -378,6 +378,52 @@ test('teacher subject list displays the configured grade status from its status 
     $response->assertOk()
         ->assertSee('Grade status: Submitted');
 });
+
+test('teacher subject status follows the displayed term after it changes', function (bool $seniorHigh) {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    if (! $seniorHigh) {
+        $assignment->section->update(['grade_ID' => GradeLevel::idForValue('grade_7')]);
+    }
+    $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'curr_subj_ID' => $assignment->curr_subj_ID,
+    ]);
+    $periodPrefix = $seniorHigh ? 'shs_sem1_' : '';
+    $attributes = [
+        'student_subject_ID' => $studentSubject->student_subject_ID,
+        'assignment_ID' => $assignment->assignment_ID,
+        'numeric_grade' => 90,
+        'posted_by' => $teacher->staff_id,
+    ];
+    StudentSubjectGrade::query()->create($attributes + [
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey($periodPrefix.'term_1'),
+        'status' => GradeStatus::SUBMITTED,
+    ]);
+    $this->actingAs($teacher)->get(route('teacher.sections.index'))
+        ->assertOk()->assertSee('Grade status: Submitted');
+
+    if ($seniorHigh) {
+        GradingTermSetting::current()->setSeniorHighPeriod('first', 2);
+    } else {
+        GradingTerm::query()->juniorHigh()->where('key', 'term_1')
+            ->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::closedId()]);
+        GradingTerm::query()->juniorHigh()->where('key', 'term_2')
+            ->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    }
+    $this->get(route('teacher.sections.index'))->assertOk()
+        ->assertSee('Term 2')->assertSee('Grade status: Ungraded')->assertDontSee('Grade status: Submitted');
+
+    $grade = StudentSubjectGrade::query()->create($attributes + [
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey($periodPrefix.'term_2'),
+        'status' => GradeStatus::DRAFT,
+    ]);
+    foreach ([GradeStatus::DRAFT, GradeStatus::SUBMITTED, GradeStatus::APPROVED, GradeStatus::REJECTED, GradeStatus::RELEASED] as $status) {
+        $grade->update(['status' => $status]);
+        $this->get(route('teacher.sections.index'))->assertOk()
+            ->assertSee('Grade status: '.GradeStatus::nameFor($status))
+            ->assertDontSee('Grade status: In progress');
+    }
+})->with(['junior high' => false, 'senior high' => true]);
 
 test('teacher subject list uses term rather than semester for junior high sections', function () {
     ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();

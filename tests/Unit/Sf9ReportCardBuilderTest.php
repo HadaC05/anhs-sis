@@ -124,6 +124,15 @@ it('keeps junior high report cards on the official learning areas', function () 
         ->and($card['signature_labels'][0])->toBe('1st Term');
 });
 
+it('maps grade-numbered TLE and EPP titles to the official SF9 learning area', function (string $title) {
+    expect(Sf9ReportCardBuilder::juniorHighSubjectSlot($title))->toBe('epp_tle');
+})->with([
+    'TLE 7',
+    'TLE 8',
+    'TLE 9',
+    'EPP 7',
+]);
+
 /**
  * @return array{teacher: Staff, section: Section, enrollment: Enrollment, firstAssignment: TeacherSubjectAssignment, secondAssignment: TeacherSubjectAssignment}
  */

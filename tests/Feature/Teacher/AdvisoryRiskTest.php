@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentObservedValue;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
@@ -199,9 +200,42 @@ test('risk notifications cannot target an enrollment from another section', func
 
 test('promotion filters and advisory navigation render', function () {
     ['teacher' => $teacher, 'section' => $section] = createAdvisoryRiskFixtures(false);
-    $this->actingAs($teacher)->get(route('teacher.advisory.promotions.index', $section))
+    $this->actingAs($teacher)->withSession(['status' => 'Promotion completed.'])->get(route('teacher.advisory.promotions.index', $section))
         ->assertOk()->assertSee('Apply filters')->assertSee('promotion-search')->assertSee('promotion-status')
-        ->assertSee('At-risk Students')->assertSee('Back to Advisory');
+        ->assertSee('At-risk Students')->assertSee('Back to Advisory')
+        ->assertSee('data-test="promotion-status"', false)
+        ->assertSee('id="recordActionConfirmation"', false)
+        ->assertSee('data-confirm-title="Promote selected learners?"', false)
+        ->assertDontSee("return confirm('Promote this learner", false);
+});
+
+test('saved observed values are recorded immediately and remain editable', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryRiskFixtures(false);
+    $statementKey = \App\Support\Sf9ReportCardBuilder::observedValueStatements()[0]['key'];
+    $periodKey = \App\Models\GradingTerm::currentEditablePeriodKeyForSection($section);
+    $url = route('teacher.advisory.observed-values.store', $section);
+    $payload = ['markings' => [
+        $enrollment->enrollment_ID => [$statementKey => [$periodKey => 'AO']],
+    ]];
+
+    $this->actingAs($teacher)->post($url, $payload)
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('status', 'Observed values saved successfully.');
+    $record = StudentObservedValue::query()->sole();
+    expect($record->status)->toBe('recorded')
+        ->and($record->marking)->toBe('AO')
+        ->and($record->submitted_at)->toBeNull()
+        ->and($record->reviewed_by)->toBeNull();
+
+    $payload['markings'][$enrollment->enrollment_ID][$statementKey][$periodKey] = 'SO';
+    $this->post($url, $payload)->assertSessionHasNoErrors();
+    expect($record->fresh()->marking)->toBe('SO')
+        ->and(StudentObservedValue::query()->count())->toBe(1);
+
+    $this->get(route('teacher.advisory.observed-values', $section))
+        ->assertOk()
+        ->assertSee('Save Observed Values')
+        ->assertDontSee('Submit Observed Values');
 });
 
 test('risk reminders send email when available and show a success toast', function () {

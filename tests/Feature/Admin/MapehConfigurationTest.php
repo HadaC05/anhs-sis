@@ -6,6 +6,7 @@ use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\DataStatus;
 use App\Models\Enrollment;
+use App\Models\EnrollmentMonthlyAttendance;
 use App\Models\GradeLevel;
 use App\Models\GradingSemester;
 use App\Models\GradingTerm;
@@ -14,6 +15,7 @@ use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentObservedValue;
 use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
@@ -68,6 +70,26 @@ test('promotion accepts complete released MAPEH components without a manually en
         mapehComponentGrades($f, $mode === 'paired' ? [88, 92] : [88, 90, 86, 92], 'released', $period['key']);
     }
     GradingTerm::closeAllJuniorHighTerms();
+    foreach (GradingTerm::configuredPeriods() as $period) {
+        foreach (Sf9ReportCardBuilder::observedValueStatements() as $statement) {
+            StudentObservedValue::create([
+                'enrollment_ID' => $f['enrollment']->enrollment_ID,
+                'statement_key' => $statement['key'],
+                'grading_period' => $period['key'],
+                'marking' => 'AO',
+                'status' => 'recorded',
+                'posted_by' => $f['teacher']->staff_id,
+            ]);
+        }
+    }
+    foreach (array_keys($f['year']->attendanceMonths()) as $month) {
+        EnrollmentMonthlyAttendance::create([
+            'enrollment_ID' => $f['enrollment']->enrollment_ID,
+            'month' => $month,
+            'days_present' => 20,
+            'days_absent' => 0,
+        ]);
+    }
 
     $evaluation = \App\Support\PromotionEligibility::evaluate($f['enrollment']->fresh());
     expect($evaluation['status'])->toBe('eligible')

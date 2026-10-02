@@ -60,8 +60,12 @@ class TeacherSectionController extends Controller
 
         if ($staff) {
             $gradeStatusIds = GradeStatus::idsBySlug();
+            $currentTermIds = array_filter([
+                StudentSubjectGrade::termIdForPeriodKey(GradingTerm::currentEditablePeriodKey()),
+                StudentSubjectGrade::termIdForPeriodKey(GradingTerm::currentSeniorHighPeriodKey()),
+            ]);
 
-            $assignmentScope = function ($query) use ($staff, $gradeStatusIds): void {
+            $assignmentScope = function ($query) use ($staff, $gradeStatusIds, $currentTermIds): void {
                 $query->withoutMapehParents()->with(['curriculumSubject.subject'])
                     ->where('staff_ID', $staff->staff_id)
                     ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
@@ -70,14 +74,16 @@ class TeacherSectionController extends Controller
                     ->orderBy('curriculum_grade_levels.semester_ID')
                     ->orderBy('subjects.title')
                     ->select('teacher_subject_assignments.*')
-                    ->withCount('grades');
+                    ->withCount(['grades' => fn ($gradeQuery) => $gradeQuery->whereIn('term_ID', $currentTermIds)]);
 
                 foreach (GradeStatus::slugs() as $status) {
                     $statusId = $gradeStatusIds[$status] ?? null;
 
                     if ($statusId) {
                         $query->withCount([
-                            "grades as {$status}_grades_count" => fn ($gradeQuery) => $gradeQuery->where('grade_status_ID', $statusId),
+                            "grades as {$status}_grades_count" => fn ($gradeQuery) => $gradeQuery
+                                ->whereIn('term_ID', $currentTermIds)
+                                ->where('grade_status_ID', $statusId),
                         ]);
                     }
                 }
@@ -427,7 +433,9 @@ class TeacherSectionController extends Controller
             $message .= ' '.count($blocked).' learner(s) were skipped: '.$blocked[0];
         }
 
-        return back()->with('status', $message);
+        $noticeType = $blocked === [] ? 'status' : ($promoted > 0 ? 'warning' : 'error');
+
+        return back()->with($noticeType, $message);
     }
 
     public function promote(Request $request, Section $section, Enrollment $enrollment): RedirectResponse
@@ -554,7 +562,7 @@ class TeacherSectionController extends Controller
             ->groupBy('enrollment_ID')
             ->map(fn ($records) => $records->keyBy('month'));
 
-        $rows = $enrollments->map(function (Enrollment $enrollment) use ($attendanceRecords, $schoolDays): array {
+        $rows = $enrollments->map(function (Enrollment $enrollment) use ($attendanceRecords, $months, $schoolDays): array {
             $student = $enrollment->student;
             $records = $attendanceRecords->get($enrollment->enrollment_ID, collect());
             $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, $schoolDays, array_keys($schoolDays));
@@ -565,6 +573,8 @@ class TeacherSectionController extends Controller
                 'lrn' => $student?->lrn ?? 'N/A',
                 'records' => $records,
                 'summary' => $summary,
+                'has_complete_attendance' => collect(array_keys($months))
+                    ->every(fn (int $month): bool => $records->has($month)),
             ];
         });
 
@@ -711,14 +721,27 @@ class TeacherSectionController extends Controller
         app(Sf2AttendanceImporter::class)->import($upload);
         $upload->refresh();
 
-        return redirect()->route('teacher.advisory.attendance', [
+        $message = match ($upload->status) {
+            'failed' => $upload->parse_notes ?: 'Attendance could not be imported. Please check the PDF and try again.',
+            'partial' => 'SF2 attendance uploaded with unmatched learners. Review the monthly record.',
+            default => 'SF2 attendance uploaded successfully.',
+        };
+
+        $redirect = redirect()->route('teacher.advisory.attendance', [
             'section' => $section,
             'view' => 'detailed',
             'month' => (int) $validated['report_month'],
             'upload' => $upload->id,
-        ])->with($upload->status === 'failed' ? 'attendance_import_error' : 'status', $upload->status === 'failed'
-            ? 'The PDF was saved, but attendance was not imported. '.$upload->parse_notes
-            : 'SF2 attendance imported into the overview and SF9. '.$upload->parse_notes);
+        ]);
+
+        if ($upload->status === 'failed') {
+            return $redirect->with([
+                'attendance_import_error' => $message,
+                'error' => $message,
+            ]);
+        }
+
+        return $redirect->with('status', $message);
     }
 
     public function advisorySf9(Request $request, Section $section): View
@@ -863,14 +886,6 @@ class TeacherSectionController extends Controller
                 ->groupBy('statement_key')
                 ->map(fn ($statementValues) => $statementValues->keyBy('grading_period')));
 
-        $allEnrollmentIds = Enrollment::query()
-            ->where('section_ID', $section->section_ID)
-            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->pluck('enrollment_ID');
-        $isObservedLocked = StudentObservedValue::query()
-            ->whereIn('enrollment_ID', $allEnrollmentIds)
-            ->where('status', 'submitted')
-            ->exists();
         $isGradingInputOpen = $this->isGradingInputOpen($section);
         $periods = $this->gradingInputPeriods($section);
         $lockedPeriodKeys = GradingTerm::lockedPeriodKeysForSection($section);
@@ -885,7 +900,7 @@ class TeacherSectionController extends Controller
             'activeCoreValue' => $activeCoreValue,
             'periods' => $periods,
             'markings' => Sf9ReportCardBuilder::observedValueMarkings(),
-            'isObservedLocked' => $isObservedLocked || ! $isGradingInputOpen,
+            'isObservedLocked' => ! $isGradingInputOpen,
             'gradingInputClosed' => ! $isGradingInputOpen,
             'lockedPeriodKeys' => $lockedPeriodKeys,
             'editablePeriodKey' => $editablePeriodKey,
@@ -915,17 +930,6 @@ class TeacherSectionController extends Controller
         $editablePeriodKey = GradingTerm::currentEditablePeriodKeyForSection($section);
         $markingKeys = array_flip(array_keys(Sf9ReportCardBuilder::observedValueMarkings()));
         $staffId = $request->user()->staff_id;
-        $saved = 0;
-        $removed = 0;
-
-        $hasSubmittedValues = StudentObservedValue::query()
-            ->whereIn('enrollment_ID', array_keys($allowedEnrollmentIds))
-            ->where('status', 'submitted')
-            ->exists();
-
-        if ($hasSubmittedValues) {
-            return back()->withErrors(['markings' => 'Submitted observed values are locked and can no longer be edited.']);
-        }
 
         if (! $this->isGradingInputOpen($section)) {
             return back()->withErrors(['markings' => 'This grading term is closed for teacher input.']);
@@ -935,7 +939,7 @@ class TeacherSectionController extends Controller
             return back()->withErrors(['markings' => 'No grading term is currently open for input.']);
         }
 
-        DB::transaction(function () use ($validated, $allowedEnrollmentIds, $statementKeys, $periodKeys, $lockedPeriodKeys, $editablePeriodKey, $markingKeys, $staffId, &$saved, &$removed): void {
+        DB::transaction(function () use ($validated, $allowedEnrollmentIds, $statementKeys, $periodKeys, $lockedPeriodKeys, $editablePeriodKey, $markingKeys, $staffId): void {
             foreach (($validated['markings'] ?? []) as $enrollmentId => $statements) {
                 if (! isset($allowedEnrollmentIds[(int) $enrollmentId]) || ! is_array($statements)) {
                     continue;
@@ -956,7 +960,7 @@ class TeacherSectionController extends Controller
                         }
 
                         if ($marking === '') {
-                            $removed += StudentObservedValue::query()
+                            StudentObservedValue::query()
                                 ->where('enrollment_ID', (int) $enrollmentId)
                                 ->where('statement_key', $statementKey)
                                 ->where('grading_period', $periodKey)
@@ -977,14 +981,13 @@ class TeacherSectionController extends Controller
                             ],
                             [
                                 'marking' => $marking,
-                                'status' => 'draft',
+                                'status' => 'recorded',
                                 'submitted_at' => null,
                                 'reviewed_by' => null,
                                 'reviewed_at' => null,
                                 'posted_by' => $staffId,
                             ]
                         );
-                        $saved++;
                     }
                 }
             }
@@ -997,7 +1000,7 @@ class TeacherSectionController extends Controller
         }
 
         return redirect()->route('teacher.advisory.observed-values', $parameters)
-            ->with('status', "{$saved} observed value marking(s) saved. {$removed} marking(s) cleared.");
+            ->with('status', 'Observed values saved successfully.');
     }
 
     public function bulkStoreAdvisoryObservedValues(Request $request, Section $section): RedirectResponse
@@ -1037,15 +1040,6 @@ class TeacherSectionController extends Controller
 
         $staffId = $request->user()->staff_id;
 
-        $hasSubmittedValues = StudentObservedValue::query()
-            ->whereIn('enrollment_ID', $enrollmentIds)
-            ->where('status', 'submitted')
-            ->exists();
-
-        if ($hasSubmittedValues) {
-            return back()->withErrors(['marking' => 'Submitted observed values are locked and can no longer be edited.']);
-        }
-
         DB::transaction(function () use ($enrollmentIds, $validated, $staffId): void {
             foreach ($enrollmentIds as $enrollmentId) {
                 StudentObservedValue::query()->updateOrCreate(
@@ -1056,7 +1050,7 @@ class TeacherSectionController extends Controller
                     ],
                     [
                         'marking' => $validated['marking'],
-                        'status' => 'draft',
+                        'status' => 'recorded',
                         'submitted_at' => null,
                         'reviewed_by' => null,
                         'reviewed_at' => null,
@@ -1066,36 +1060,7 @@ class TeacherSectionController extends Controller
             }
         });
 
-        return back()->with('status', "{$enrollmentIds->count()} learner marking(s) updated.");
-    }
-
-    public function submitAdvisoryObservedValues(Request $request, Section $section): RedirectResponse
-    {
-        $this->authorizeAdvisorySection($request, $section);
-
-        if (! $this->isGradingInputOpen($section)) {
-            return back()->withErrors(['markings' => 'This grading term is closed for teacher input.']);
-        }
-
-        $enrollmentIds = Enrollment::query()
-            ->where('section_ID', $section->section_ID)
-            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
-            ->pluck('enrollment_ID');
-
-        $updated = StudentObservedValue::query()
-            ->whereIn('enrollment_ID', $enrollmentIds)
-            ->update([
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'reviewed_by' => null,
-                'reviewed_at' => null,
-            ]);
-
-        if (! $updated) {
-            return back()->withErrors(['markings' => 'No observed values available to submit.'])->withInput();
-        }
-
-        return back()->with('status', 'Observed values submitted and locked.');
+        return back()->with('status', 'Observed values saved successfully.');
     }
 
     public function show(Request $request, TeacherSubjectAssignment $assignment): View|RedirectResponse

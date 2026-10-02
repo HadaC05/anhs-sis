@@ -4,7 +4,6 @@ namespace App\Notifications;
 
 use App\Models\NotificationType;
 use App\Models\TeacherSubjectAssignment;
-use App\Support\TeacherGradeNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -12,7 +11,10 @@ class GradesReleased extends Notification
 {
     use Queueable;
 
-    public function __construct(public TeacherSubjectAssignment $assignment) {}
+    public function __construct(
+        public TeacherSubjectAssignment $assignment,
+        public int $gradeCount = 1,
+    ) {}
 
     /**
      * @return list<string>
@@ -23,15 +25,17 @@ class GradesReleased extends Notification
     }
 
     /**
-     * @return array{notification_type_ID: int, title: string, message: string, url: string}
+     * @return array{notification_type_ID: int, title: string, message: string, url: string, grade_count: int}
      */
     public function toArray(object $notifiable): array
     {
-        $summary = TeacherGradeNotifier::assignmentSummary($this->assignment);
+        $count = max(1, $this->gradeCount);
+        $grade = $count === 1 ? 'grade has' : 'grades have';
 
         return NotificationType::payload(NotificationType::GRADES_RELEASED, [
-            'message' => "Grades for {$summary} have been released to students.",
-            'url' => route('teacher.sections.show', $this->assignment, false),
+            'message' => "{$count} {$grade} been released to students.",
+            'url' => route('teacher.sections.index', absolute: false),
+            'grade_count' => $count,
         ]);
     }
 }

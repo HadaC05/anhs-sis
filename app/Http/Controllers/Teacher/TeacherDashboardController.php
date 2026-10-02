@@ -51,13 +51,14 @@ class TeacherDashboardController extends Controller
 
         $returnedAssignments = $assignments->filter(fn ($assignment) => $assignment->rejected_grades_count > 0);
         $draftAssignments = $assignments->filter(fn ($assignment) => $assignment->draft_grades_count > 0);
+        $submittedAssignments = $assignments->filter(fn ($assignment) => $assignment->submitted_grades_count > 0);
         $ungradedAssignments = $assignments->filter(fn ($assignment) => (int) $assignment->grades_count === 0);
         $gradeTotals = collect(GradeStatus::slugs())
             ->mapWithKeys(fn ($status) => [$status => (int) $assignments->sum("{$status}_grades_count")]);
 
         return view('users.teacher.dashboard', compact(
             'staff', 'activeYear', 'assignments', 'advisorySections', 'totalStudents',
-            'returnedAssignments', 'draftAssignments', 'ungradedAssignments', 'gradeTotals',
+            'returnedAssignments', 'draftAssignments', 'submittedAssignments', 'ungradedAssignments', 'gradeTotals',
         ));
     }
 }

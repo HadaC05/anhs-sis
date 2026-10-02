@@ -67,6 +67,8 @@
 </head>
 
 <body class="registrar-layout min-h-screen flex flex-col bg-gray-100">
+    @stack('toasts')
+
     <header class="registrar-topbar fixed top-0 left-0 right-0 w-full shadow-sm border-b border-white/20 z-50" style="background-color: #296374;">
         <div class="registrar-topbar-inner">
             <div class="registrar-brand">

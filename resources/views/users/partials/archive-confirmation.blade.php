@@ -19,7 +19,7 @@
         event.preventDefault();
         pendingForm = form;
         const action = form.dataset.confirmAction;
-        document.getElementById('recordActionTitle').textContent = action + ' record?';
+        document.getElementById('recordActionTitle').textContent = form.dataset.confirmTitle || action + ' record?';
         document.getElementById('recordActionMessage').textContent = form.dataset.confirmMessage
             || action + ' “' + (form.dataset.confirmName || 'this record') + '”?';
         confirm.textContent = action;

@@ -10,14 +10,14 @@ use Illuminate\Notifications\Notification;
 
 class TeacherGradeNotifier
 {
-    public static function approved(TeacherSubjectAssignment $assignment): void
+    public static function approved(TeacherSubjectAssignment $assignment, int $gradeCount = 1): void
     {
-        self::notifyTeacher($assignment, new GradesApproved($assignment));
+        self::notifyTeacher($assignment, new GradesApproved($assignment, $gradeCount));
     }
 
-    public static function released(TeacherSubjectAssignment $assignment): void
+    public static function released(TeacherSubjectAssignment $assignment, int $gradeCount = 1): void
     {
-        self::notifyTeacher($assignment, new GradesReleased($assignment));
+        self::notifyTeacher($assignment, new GradesReleased($assignment, $gradeCount));
     }
 
     public static function unlocked(TeacherSubjectAssignment $assignment): void

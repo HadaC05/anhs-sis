@@ -31,6 +31,7 @@ use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -398,6 +399,65 @@ class RegistrarDashboardController extends Controller
         ]);
     }
 
+    public function approveSelectedGrades(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'assignment_ids' => ['required', 'array', 'min:1'],
+            'assignment_ids.*' => ['required', 'integer', 'distinct', 'exists:teacher_subject_assignments,assignment_ID'],
+            'term_id' => ['nullable', 'regex:/^(current|[0-9]+)$/'],
+            'semester' => ['nullable', 'in:first,second'],
+        ]);
+        $gradeId = GradeLevel::idForValue($request->string('grade_level')->toString());
+        $periods = GradeRecordPeriodFilters::resolve($request, $gradeId ? GradeLevel::find($gradeId) : null);
+        $academicYearId = $request->has('academic_year_id')
+            ? ($request->integer('academic_year_id') ?: null)
+            : AcademicYear::query()->where('status', true)->value('SY_ID');
+        $assignments = $this->gradeApprovalAssignments(
+            GradeStatus::SUBMITTED,
+            $request->integer('subject_id') ?: null,
+            $gradeId,
+            $academicYearId,
+            trim($request->string('search')->toString()),
+            $periods['term_ids'],
+            $periods['semester'],
+        )->whereIn('assignment_ID', $validated['assignment_ids']);
+
+        $approvedAssignments = collect();
+        $approved = DB::transaction(function () use ($assignments, $request, $approvedAssignments): int {
+            $total = 0;
+            foreach ($assignments as $assignment) {
+                $count = StudentSubjectGrade::query()
+                    ->whereKey($assignment->grades->modelKeys())
+                    ->whereStatus(GradeStatus::SUBMITTED)
+                    ->update([
+                        'grade_status_ID' => GradeStatus::idFor(GradeStatus::APPROVED),
+                        'reviewed_by' => $request->user()->staff_id,
+                        'reviewed_at' => now(),
+                    ]);
+                if ($count > 0) {
+                    $approvedAssignments->push([
+                        'assignment' => $assignment,
+                        'count' => $count,
+                    ]);
+                    $total += $count;
+                }
+            }
+
+            return $total;
+        });
+
+        foreach ($approvedAssignments as $approvedAssignment) {
+            TeacherGradeNotifier::approved($approvedAssignment['assignment'], $approvedAssignment['count']);
+        }
+        $request->attributes->set('audit_description', "Bulk approved {$approved} submitted grade record(s).");
+
+        return redirect()->route('registrar.grade-approvals', array_map(fn ($value) => $value ?? '', $request->only([
+            'search', 'status', 'subject_id', 'grade_level', 'academic_year_id', 'term_id', 'semester',
+        ])))->with($approved ? 'status' : 'error', $approved
+            ? "{$approved} grade record(s) approved and sent to the principal for release."
+            : 'No submitted grades were available to approve.');
+    }
+
     public function approveGrades(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse
     {
         $approved = StudentSubjectGrade::query()
@@ -412,7 +472,7 @@ class RegistrarDashboardController extends Controller
         $request->attributes->set('audit_description', "Approved {$approved} submitted grade record(s).");
 
         if ($approved > 0) {
-            TeacherGradeNotifier::approved($assignment);
+            TeacherGradeNotifier::approved($assignment, $approved);
         }
 
         return redirect()

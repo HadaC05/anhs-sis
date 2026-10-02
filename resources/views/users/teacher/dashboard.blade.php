@@ -125,11 +125,11 @@
             <h2 id="next-heading" class="text-lg font-bold text-slate-900">Grading checklist</h2>
             <p class="mt-1 text-xs text-slate-500">Subject counts across all terms this school year. Released grades count individual grade records.</p>
             <dl class="mt-4 divide-y divide-slate-100 text-sm">
-                @foreach (['Review returned grades' => $returnedAssignments->count(), 'Continue draft grades' => $draftAssignments->count(), 'Start ungraded subjects' => $ungradedAssignments->count(), 'Released grades' => $gradeTotals['released']] as $label => $count)
+                @foreach (['Review returned grades' => $returnedAssignments->count(), 'Continue draft grades' => $draftAssignments->count(), 'Start ungraded subjects' => $ungradedAssignments->count(), 'Submitted subjects' => $submittedAssignments->count(), 'Released grades' => $gradeTotals['released']] as $label => $count)
                     <div class="flex items-center justify-between gap-3 py-3"><dt class="text-slate-600">{{ $label }}</dt><dd class="rounded-md bg-slate-100 px-2.5 py-1 font-bold text-slate-900">{{ $count }}</dd></div>
                 @endforeach
             </dl>
-            <div class="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">{{ number_format($gradeTotals['submitted']) }} submitted grade records awaiting review. Open a subject to check individual terms and submission requirements.</div>
+            <div class="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">{{ number_format($submittedAssignments->count()) }} submitted {{ Str::plural('subject', $submittedAssignments->count()) }} awaiting review. Each subject assignment is counted once. Open a subject to check individual terms and submission requirements.</div>
         </section>
     </aside>
 </div>

@@ -138,7 +138,7 @@ class GuidanceDashboardController extends Controller
         $nextGradeLabel = $nextEnrollment->gradeLevel()->value('grade_label') ?? 'next-grade';
 
         return redirect()->route('guidance.enrollments.show', $nextEnrollment)
-            ->with('status', "Promotion confirmed. A pending {$nextGradeLabel} enrollment was created for {$nextEnrollment->academicYear?->school_year}; assign the learner to a section to finish enrollment.");
+            ->with('success', "Promotion confirmed. A pending {$nextGradeLabel} enrollment was created for {$nextEnrollment->academicYear?->school_year}; assign the learner to a section to finish enrollment.");
     }
 
     public function index(Request $request): View

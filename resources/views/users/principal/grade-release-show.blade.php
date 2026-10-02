@@ -12,15 +12,18 @@
     $isReleasedView = ($status ?? 'approved') === 'released';
 @endphp
 
+@include('users.principal.partials.grade-release-toasts')
+
+@if ($isReleasedView)
+    <a href="{{ route('principal.grade-releases') }}" class="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] transition hover:text-[#1f4d5b] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#296374]">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+        Return to Grade Releases
+    </a>
+@endif
+
 <div class="mb-6">
     <h1 class="text-xl font-bold tracking-tight text-gray-700 md:text-2xl">{{ $isReleasedView ? 'Released Grade Record' : 'Review Grade Release' }}</h1>
 </div>
-
-@if (session('status'))
-    <div class="mb-6 rounded-lg bg-green-100 border border-green-400 text-green-700 px-4 py-3">
-        {{ session('status') }}
-    </div>
-@endif
 
 <section class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
     <div class="grid xl:grid-cols-2 xl:divide-x xl:divide-slate-200">

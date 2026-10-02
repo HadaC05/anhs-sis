@@ -156,7 +156,6 @@ return [
         'teacher.advisory.class-list.import' => ['Imports', 'Queued', 'Queued SF1/class list import.'],
         'teacher.advisory.observed-values.store' => ['Grades', 'Updated', 'Saved advisory observed values.'],
         'teacher.advisory.observed-values.bulk' => ['Grades', 'Updated', 'Saved advisory observed values.'],
-        'teacher.advisory.observed-values.submit' => ['Grades', 'Submitted', 'Submitted advisory observed values.'],
         'teacher.advisory.promotions.bulk' => ['Promotions', 'Updated', 'Updated promotions in bulk.'],
         'teacher.advisory.promotions.sf5' => ['School Forms', 'Generated', 'Generated SF5.'],
         'teacher.advisory.promotions.promote' => ['Promotions', 'Updated', 'Updated learner promotion status.'],

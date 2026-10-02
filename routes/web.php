@@ -144,9 +144,6 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/teacher/advisory/{section}/observed-values/bulk', [TeacherSectionController::class, 'bulkStoreAdvisoryObservedValues'])
         ->middleware('teacher')
         ->name('teacher.advisory.observed-values.bulk');
-    Route::post('/teacher/advisory/{section}/observed-values/submit', [TeacherSectionController::class, 'submitAdvisoryObservedValues'])
-        ->middleware('teacher')
-        ->name('teacher.advisory.observed-values.submit');
     Route::match(['get', 'post'], '/teacher/advisory/{section}/sf9', [TeacherSectionController::class, 'advisorySf9'])
         ->middleware('teacher')
         ->name('teacher.advisory.sf9');
@@ -214,6 +211,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/registrar/grade-approvals', [RegistrarDashboardController::class, 'gradeApprovals'])
         ->middleware('registrar')
         ->name('registrar.grade-approvals');
+    Route::post('/registrar/grade-approvals/approve-selected', [RegistrarDashboardController::class, 'approveSelectedGrades'])
+        ->middleware('registrar')
+        ->name('registrar.grade-approvals.approve-selected');
     Route::get('/registrar/grade-approvals/{assignment}', [RegistrarDashboardController::class, 'showGradeApproval'])
         ->middleware('registrar')
         ->name('registrar.grade-approvals.show');

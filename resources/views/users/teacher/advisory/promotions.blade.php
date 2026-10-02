@@ -4,13 +4,7 @@
 
 @section('content')
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'promotions'])
-
-@if (session('status'))
-    <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('status') }}</div>
-@endif
-@if ($errors->any())
-    <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ $errors->first() }}</div>
-@endif
+<x-password-reset-toasts test-prefix="promotion" />
 
 <form method="GET" action="{{ route('teacher.advisory.promotions.index', $section) }}" class="mb-5 grid grid-cols-1 gap-4 rounded-xl border border-[#296374]/25 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
     <label for="promotion-search" class="block lg:col-span-2"><span class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500">Learner / LRN</span>
@@ -37,7 +31,8 @@
     <button type="submit" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f4e5c]">Generate SF 5 (.xlsx)</button>
 </form>
 
-<form id="bulkPromotionForm" method="POST" action="{{ route('teacher.advisory.promotions.bulk', $section) }}">
+<form id="bulkPromotionForm" method="POST" action="{{ route('teacher.advisory.promotions.bulk', $section) }}"
+    data-confirm-action="Promote" data-confirm-title="Promote selected learners?" data-confirm-message="The selected eligible learners will be promoted to the next grade level.">
     @csrf
 </form>
 
@@ -89,7 +84,8 @@
                         <td class="px-5 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $badge }}">{{ $label }}</span></td>
                         <td class="px-5 py-4">
                             @if ($canPromote)
-                                <form method="POST" action="{{ route('teacher.advisory.promotions.promote', [$section, $enrollment]) }}" onsubmit="return confirm('Promote this learner to the next grade?');">
+                                <form method="POST" action="{{ route('teacher.advisory.promotions.promote', [$section, $enrollment]) }}"
+                                    data-confirm-action="Promote" data-confirm-title="Promote learner?" data-confirm-message="Promote {{ $name }} to the next grade level?">
                                     @csrf
                                     <button type="submit" class="rounded-lg bg-[#296374] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f4e5c]">Promote</button>
                                 </form>
@@ -111,6 +107,8 @@
         </table>
     </div>
 </div>
+
+@include('users.partials.archive-confirmation')
 
 <script>
 (() => {

@@ -9,6 +9,10 @@ it('maps subjects to sf10 learning area slots', function () {
         ->and(LearnerPermanentRecordBuilder::subjectSlot('Values Education'))->toBe('values_education')
         ->and(LearnerPermanentRecordBuilder::subjectSlot('Edukasyon sa Pagpapakatao'))->toBe('values_education')
         ->and(LearnerPermanentRecordBuilder::subjectSlot('Technology and Livelihood Education'))->toBe('tle')
+        ->and(LearnerPermanentRecordBuilder::subjectSlot('TLE 7'))->toBe('tle')
+        ->and(LearnerPermanentRecordBuilder::subjectSlot('TLE 8'))->toBe('tle')
+        ->and(LearnerPermanentRecordBuilder::subjectSlot('TLE 9'))->toBe('tle')
+        ->and(LearnerPermanentRecordBuilder::subjectSlot('EPP 7'))->toBe('tle')
         ->and(LearnerPermanentRecordBuilder::subjectSlot('Music'))->toBe('music')
         ->and(LearnerPermanentRecordBuilder::subjectSlot('Arts'))->toBe('arts');
 });

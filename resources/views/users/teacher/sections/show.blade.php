@@ -12,8 +12,8 @@ $subjectTitle = $subject?->title ?? 'Subject';
 $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
 $lockedPeriodKeys = $lockedPeriodKeys ?? [];
 $studentCount = $enrollments->count();
-$inputColspan = 3 + count($inputPeriods);
-$summaryColspan = 3 + count($periods);
+$inputColspan = 3 + 2 * count($inputPeriods);
+$summaryColspan = 4 + count($periods);
 $gradeReturnReasons = $gradeReturnReasons ?? collect();
 $currentTermLabel = \App\Models\GradingTerm::currentEditablePeriodLabelForSection($section, $assignment->curriculumSubject?->semester);
 $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorHighSection($section)
@@ -146,6 +146,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                             <col>
                             @foreach ($inputPeriods as $period)
                                 <col class="w-36">
+                                <col class="w-28">
                             @endforeach
                         </colgroup>
                         <thead>
@@ -155,6 +156,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                                 <th scope="col" class="border-b border-gray-200 px-4 py-4">Student</th>
                                 @foreach ($inputPeriods as $period)
                                 <th scope="col" class="border-b border-l border-gray-200 bg-[#dbeaf1]/60 px-4 py-4 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
+                                <th scope="col" class="border-b border-gray-200 px-4 py-4 text-center">Remarks</th>
                                 @endforeach
                             </tr>
                         </thead>
@@ -191,6 +193,8 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                                 @foreach ($inputPeriods as $period)
                                 @php
                                 $gradeRecord = $gradeSet->get($period['key']);
+                                $inputGrade = old('grades.'.$enrollment->enrollment_ID.'.'.$period['key'].'.grade', $gradeRecord?->numeric_grade);
+                                $validInputGrade = is_numeric($inputGrade) && $inputGrade >= 60 && $inputGrade <= 100;
                                 $isCellLocked = in_array($period['key'], $lockedPeriodKeys, true) || $gradeRecord?->isTeacherLocked() || ! $canEditCurrentTerm;
                                 @endphp
                                 <td class="border-b border-l border-gray-100 px-4 py-2 text-center" data-period-column="{{ $period['key'] }}">
@@ -209,6 +213,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                                         title="Enter a number from 60 to 100"
                                         @disabled($isCellLocked) />
                                 </td>
+                                <td class="border-b border-gray-100 px-4 py-3 text-center text-xs font-semibold {{ ! $validInputGrade ? 'text-gray-400' : ($inputGrade >= 75 ? 'text-emerald-700' : 'text-red-700') }}" data-input-remarks aria-live="polite">{{ $validInputGrade ? ($inputGrade >= 75 ? 'Passed' : 'Failed') : '—' }}</td>
                                 @endforeach
                             </tr>
                             @empty
@@ -254,6 +259,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                             <th scope="col" class="min-w-28 border-b border-gray-200 px-4 py-4 text-center" data-period-column="{{ $period['key'] }}">{{ $period['label'] }}</th>
                             @endforeach
                             <th scope="col" class="w-32 min-w-28 border-b border-l border-[#296374]/15 bg-[#296374]/10 px-4 py-4 text-center text-[#296374]">Average</th>
+                            <th scope="col" class="min-w-28 border-b border-gray-200 px-4 py-4 text-center">Remarks</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -302,6 +308,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                             <td class="border-b border-l border-gray-100 bg-[#296374]/5 px-4 py-3.5 text-center text-base tabular-nums {{ $averageClass }}" data-summary-average>
                                 {{ $average !== null ? $average : '—' }}
                             </td>
+                            <td class="border-b border-gray-100 px-4 py-3.5 text-center text-xs font-semibold {{ $averageClass }}" data-summary-remarks>{{ $average === null ? '—' : ($average >= 75 ? 'Passed' : 'Failed') }}</td>
                         </tr>
                         @empty
                         <tr>
@@ -391,6 +398,16 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
 @endpush
 
 <script>
+    function updateGradeRemarks(cell, value) {
+        if (!cell) return;
+        const grade = value === null || String(value).trim() === '' ? NaN : Number(value);
+        const valid = Number.isFinite(grade) && grade >= 60 && grade <= 100;
+        cell.textContent = valid ? (grade >= 75 ? 'Passed' : 'Failed') : '—';
+        cell.classList.toggle('text-gray-400', !valid);
+        cell.classList.toggle('text-emerald-700', valid && grade >= 75);
+        cell.classList.toggle('text-red-700', valid && grade < 75);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         (function() {
             const gradeForm = document.getElementById('gradeForm');
@@ -567,6 +584,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                 }
 
                 input.setCustomValidity('');
+                updateGradeRemarks(input.closest('td').nextElementSibling, input.value);
             }
 
             function gradeInputsAreValid() {
@@ -593,6 +611,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
             }
 
             gradeInputs.forEach((input) => {
+                updateGradeRemarks(input.closest('td').nextElementSibling, input.value);
                 input.addEventListener('keydown', (event) => {
                     if (event.ctrlKey || event.metaKey || event.altKey) {
                         return;
@@ -776,6 +795,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                     cell.classList.toggle('font-bold', average !== null);
                     cell.classList.toggle('text-emerald-700', average !== null && average >= 75);
                     cell.classList.toggle('text-red-700', average !== null && average < 75);
+                    updateGradeRemarks(cell.parentElement.querySelector('[data-summary-remarks]'), average);
                 });
             }
             tabs.forEach((tab) => {

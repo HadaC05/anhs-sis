@@ -3,10 +3,12 @@
 namespace App\Support;
 
 use App\Models\Enrollment;
+use App\Models\EnrollmentMonthlyAttendance;
 use App\Models\GradeStatus;
 use App\Models\GradingPeriodStatus;
 use App\Models\GradingTerm;
 use App\Models\PromotionStatus;
+use App\Models\StudentObservedValue;
 use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
@@ -31,6 +33,14 @@ class PromotionEligibility
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->modelKeys()))
             ->get()
             ->groupBy(fn ($grade) => $grade->studentSubject->enrollment_ID);
+        $observedValues = StudentObservedValue::query()
+            ->whereIn('enrollment_ID', $enrollments->modelKeys())
+            ->get()
+            ->groupBy('enrollment_ID');
+        $attendance = EnrollmentMonthlyAttendance::query()
+            ->whereIn('enrollment_ID', $enrollments->modelKeys())
+            ->get()
+            ->groupBy('enrollment_ID');
         $closed = GradingTerm::areJuniorHighTermsClosed();
         $statusIds = PromotionStatus::query()->pluck('promotion_status_ID', 'slug')->all();
         $closedSemesterId = GradingPeriodStatus::closedId();
@@ -58,6 +68,8 @@ class PromotionEligibility
                     'assignments' => $assignments->get($enrollment->section_ID, collect())->where('SY_ID', $enrollment->SY_ID)
                         ->whereIn('curr_subj_ID', $enrollment->studentSubjects->pluck('curr_subj_ID')),
                     'grades' => $grades->get($enrollment->enrollment_ID, collect()),
+                    'observed_values' => $observedValues->get($enrollment->enrollment_ID, collect()),
+                    'attendance' => $attendance->get($enrollment->enrollment_ID, collect()),
                 ]);
             $evaluations[$enrollment->enrollment_ID] = $evaluation;
             $statusId = (int) $statusIds[$evaluation['status']];
@@ -171,6 +183,14 @@ class PromotionEligibility
             $averages[$assignment->assignment_ID] = round((float) $subjectGrades->avg('numeric_grade'), 2);
         }
 
+        if (! self::hasCompleteObservedValues($enrollment, $periodKeys, $batch)) {
+            return self::pending('Complete observed values are required before promotion.');
+        }
+
+        if (! self::hasCompleteAttendance($enrollment, $batch)) {
+            return self::pending('Complete attendance records are required before promotion.');
+        }
+
         $failingGrades = $grades->flatten()
             ->filter(fn (StudentSubjectGrade $grade): bool => (float) $grade->numeric_grade < self::PASSING_GRADE)
             ->count();
@@ -195,5 +215,34 @@ class PromotionEligibility
     private static function pending(string $reason): array
     {
         return ['status' => PromotionStatus::PENDING, 'reason' => $reason, 'subject_averages' => []];
+    }
+
+    private static function hasCompleteObservedValues(Enrollment $enrollment, $periodKeys, ?array $batch): bool
+    {
+        $statementKeys = collect(Sf9ReportCardBuilder::observedValueStatements())->pluck('key');
+        $values = $batch !== null
+            ? $batch['observed_values']
+            : StudentObservedValue::query()->where('enrollment_ID', $enrollment->enrollment_ID)->get();
+        $values = $values
+            ->whereIn('statement_key', $statementKeys)
+            ->whereIn('grading_period', $periodKeys)
+            ->filter(fn (StudentObservedValue $value): bool => array_key_exists($value->marking, Sf9ReportCardBuilder::observedValueMarkings()))
+            ->unique(fn (StudentObservedValue $value): string => $value->statement_key.'|'.$value->grading_period);
+
+        return $values->count() === $statementKeys->count() * $periodKeys->count();
+    }
+
+    private static function hasCompleteAttendance(Enrollment $enrollment, ?array $batch): bool
+    {
+        $months = array_keys($enrollment->academicYear?->attendanceMonths() ?? []);
+        if ($months === []) {
+            return false;
+        }
+
+        $records = $batch !== null
+            ? $batch['attendance']
+            : EnrollmentMonthlyAttendance::query()->where('enrollment_ID', $enrollment->enrollment_ID)->get();
+
+        return $records->whereIn('month', $months)->unique('month')->count() === count($months);
     }
 }

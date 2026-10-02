@@ -11,12 +11,7 @@
     <h1 class="text-2xl font-bold text-gray-900">{{ $isPrincipal ? 'Promotions' : 'Promotion Confirmation' }}</h1>
 </div>
 
-@if (session('status'))
-    <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('status') }}</div>
-@endif
-@if ($errors->any())
-    <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ $errors->first() }}</div>
-@endif
+<x-password-reset-toasts test-prefix="promotion" />
 
 <form method="GET" action="{{ route($promotionsRoute) }}" class="mb-5">
     <div class="guidance-filters flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
@@ -65,7 +60,8 @@
 </form>
 
 @if (! $isPrincipal)
-<form id="bulkPromotionForm" method="POST" action="{{ route('guidance.promotions.bulk') }}">
+<form id="bulkPromotionForm" method="POST" action="{{ route('guidance.promotions.bulk') }}"
+    data-confirm-action="Promote" data-confirm-title="Promote selected learners?" data-confirm-message="The selected eligible learners will be promoted to the next active school year.">
     @csrf
 </form>
 @endif
@@ -138,7 +134,8 @@
                         </td>
                         <td class="px-5 py-4">
                             @if ($canPromote && ! $isPrincipal)
-                            <form method="POST" action="{{ route('guidance.promotions.confirm', $enrollment) }}" class="flex flex-wrap items-center gap-2">
+                            <form method="POST" action="{{ route('guidance.promotions.confirm', $enrollment) }}" class="flex flex-wrap items-center gap-2"
+                                data-confirm-action="Promote" data-confirm-title="Promote learner?" data-confirm-message="Promote {{ $name }} to the next grade level in the active school year?">
                                 @csrf
                                 <button type="submit" class="rounded-lg bg-[#296374] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f4e5c]">Promote</button>
                             </form>
@@ -159,6 +156,8 @@
 </div>
 
 @if (! $isPrincipal)
+@include('users.partials.archive-confirmation')
+
 <script>
 (() => {
     const selectAll = document.getElementById('promotion-select-all');

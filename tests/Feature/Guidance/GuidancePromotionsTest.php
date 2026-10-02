@@ -5,6 +5,7 @@ use App\Models\Curricula;
 use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\Enrollment;
+use App\Models\EnrollmentMonthlyAttendance;
 use App\Models\GradeLevel;
 use App\Models\GradeStatus;
 use App\Models\GradingPeriodStatus;
@@ -15,6 +16,7 @@ use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentObservedValue;
 use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
@@ -22,6 +24,32 @@ use App\Models\TeacherSubjectAssignment;
 use App\Models\User;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
+use App\Support\Sf9ReportCardBuilder;
+
+function completeGuidancePromotionRecords(Enrollment $enrollment, Staff $teacher): void
+{
+    foreach (GradingTerm::configuredPeriods() as $period) {
+        foreach (Sf9ReportCardBuilder::observedValueStatements() as $statement) {
+            StudentObservedValue::query()->create([
+                'enrollment_ID' => $enrollment->enrollment_ID,
+                'statement_key' => $statement['key'],
+                'grading_period' => $period['key'],
+                'marking' => 'AO',
+                'status' => 'recorded',
+                'posted_by' => $teacher->staff_id,
+            ]);
+        }
+    }
+
+    foreach (array_keys($enrollment->academicYear->attendanceMonths()) as $month) {
+        EnrollmentMonthlyAttendance::query()->create([
+            'enrollment_ID' => $enrollment->enrollment_ID,
+            'month' => $month,
+            'days_present' => 20,
+            'days_absent' => 0,
+        ]);
+    }
+}
 
 test('guidance and principal can open their promotions page', function (bool $hasEligibleLearner, string $roleName) {
     $isPrincipal = $roleName === 'principal';
@@ -68,7 +96,7 @@ test('guidance and principal can open their promotions page', function (bool $ha
         ]);
     }
 
-    $response = $this->actingAs($user)->get(route($isPrincipal ? 'principal.promotions.index' : 'guidance.promotions.index'))
+    $response = $this->actingAs($user)->withSession(['status' => 'Promotion completed.'])->get(route($isPrincipal ? 'principal.promotions.index' : 'guidance.promotions.index'))
         ->assertOk()
         ->assertSee($isPrincipal ? 'Academic Records' : 'Promotion Confirmation');
 
@@ -86,7 +114,10 @@ test('guidance and principal can open their promotions page', function (bool $ha
             ->assertSee('Promote')
             ->assertDontSee('name="SY_ID"', false);
         if (! $isPrincipal) {
-            $response->assertSee(route('guidance.promotions.confirm', Enrollment::query()->firstOrFail()), false);
+            $response->assertSee(route('guidance.promotions.confirm', Enrollment::query()->firstOrFail()), false)
+                ->assertSee('data-test="promotion-status"', false)
+                ->assertSee('id="recordActionConfirmation"', false)
+                ->assertSee('data-confirm-title="Promote learner?"', false);
         }
     } else {
         $response->assertSee($isPrincipal ? 'No learners match the selected filters.' : 'No learners are currently eligible for promotion.');
@@ -193,8 +224,9 @@ function guidancePromotionFixtures(): array
             'posted_by' => $teacher->staff_id,
         ]);
     }
+    completeGuidancePromotionRecords($enrollment, $teacher);
 
-    return compact('user', 'enrollment', 'year', 'offerings');
+    return compact('user', 'enrollment', 'year', 'offerings', 'teacher');
 }
 
 test('guidance promotion automatically uses the later active year and ignores submitted year selection', function (bool $submitYear) {
@@ -209,7 +241,7 @@ test('guidance promotion automatically uses the later active year and ignores su
     ]);
     $payload = $submitYear ? ['SY_ID' => $inactiveYear->SY_ID] : [];
     $response = $this->actingAs($user)->post(route('guidance.promotions.confirm', $enrollment), $payload);
-    $response->assertSessionHasNoErrors();
+    $response->assertSessionHasNoErrors()->assertSessionHas('success');
     $next = Enrollment::query()->where('student_ID', $enrollment->student_ID)->where('SY_ID', $activeYear->SY_ID)->firstOrFail();
     $response->assertRedirect(route('guidance.enrollments.show', $next));
     expect($next->curriculum_grade_level_ID)->toBe($offerings[8]->curriculum_ID)
@@ -296,7 +328,7 @@ test('guidance promotion filters combine search grade eligibility and source sch
 });
 
 test('guidance bulk promotion creates enrollments for selected learners and rolls back an invalid batch', function (bool $validBatch) {
-    ['user' => $user, 'enrollment' => $enrollment, 'offerings' => $offerings] = guidancePromotionFixtures();
+    ['user' => $user, 'enrollment' => $enrollment, 'offerings' => $offerings, 'teacher' => $teacher] = guidancePromotionFixtures();
     $year = AcademicYear::query()->create([
         'school_year' => '2027-2028', 'start_date' => '2027-06-01', 'end_date' => '2028-03-31', 'status' => true,
     ]);
@@ -315,6 +347,7 @@ test('guidance bulk promotion creates enrollments for selected learners and roll
             $copy->student_subject_ID = $subject->student_subject_ID;
             $copy->save();
         }
+        completeGuidancePromotionRecords($second, $teacher);
     }
     $payload = ['enrollment_ids' => [$enrollment->enrollment_ID, $second->enrollment_ID]];
     $response = $this->actingAs($user)->from(route('guidance.promotions.index'))
@@ -392,6 +425,33 @@ test('incomplete grades stay pending and corrected failing grades become eligibl
     expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::CONDITIONALLY_PROMOTED);
     $grade->update(['numeric_grade' => 75]);
     expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::ELIGIBLE);
+});
+
+test('promotion stays pending until observed values and attendance records are complete', function () {
+    ['enrollment' => $enrollment] = guidancePromotionFixtures();
+
+    $missingObservedValue = StudentObservedValue::query()
+        ->where('enrollment_ID', $enrollment->enrollment_ID)
+        ->firstOrFail();
+    $missingObservedValue->delete();
+    $evaluation = PromotionEligibility::evaluate($enrollment->fresh());
+    expect($evaluation['status'])->toBe(PromotionStatus::PENDING)
+        ->and($evaluation['reason'])->toBe('Complete observed values are required before promotion.');
+
+    $teacher = Staff::query()->where('username', 'promotion.teacher')->firstOrFail();
+    StudentObservedValue::query()->create([
+        'enrollment_ID' => $enrollment->enrollment_ID,
+        'statement_key' => $missingObservedValue->statement_key,
+        'grading_period' => $missingObservedValue->grading_period,
+        'marking' => 'AO',
+        'status' => 'recorded',
+        'posted_by' => $teacher->staff_id,
+    ]);
+    EnrollmentMonthlyAttendance::query()->where('enrollment_ID', $enrollment->enrollment_ID)->firstOrFail()->delete();
+
+    $evaluation = PromotionEligibility::evaluate($enrollment->fresh());
+    expect($evaluation['status'])->toBe(PromotionStatus::PENDING)
+        ->and($evaluation['reason'])->toBe('Complete attendance records are required before promotion.');
 });
 
 test('existing next grade enrollments are recognized as completed promotions', function () {

@@ -6,19 +6,8 @@
 @include('users.teacher.advisory.partials.header', ['section' => $section, 'active' => 'attendance'])
 
 @push('toasts')
-    <x-password-reset-toasts :include-errors="false" test-prefix="attendance-upload" />
+    <x-password-reset-toasts test-prefix="attendance-upload" />
 @endpush
-
-@if(session('attendance_import_error'))
-    <div role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{{ session('attendance_import_error') }}</div>
-@endif
-
-@if($errors->any())
-    <div class="mb-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-        <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        <span>{{ $errors->first() }}</span>
-    </div>
-@endif
 
 @php
     $totalSchoolDays = collect($schoolDays)->sum();
@@ -116,7 +105,7 @@
                                 </td>
                             @endforeach
                             <td class="border-l border-gray-100 px-2 py-2 text-center font-semibold text-emerald-700">{{ $summary['total_present'] ?: '—' }}</td>
-                            <td class="px-2 py-2 text-center font-semibold text-red-600">{{ $summary['total_absent'] ?: '—' }}</td>
+                            <td class="px-2 py-2 text-center font-semibold text-red-600" data-test="attendance-total-absent">{{ $summary['total_absent'] > 0 || $row['has_complete_attendance'] ? $summary['total_absent'] : '—' }}</td>
                         </tr>
                     @empty
                         <tr>
