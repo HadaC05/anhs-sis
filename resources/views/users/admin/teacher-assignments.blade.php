@@ -396,11 +396,20 @@
             <input type="hidden" name="_form" value="assignment">
             <div class="space-y-4 px-6 py-5">
                 <div>
+                    <label for="assignment_school_year" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">School Year <span class="text-red-500">*</span></label>
+                    <select id="assignment_school_year" name="assignment_SY_ID" required class="{{ $fieldClass }} border-gray-200">
+                        <option value="">Select school year</option>
+                        @foreach ($academicYears as $year)
+                            <option value="{{ $year->SY_ID }}" @selected((string) old('assignment_SY_ID', request('SY_ID', '')) === (string) $year->SY_ID)>{{ $year->school_year }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label for="section_ID" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Section <span class="text-red-500">*</span></label>
                     <select id="section_ID" name="section_ID" required class="{{ $fieldClass }} {{ $errors->has('section_ID') && old('_form') === 'assignment' ? 'border-red-300' : 'border-gray-200' }}">
                         <option value="">Select section</option>
                         @foreach ($sections as $section)
-                            <option value="{{ $section->section_ID }}" data-curriculum="{{ $section->curriculum_grade_level_ID }}" data-grade="{{ $section->grade_level }}" data-cluster="{{ $section->cluster_ID ?? '' }}" @selected((string) old('section_ID') === (string) $section->section_ID)>
+                            <option value="{{ $section->section_ID }}" data-year="{{ $section->SY_ID }}" data-curriculum="{{ $section->curriculum_grade_level_ID }}" data-grade="{{ $section->grade_level }}" data-cluster="{{ $section->cluster_ID ?? '' }}" @selected((string) old('section_ID') === (string) $section->section_ID)>
                                 {{ $section->name }} | {{ optional($section->gradeLevel)->grade_label ?? '—' }} | {{ $section->academicYear?->school_year ?? '—' }}
                             </option>
                         @endforeach
@@ -474,6 +483,15 @@
             <input type="hidden" name="_form" value="bulk">
             <div class="space-y-5 px-6 py-5">
                 <div>
+                    <label for="bulk_school_year" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">School Year <span class="text-red-500">*</span></label>
+                    <select id="bulk_school_year" name="bulk_SY_ID" required class="{{ $fieldClass }} border-gray-200">
+                        <option value="">Select school year</option>
+                        @foreach ($academicYears as $year)
+                            <option value="{{ $year->SY_ID }}" @selected((string) old('bulk_SY_ID', request('SY_ID', '')) === (string) $year->SY_ID)>{{ $year->school_year }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label for="bulk_staff_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Teacher <span class="text-red-500">*</span></label>
                     <select id="bulk_staff_id" name="staff_ID" required class="{{ $fieldClass }} {{ $errors->has('staff_ID') && old('_form') === 'bulk' ? 'border-red-300' : 'border-gray-200' }}">
                         <option value="">Select teacher</option>
@@ -516,11 +534,12 @@
                         <span id="bulk-section-count" class="text-xs text-gray-400">0 selected</span>
                     </div>
                     <div id="bulk-sections-empty" class="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
-                        Select one or more grade levels to show matching sections.
+                        Select a school year and one or more grade levels to show matching sections.
                     </div>
                     <div id="bulk-sections-list" class="hidden grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($sections as $section)
                             <label class="bulk-section-option hidden items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700"
+                                data-year="{{ $section->SY_ID }}"
                                 data-grade="{{ $section->grade_level }}"
                                 data-curriculum="{{ $section->curriculum_grade_level_ID }}"
                                 data-cluster="{{ $section->cluster_ID ?? '' }}">
@@ -683,8 +702,8 @@
 
     function openAssignmentModal() {
         setModalOpen(document.getElementById('assignmentModal'), true);
-        filterSubjects();
-        document.getElementById('section_ID').focus();
+        filterAssignmentSections();
+        document.getElementById('assignment_school_year').focus();
     }
 
     function closeAssignmentModal() {
@@ -694,7 +713,7 @@
     function openBulkModal() {
         setModalOpen(document.getElementById('bulkModal'), true);
         refreshBulkFilters();
-        document.getElementById('bulk_staff_id').focus();
+        document.getElementById('bulk_school_year').focus();
     }
 
     function closeBulkModal() {
@@ -857,6 +876,20 @@
     var mapehExcludedBySection = @json($mapehExcludedBySection);
     var sectionSelect = document.getElementById('section_ID');
     var subjectSelect = document.getElementById('curr_subj_ID');
+    var assignmentSchoolYearSelect = document.getElementById('assignment_school_year');
+
+    function filterAssignmentSections() {
+        var schoolYearId = assignmentSchoolYearSelect.value;
+        filterSelectOptions(sectionSelect, '', function (option) {
+            return schoolYearId !== '' && option.dataset.year === schoolYearId;
+        });
+        sectionSelect.disabled = !schoolYearId;
+        sectionSelect.options[0].text = !schoolYearId
+            ? 'Select a school year first'
+            : (Array.from(sectionSelect.options).some(function (option) { return option.value && !option.hidden; })
+                ? 'Select section' : 'No sections for this school year');
+        filterSubjects();
+    }
 
     function filterSubjects() {
         if (!sectionSelect || !subjectSelect) {
@@ -896,10 +929,12 @@
 
     if (sectionSelect) {
         sectionSelect.addEventListener('change', filterSubjects);
-        filterSubjects();
+        assignmentSchoolYearSelect.addEventListener('change', filterAssignmentSections);
+        filterAssignmentSections();
     }
 
     var bulkGradeCheckboxes = Array.from(document.querySelectorAll('.bulk-grade-checkbox'));
+    var bulkSchoolYearSelect = document.getElementById('bulk_school_year');
     var bulkSectionOptions = Array.from(document.querySelectorAll('.bulk-section-option'));
     var bulkSectionCheckboxes = Array.from(document.querySelectorAll('.bulk-section-checkbox'));
     var bulkSubjectOptions = Array.from(document.querySelectorAll('.bulk-subject-option'));
@@ -966,11 +1001,14 @@
 
         var visibleSections = 0;
         bulkSectionOptions.forEach(function (option) {
-            var shouldShow = selectedGrades.indexOf(option.getAttribute('data-grade')) !== -1;
+            var shouldShow = bulkSchoolYearSelect.value !== ''
+                && option.dataset.year === bulkSchoolYearSelect.value
+                && selectedGrades.indexOf(option.getAttribute('data-grade')) !== -1;
             option.classList.toggle('hidden', !shouldShow);
             option.classList.toggle('flex', shouldShow);
 
             var input = option.querySelector('.bulk-section-checkbox');
+            if (input) input.disabled = !shouldShow;
             if (!shouldShow && input) {
                 input.checked = false;
             }
@@ -981,6 +1019,9 @@
         });
 
         if (bulkSectionsEmpty) {
+            bulkSectionsEmpty.textContent = !bulkSchoolYearSelect.value || selectedGrades.length === 0
+                ? 'Select a school year and one or more grade levels to show matching sections.'
+                : 'No sections match the selected school year and grade levels.';
             bulkSectionsEmpty.classList.toggle('hidden', visibleSections > 0);
         }
         if (bulkSectionsList) {
@@ -1020,6 +1061,8 @@
         updateBulkSubjects();
         updateBulkCounts();
     }
+
+    bulkSchoolYearSelect.addEventListener('change', refreshBulkFilters);
 
     bulkGradeCheckboxes.forEach(function (input) {
         input.addEventListener('change', refreshBulkFilters);
