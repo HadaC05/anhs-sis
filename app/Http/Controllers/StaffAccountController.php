@@ -24,7 +24,7 @@ class StaffAccountController extends Controller
 
     public function edit(Request $request): View
     {
-        $staff = $this->staff($request);
+        $staff = $this->staff($request)->loadMissing('specialization');
         $role = match ($staff->roleName()) {
             'guidance counselor' => 'guidance',
             'admin', 'principal', 'registrar', 'teacher' => $staff->roleName(),

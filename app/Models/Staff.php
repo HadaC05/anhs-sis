@@ -52,6 +52,7 @@ class Staff extends Authenticatable
         'fund_source',
         'degree_earned',
         'major_specialization',
+        'specialization_id',
         'teaching_minutes',
         'status',
     ];
@@ -74,6 +75,27 @@ class Staff extends Authenticatable
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Staff $staff): void {
+            if ($staff->isDirty('specialization_id')) {
+                $staff->major_specialization = $staff->specialization_id
+                    ? Specialization::query()->findOrFail($staff->specialization_id)->name
+                    : null;
+            } elseif ($staff->isDirty('major_specialization')) {
+                $name = trim($staff->major_specialization ?? '');
+                $staff->specialization_id = $name !== ''
+                    ? Specialization::query()->firstOrCreate(['name' => $name])->id
+                    : null;
+            }
+        });
+    }
+
+    public function specialization(): BelongsTo
+    {
+        return $this->belongsTo(Specialization::class);
     }
 
     public function getNameAttribute(): string

@@ -350,6 +350,18 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
                             <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
+                        <div id="add_specialization_field" class="sm:col-span-2" @if(old('role') !== 'teacher') hidden @endif>
+                            <label for="add_specialization_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Specialization</label>
+                            <select id="add_specialization_id" name="specialization_id" @disabled(old('role') !== 'teacher') class="{{ $addFieldClass }} {{ $errors->has('specialization_id') ? 'border-red-300' : 'border-gray-200' }}">
+                                <option value="">Select a specialization (optional)</option>
+                                @foreach($specializations as $specialization)
+                                <option value="{{ $specialization->id }}" @selected((string) old('specialization_id') === (string) $specialization->id)>{{ $specialization->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('specialization_id')
+                            <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
                         <div>
                             <label for="add_username" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">Username <span class="text-red-500">*</span></label>
                             <input id="add_username" type="text" name="username" value="{{ old('username') }}" required autocomplete="username"
@@ -441,6 +453,16 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
                 </select>
             </div>
 
+            <div id="edit_specialization_field" hidden>
+                <label for="edit_specialization_id" class="mb-1 block text-sm font-semibold text-gray-700">Specialization</label>
+                <select id="edit_specialization_id" name="specialization_id" disabled class="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-[#296374]">
+                    <option value="">Select a specialization (optional)</option>
+                    @foreach($specializations as $specialization)
+                    <option value="{{ $specialization->id }}">{{ $specialization->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
             <div>
                 <label class="mb-1 block text-sm font-semibold text-gray-700">New Password</label>
                 <input type="password" name="password" minlength="12" autocomplete="new-password"
@@ -514,6 +536,19 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
 </div>
 
 <script>
+    function syncSpecializationField(prefix) {
+        var isTeacher = document.getElementById(prefix + '_role').value === 'teacher';
+        document.getElementById(prefix + '_specialization_field').hidden = !isTeacher;
+        document.getElementById(prefix + '_specialization_id').disabled = !isTeacher;
+    }
+
+    ['add', 'edit'].forEach(function (prefix) {
+        document.getElementById(prefix + '_role').addEventListener('change', function () {
+            syncSpecializationField(prefix);
+        });
+        syncSpecializationField(prefix);
+    });
+
     function openAddModal() {
         var modal = document.getElementById('addModal');
         modal.classList.remove('hidden');
@@ -533,10 +568,13 @@ $addPasswordFieldClass = 'h-10 w-full rounded-lg border bg-white pl-3 pr-10 text
     }
 
     function openEditModal(user) {
-        document.getElementById('editForm').action = @js(route($managementRoutePrefix.'users.update', ['user' => '__USER__'])).replace('__USER__', user.id);
+        document.getElementById('editForm').action = @js(route($managementRoutePrefix.'users.update', ['user' => '__USER__'])).replace('__USER__', user.staff_id);
+        document.getElementById('editForm').reset();
         document.getElementById('edit_username').value = user.username;
         document.getElementById('edit_email').value = user.email;
         document.getElementById('edit_role').value = user.role.role_name;
+        document.getElementById('edit_specialization_id').value = user.specialization_id || '';
+        syncSpecializationField('edit');
         document.getElementById('editModal').classList.remove('hidden');
         document.getElementById('editModal').classList.add('flex');
     }

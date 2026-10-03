@@ -43,6 +43,10 @@ class UpdateAdminUserRequest extends FormRequest
             ],
             'email' => ['required', 'email', 'max:255', Rule::unique($table, 'email')->ignore($key, $keyName)],
             'role' => ['nullable', Rule::exists('roles', 'role_name')],
+            'specialization_id' => [
+                Rule::excludeIf($account instanceof Student || ($this->input('role') ?: $account->roleName()) !== 'teacher'),
+                'nullable', 'integer', Rule::exists('specializations', 'id'),
+            ],
             'password' => ['nullable', 'string', 'confirmed', Password::defaults()],
         ];
     }

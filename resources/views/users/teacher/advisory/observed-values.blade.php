@@ -44,7 +44,7 @@
             <section data-core-panel="{{ $coreValue }}" class="{{ $activeCoreValue === $coreValue ? '' : 'hidden' }}">
                 @if(! $isObservedLocked)
                     <div class="flex flex-wrap items-end gap-3 border-b border-gray-200 bg-slate-50 px-4 py-3 lg:px-6" data-bulk-controls data-period="{{ $editablePeriodKey }}">
-                        <label class="block min-w-0 flex-1"><span class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Bulk statement</span><select data-bulk-statement class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select statement</option>@foreach($groupStatements as $statement)<option value="{{ $statement['key'] }}">{{ $statement['statement'] }}</option>@endforeach</select></label>
+                        <label class="block min-w-0 flex-1"><span class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Bulk statement</span><select data-bulk-statement class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select statement</option>@if($groupStatements->count() === 2)<option value="both">Both statements</option>@endif @foreach($groupStatements as $statement)<option value="{{ $statement['key'] }}">{{ $statement['statement'] }}</option>@endforeach</select></label>
                         <label class="block"><span class="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-500">Marking</span><select data-bulk-marking class="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700"><option value="">Select marking</option>@foreach($markings as $code => $label)<option value="{{ $code }}">{{ $code }} - {{ $label }}</option>@endforeach</select></label>
                         <p class="w-full text-xs text-gray-500">Choose a statement, marking, and learners, then save them as recorded observed values for the current grading term.</p>
                     </div>
@@ -162,7 +162,8 @@
             for (var panel of panels) {
                 var controls = panel.querySelector('[data-bulk-controls]');
                 if (!controls) continue;
-                var statement = controls.querySelector('[data-bulk-statement]').value;
+                var statementSelect = controls.querySelector('[data-bulk-statement]');
+                var statement = statementSelect.value;
                 var marking = controls.querySelector('[data-bulk-marking]').value;
                 if (!statement && !marking) continue;
                 var learners = Array.from(panel.querySelectorAll('[data-learner-checkbox]:checked'));
@@ -173,10 +174,15 @@
                     window.showObservedToast('Select a statement, a marking, and at least one learner for an open grading term.', 'error');
                     return false;
                 }
+                var statementKeys = statement === 'both'
+                    ? Array.from(statementSelect.options).map(function (option) { return option.value; }).filter(function (key) { return key && key !== 'both'; })
+                    : [statement];
                 learners.forEach(function (learner) {
-                    var name = 'markings[' + learner.value + '][' + statement + '][' + controls.dataset.period + ']';
-                    var input = form.elements.namedItem(name);
-                    if (input && !input.disabled) updates.push({ input: input, marking: marking });
+                    statementKeys.forEach(function (statementKey) {
+                        var name = 'markings[' + learner.value + '][' + statementKey + '][' + controls.dataset.period + ']';
+                        var input = form.elements.namedItem(name);
+                        if (input && !input.disabled) updates.push({ input: input, marking: marking });
+                    });
                 });
             }
             updates.forEach(function (update) { update.input.value = update.marking; });

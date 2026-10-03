@@ -28,25 +28,25 @@
 
     <!-- Header with Logo and Navigation - Fixed at top -->
     <header class="fixed top-0 left-0 right-0 w-full bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-200 z-50">
-        <div class="container mx-auto flex min-h-20 items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <div class="flex min-h-20 w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10 xl:px-14">
             <!-- Logo on the left -->
             <div class="flex items-center">
                 <img src="{{ asset('images/school-logo-light.png') }}" alt="Agusan National High School" class="h-10 w-auto sm:h-12">
             </div>
 
-            <button type="button" class="inline-flex items-center justify-center rounded-md p-2 text-[#0C2C55] hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0C2C55] sm:hidden" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="primary-navigation">
+            <button type="button" class="inline-flex shrink-0 items-center justify-center rounded-md p-2 text-[#0C2C55] hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0C2C55] lg:hidden" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="primary-navigation">
                 <span class="sr-only">Toggle navigation</span>
                 <svg x-show="!mobileMenuOpen" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                 <svg x-show="mobileMenuOpen" x-cloak class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
 
-            <!-- Navigation links: compact menu on small screens, inline from sm upward -->
-            <nav id="primary-navigation" :class="mobileMenuOpen ? 'flex' : 'hidden'" class="absolute left-0 right-0 top-full flex-col gap-1 border-b border-gray-200 bg-white px-4 py-4 shadow-lg sm:static sm:flex sm:flex-row sm:items-center sm:gap-6 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none lg:gap-10">
-                <a @click="mobileMenuOpen = false" href="{{ route('home') }}" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">Home</a>
-                <a @click="mobileMenuOpen = false" href="#about-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">About</a>
-                <a @click="mobileMenuOpen = false" href="#faq" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">FAQ</a>
-                <a @click="mobileMenuOpen = false" href="#contact-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 sm:px-0 sm:py-1 sm:hover:bg-transparent sm:text-base">Contact Us</a>
-                <a @click="mobileMenuOpen = false" href="{{ route('login') }}" class="mt-2 inline-flex justify-center rounded-full bg-[#0C2C55] px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#143d73] sm:mt-0">Login</a>
+            <!-- Navigation links: compact menu below desktop width -->
+            <nav id="primary-navigation" :class="mobileMenuOpen ? 'flex' : 'hidden'" class="absolute left-0 right-0 top-full flex-col gap-1 border-b border-gray-200 bg-white px-4 py-4 shadow-lg lg:static lg:flex lg:flex-row lg:items-center lg:gap-7 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none xl:gap-10">
+                <a @click="mobileMenuOpen = false" href="{{ route('home') }}" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 lg:px-0 lg:py-1 lg:hover:bg-transparent xl:text-base">Home</a>
+                <a @click="mobileMenuOpen = false" href="#about-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 lg:px-0 lg:py-1 lg:hover:bg-transparent xl:text-base">About</a>
+                <a @click="mobileMenuOpen = false" href="#faq" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 lg:px-0 lg:py-1 lg:hover:bg-transparent xl:text-base">FAQ</a>
+                <a @click="mobileMenuOpen = false" href="#contact-us" class="rounded px-3 py-2 text-sm font-medium uppercase tracking-wide text-[#0C2C55] transition hover:bg-gray-100 hover:text-[#0C2C55]/80 lg:px-0 lg:py-1 lg:hover:bg-transparent xl:text-base">Contact Us</a>
+                <a @click="mobileMenuOpen = false" href="{{ route('login') }}" class="mt-2 inline-flex justify-center rounded-full bg-[#0C2C55] px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[#143d73] lg:mt-0">Login</a>
             </nav>
         </div>
     </header>
@@ -277,7 +277,7 @@
     <section id="contact-us" class="bg-[#0C2C55] px-4 py-12 text-white sm:py-16">
         <div class="container mx-auto max-w-6xl">
             <h2 class="mb-8 text-center text-3xl font-bold sm:mb-12 sm:text-4xl">Contact Us</h2>
-            <div class="grid gap-8 md:grid-cols-3">
+            <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="text-center">
                     <div class="bg-white/10 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,13 +311,18 @@
                     <p class="text-white/80">123 Education Street</p>
                     <p class="text-white/80">City, Province 1234</p>
                 </div>
-            </div>
 
-            <div class="mt-12 text-center">
-                <h3 class="text-2xl font-semibold mb-4">Office Hours</h3>
-                <p class="text-white/80">Monday to Friday: 8:00 AM - 5:00 PM</p>
-                <p class="text-white/80">Saturday: 9:00 AM - 12:00 PM</p>
-                <p class="text-white/80">Sunday: Closed</p>
+                <div class="text-center">
+                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="mb-2 text-xl font-semibold">Office Hours</h3>
+                    <p class="text-white/80">Monday to Friday: 8:00 AM - 5:00 PM</p>
+                    <p class="text-white/80">Saturday: 9:00 AM - 12:00 PM</p>
+                    <p class="text-white/80">Sunday: Closed</p>
+                </div>
             </div>
         </div>
     </section>

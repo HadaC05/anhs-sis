@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreAdminUserRequest;
 use App\Http\Requests\Admin\UpdateAdminUserRequest;
 use App\Models\Role;
+use App\Models\Specialization;
 use App\Models\Staff;
 use App\Models\Student;
 use App\Models\StudentApplication;
@@ -81,6 +82,7 @@ class AdminUserController extends Controller
             'activeTab' => $activeTab,
             'users' => $users,
             'staffRoles' => $staffRoles,
+            'specializations' => Specialization::query()->orderBy('name')->get(),
             'roleCounts' => $roleCounts,
             'totalUsers' => Staff::query()->count() + Student::query()->whereNotNull('username')->count(),
             'staffCount' => Staff::query()->count(),
@@ -103,6 +105,7 @@ class AdminUserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role_id' => $role->id,
+            'specialization_id' => $validated['role'] === 'teacher' ? ($validated['specialization_id'] ?? null) : null,
             'status' => 'active',
             'change_password' => true,
             'first_name' => $validated['first_name'],
@@ -135,6 +138,10 @@ class AdminUserController extends Controller
         if (! empty($validated['password'])) {
             $updates['password'] = Hash::make($validated['password']);
             $updates['change_password'] = true;
+        }
+
+        if ($account instanceof Staff && array_key_exists('specialization_id', $validated)) {
+            $updates['specialization_id'] = $validated['specialization_id'];
         }
 
         $account->update($updates);

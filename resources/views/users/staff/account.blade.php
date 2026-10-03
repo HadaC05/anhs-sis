@@ -109,6 +109,16 @@
                     </div>
                 </div>
 
+                <div>
+                    <h2 class="mb-4 text-sm font-bold uppercase tracking-wide text-[#296374]">Specialization</h2>
+                    <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                            <dt class="sr-only">Specialization</dt>
+                            <dd class="{{ $readonlyClass }}">{{ $staff->specialization?->name ?: ($staff->major_specialization ?: 'Not set') }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 class="text-sm font-bold uppercase tracking-wide text-[#296374]">Change Password</h2>
