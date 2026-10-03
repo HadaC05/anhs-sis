@@ -3,6 +3,8 @@
 @section('title', 'Account Profile')
 
 @section('content')
+<x-password-reset-toasts :include-errors="false" test-prefix="student-account" />
+
 @php
     $fieldClass = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/15';
     $readonlyClass = 'w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-[#296374] shadow-sm';
@@ -19,12 +21,6 @@
     <style>
         [x-cloak] { display: none !important; }
     </style>
-    @if (session('status'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-            {{ session('status') }}
-        </div>
-    @endif
-
     @if ($errors->any() && ! $passwordModalOpen)
         <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {{ $errors->first() }}
