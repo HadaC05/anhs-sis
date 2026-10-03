@@ -250,7 +250,11 @@ test('risk reminders send email when available and show a success toast', functi
     expect($transport->messages())->toHaveCount(1);
     $email = $transport->messages()->first()->getOriginalMessage();
     expect($email->getTo()[0]->getAddress())->toBe('student@example.com')
-        ->and($email->getSubject())->toBe('Academic support reminder');
+        ->and($email->getSubject())->toBe('Academic support reminder')
+        ->and($email->getHtmlBody())->toContain('1 subject', 'passing grade of 75', 'Please contact your class adviser', 'cid:')
+        ->not->toContain('Regards', 'Laravel')
+        ->and($email->getAttachments())->toHaveCount(1)
+        ->and($email->getAttachments()[0]->getFilename())->toBe('school-logo-light.png');
     $this->get($page)->assertOk()->assertSee('data-test="advisory-risk-status"', false);
     $this->post($url, ['term' => 'term_1'])->assertSessionHas('warning');
     expect($transport->messages())->toHaveCount(1)

@@ -65,7 +65,13 @@ class AdvisoryRiskController extends Controller
             return back()->withErrors(['student' => 'This learner no longer has recorded grades below 75 for this period.']);
         }
 
-        $reminder = new AcademicSupportReminder($enrollment->enrollment_ID, $periods->firstWhere('key', $term)['label'], $section->academicYear->school_year, $term);
+        $reminder = new AcademicSupportReminder(
+            $enrollment->enrollment_ID,
+            $periods->firstWhere('key', $term)['label'],
+            $section->academicYear->school_year,
+            $term,
+            $grades->unique('assignment.curriculumSubject.subject_ID')->count(),
+        );
         $student = DB::transaction(function () use ($enrollment, $term, $reminder) {
             $student = $enrollment->student()->lockForUpdate()->firstOrFail();
             $recent = $student->notifications()->where('type', AcademicSupportReminder::class)
