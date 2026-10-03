@@ -7,7 +7,7 @@
 
 @php
     $importResult = $latestImport?->result ?? [];
-    $importFinished = $latestImport && in_array($latestImport->status, ['completed', 'failed'], true);
+    $importFinished = $showImportResult;
 @endphp
 
 @push('toasts')
@@ -257,9 +257,16 @@
             toast.querySelector('[data-dismiss-toast]')?.addEventListener('click', dismiss);
             if (toast.getAttribute('role') === 'status') {
                 let timer = setTimeout(dismiss, 12000);
+                function resumeDismissal() {
+                    clearTimeout(timer);
+                    if (!toast.matches(':hover') && !toast.contains(document.activeElement)) {
+                        timer = setTimeout(dismiss, 12000);
+                    }
+                }
                 toast.addEventListener('mouseenter', function () { clearTimeout(timer); });
                 toast.addEventListener('focusin', function () { clearTimeout(timer); });
-                toast.addEventListener('mouseleave', function () { timer = setTimeout(dismiss, 12000); });
+                toast.addEventListener('mouseleave', resumeDismissal);
+                toast.addEventListener('focusout', function () { setTimeout(resumeDismissal, 0); });
             }
         });
     });

@@ -321,6 +321,29 @@ test('import status is private and reports when a worker has not started', funct
     $this->actingAs($teacher)->getJson($url)->assertNotFound();
 });
 
+test('completed import notification appears once per session and appears again for a new import', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $section = $assignment->section;
+    $import = AdvisoryClassListImport::query()->create([
+        'section_ID' => $section->section_ID,
+        'requested_by' => $teacher->staff_id,
+        'original_filename' => 'students.csv',
+        'status' => 'processing',
+    ]);
+    $url = route('teacher.advisory.class-list.index', $section);
+
+    $this->actingAs($teacher)->get($url)->assertOk()->assertDontSee('Student import complete.');
+    $import->update(['status' => 'completed', 'completed_at' => now()]);
+    $this->get($url)->assertOk()->assertSee('Student import complete.');
+    $this->get($url)->assertOk()->assertDontSee('Student import complete.');
+    $this->get($url.'?search=Ana')->assertOk()->assertDontSee('Student import complete.');
+
+    $nextImport = $import->replicate();
+    $nextImport->save();
+    $this->get($url)->assertOk()->assertSee('Student import complete.');
+    $this->get($url)->assertOk()->assertDontSee('Student import complete.');
+});
+
 test('worker failure releases an import and preserves its progress', function () {
     ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
     $import = AdvisoryClassListImport::query()->create([

@@ -374,7 +374,15 @@ class TeacherSectionController extends Controller
             ->latest('id')
             ->first();
 
-        return view('users.teacher.advisory.class-list', compact('section', 'enrollments', 'search', 'sex', 'latestImport'));
+        $showImportResult = false;
+        if ($latestImport && in_array($latestImport->status, ['completed', 'failed'], true)) {
+            $notificationKey = 'class_list_import_seen.'.$request->user()->staff_id.'.'.$section->section_ID;
+            $notificationValue = $latestImport->id.'-'.$latestImport->status;
+            $showImportResult = $request->session()->get($notificationKey) !== $notificationValue;
+            $request->session()->put($notificationKey, $notificationValue);
+        }
+
+        return view('users.teacher.advisory.class-list', compact('section', 'enrollments', 'search', 'sex', 'latestImport', 'showImportResult'));
     }
 
     public function advisoryStudentProfile(Request $request, Section $section, Enrollment $enrollment): View
