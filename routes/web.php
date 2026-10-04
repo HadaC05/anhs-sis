@@ -348,6 +348,12 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/guidance/documents/{document}/view', [GuidanceDashboardController::class, 'viewDocument'])
         ->middleware('guidance')
         ->name('guidance.documents.view');
+    Route::get('/guidance/reports/promotion', [\App\Http\Controllers\Guidance\PromotionReportController::class, 'index'])
+        ->middleware('guidance')
+        ->name('guidance.reports.promotion');
+    Route::get('/guidance/reports/enrollment', [\App\Http\Controllers\Guidance\EnrollmentReportController::class, 'index'])
+        ->middleware('guidance')
+        ->name('guidance.reports.enrollment');
     Route::get('/guidance/reports/age-for-grade', [GuidanceDashboardController::class, 'ageForGradeReport'])
         ->middleware('guidance')
         ->name('guidance.reports.age-for-grade');

@@ -134,7 +134,15 @@
 
                     <div class="space-y-1">
                         <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reports</p>
-                        <a href="{{ route('guidance.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('guidance.reports.*') ? 'active' : '' }}">
+                        <a href="{{ route('guidance.reports.enrollment') }}" class="sidebar-link {{ request()->routeIs('guidance.reports.enrollment') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-4m3 4V7m3 10v-7M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            <span class="font-semibold">Enrollment Reports</span>
+                        </a>
+                        <a href="{{ route('guidance.reports.promotion') }}" class="sidebar-link {{ request()->routeIs('guidance.reports.promotion') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19h16M6 15V9m6 6V5m6 10v-4"></path></svg>
+                            <span class="font-semibold">Promotion Reports</span>
+                        </a>
+                        <a href="{{ route('guidance.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('guidance.reports.age-for-grade') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6m-8 0h8m-8 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3m11 12h2a2 2 0 002-2V7a2 2 0 00-2-2h-3m-4 0h-4m4 0a2 2 0 11-4 0"></path>
                             </svg>
