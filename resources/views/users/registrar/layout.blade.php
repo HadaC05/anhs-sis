@@ -133,6 +133,15 @@
                             <span class="font-semibold">Student Masterlist</span>
                         </a>
                     </div>
+                    <div class="space-y-1">
+                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reports</p>
+                        @foreach (['enrollment' => 'Enrollment Summary', 'grades' => 'Grade Approval Status'] as $reportKey => $reportLabel)
+                            <a href="{{ route('registrar.reports.index', ['report' => $reportKey]) }}" class="sidebar-link {{ request()->routeIs('registrar.reports.*') && request('report', 'enrollment') === $reportKey ? 'active' : '' }}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6m3 6V7m3 10v-4M5 3h14v18H5z" /></svg>
+                                <span class="font-semibold">{{ $reportLabel }}</span>
+                            </a>
+                        @endforeach
+                    </div>
                 </nav>
             </div>
         </aside>

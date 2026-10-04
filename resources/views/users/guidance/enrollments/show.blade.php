@@ -1,4 +1,4 @@
-﻿@extends('users.guidance.layout')
+﻿@extends(\App\Support\AcademicPortal::layout('guidance'))
 
 @section('title', 'Enrollment Details')
 
@@ -156,7 +156,7 @@
                 <span class="sr-only">Enrollment settings</span>
             </button>
             <div id="enrollmentSettingsMenu" role="menu" class="absolute right-0 z-20 mt-2 hidden w-64 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                <a href="{{ route('guidance.enrollments.edit', array_filter(['enrollment' => $enrollment, 'from_section' => $fromSectionId])) }}" role="menuitem"
+                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.edit'), array_filter(['enrollment' => $enrollment, 'from_section' => $fromSectionId])) }}" role="menuitem"
                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
                     <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -172,7 +172,7 @@
                 </button>
             </div>
         </div>
-        <a href="{{ route('guidance.enrollments.print', $enrollment) }}" target="_blank" class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-600 text-white shadow-md transition hover:opacity-90" title="Print enrollment">
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.print'), $enrollment) }}" target="_blank" class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-600 text-white shadow-md transition hover:opacity-90" title="Print enrollment">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2m-12 0h12v4H6v-4z"></path></svg>
         </a>
     </div>
@@ -275,7 +275,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                 @endif
             </div>
         </div>
-        <form action="{{ route('guidance.enrollments.placement-test', $enrollment) }}" method="POST" class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <form action="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.placement-test'), $enrollment) }}" method="POST" class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
             @csrf
             @method('PATCH')
             <input type="hidden" name="step" value="{{ $activeStep ?: 'enrollment' }}" data-guidance-step-field>
@@ -594,7 +594,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
         </div>
         <div class="flex flex-wrap items-center gap-2">
             @if($pendingDocuments->isNotEmpty())
-            <form id="bulk-verify-form" action="{{ route('guidance.documents.bulk-verify') }}" method="POST" class="document-action-form inline" data-confirm-title="Verify selected documents?" data-confirm-message="The selected documents will be marked as verified.">
+            <form id="bulk-verify-form" action="{{ route(\App\Support\AcademicPortal::routeName('guidance.documents.bulk-verify')) }}" method="POST" class="document-action-form inline" data-confirm-title="Verify selected documents?" data-confirm-message="The selected documents will be marked as verified.">
                 @csrf
                 <input type="hidden" name="enrollment_ID" value="{{ $enrollment->enrollment_ID }}">
                 @if ($fromSectionId)
@@ -658,7 +658,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                 <div class="grid w-max grid-cols-[repeat(3,6rem)] items-center gap-2">
 
             @if($doc->file_path)
-            <a href="{{ route('guidance.documents.view', $doc) }}"
+            <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.documents.view'), $doc) }}"
                target="_blank"
                rel="noopener noreferrer"
                class="inline-flex h-9 w-full items-center justify-center gap-1 rounded-lg border border-[#296374]/20 px-3 text-xs font-bold uppercase tracking-wide text-[#296374] hover:bg-[#296374]/5">
@@ -672,7 +672,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
             @endif
 
             @if(($doc->status ?? '') === 'pending')
-                <form action="{{ route('guidance.documents.verify', $doc) }}" method="POST" class="document-action-form inline" data-confirm-title="Verify document?" data-confirm-message="This marks the document as verified.">
+                <form action="{{ route(\App\Support\AcademicPortal::routeName('guidance.documents.verify'), $doc) }}" method="POST" class="document-action-form inline" data-confirm-title="Verify document?" data-confirm-message="This marks the document as verified.">
                     @csrf
                     @if ($fromSectionId)
                         <input type="hidden" name="from_section" value="{{ $fromSectionId }}">
@@ -683,12 +683,12 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
                 </form>
                 <button type="button"
                     data-return-document-id="{{ $doc->doc_ID }}"
-                    data-return-action="{{ route('guidance.documents.reject', $doc) }}"
+                    data-return-action="{{ route(\App\Support\AcademicPortal::routeName('guidance.documents.reject'), $doc) }}"
                     class="document-return-trigger h-9 w-full rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-white bg-red-600 hover:bg-red-700 transition-colors">
                     Return
                 </button>
             @elseif($doc->isVerified())
-                <form action="{{ route('guidance.documents.unverify', $doc) }}" method="POST" class="document-action-form inline" data-confirm-title="Unverify document?" data-confirm-message="The student will be able to replace this document.">
+                <form action="{{ route(\App\Support\AcademicPortal::routeName('guidance.documents.unverify'), $doc) }}" method="POST" class="document-action-form inline" data-confirm-title="Unverify document?" data-confirm-message="The student will be able to replace this document.">
                     @csrf
                     @if ($fromSectionId)
                         <input type="hidden" name="from_section" value="{{ $fromSectionId }}">
@@ -720,7 +720,7 @@ $currentStepIndex = $stepIndexes[$activeStep ?? ''] ?? 0;
         @if ($returnSection)
             <a href="{{ route('guidance.sections.show', $returnSection) }}" class="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">Back to {{ $returnSection->name }}</a>
         @else
-            <a href="{{ route('guidance.enrollments.index') }}" class="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">Back to List</a>
+            <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.index')) }}" class="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-bold text-white shadow-md hover:opacity-90 transition-opacity" style="background-color: #296374;">Back to List</a>
         @endif
     </div>
 </div>

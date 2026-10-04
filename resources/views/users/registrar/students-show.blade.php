@@ -1,9 +1,9 @@
-@extends('users.registrar.layout')
+@extends(\App\Support\AcademicPortal::layout('registrar'))
 
 @section('title', 'Student Details')
 
 @section('content')
-<a href="{{ route('registrar.students') }}" class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
+<a href="{{ route(\App\Support\AcademicPortal::routeName('registrar.students')) }}" class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[#296374] hover:underline">
     <span aria-hidden="true">&larr;</span> Back to Masterlist
 </a>
 
@@ -58,7 +58,7 @@
     </aside>
     <div class="min-w-0 space-y-6">
         @if ($student->enrollments->count() > 1)
-        <form method="GET" action="{{ route('registrar.students.show', $student) }}" class="flex flex-wrap items-center gap-3">
+        <form method="GET" action="{{ route(\App\Support\AcademicPortal::routeName('registrar.students.show'), $student) }}" class="flex flex-wrap items-center gap-3">
             <label for="record-enrollment" class="text-sm font-semibold text-gray-600">Enrollment record</label>
             <select id="record-enrollment" name="enrollment_id" onchange="this.form.requestSubmit()" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
                 @foreach ($student->enrollments as $record)

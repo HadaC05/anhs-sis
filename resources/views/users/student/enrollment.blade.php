@@ -30,7 +30,7 @@
         ? min((int) $matches[1], now()->year)
         : now()->year;
     $isPublicEnrollment = ($layout ?? null) === 'layouts.public-enrollment';
-    $isGuidanceEdit = ($layout ?? null) === 'users.guidance.layout' && ! empty($enrollmentMethod);
+    $isGuidanceEdit = in_array($layout ?? null, ['users.guidance.layout', 'users.principal.layout', 'users.admin.layout'], true) && ! empty($enrollmentMethod);
     $cancelUrl = $cancelUrl ?? route('home');
     $formAction = $enrollmentStoreUrl ?? route($enrollmentStoreRoute ?? 'register.store');
     $birthdateValue = $value('birthdate', optional(optional($application)->birthdate)->format('Y-m-d'));

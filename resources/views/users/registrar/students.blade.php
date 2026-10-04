@@ -1,4 +1,4 @@
-@extends('users.registrar.layout')
+@extends(\App\Support\AcademicPortal::layout('registrar'))
 
 @section('title', 'Student Masterlist')
 
@@ -36,7 +36,7 @@
     </div>
 @endif
 
-<form method="GET" action="{{ route('registrar.students') }}" class="mb-5">
+<form method="GET" action="{{ route(\App\Support\AcademicPortal::routeName('registrar.students')) }}" class="mb-5">
     <div class="registrar-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
         <div class="relative min-w-[220px] flex-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,7 +111,7 @@
             </svg>
             Apply
         </button>
-        <a href="{{ route('registrar.students') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('registrar.students')) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
     </div>
 </form>
 
@@ -146,7 +146,7 @@
                             'temporarily_enrolled' => 'bg-blue-50 text-blue-700 ring-blue-200',
                             default => 'bg-gray-100 text-gray-700 ring-gray-200',
                         };
-                        $studentUrl = $student ? route('registrar.students.show', ['student' => $student, 'enrollment_id' => $enrollment->enrollment_ID]) : null;
+                        $studentUrl = $student ? route(\App\Support\AcademicPortal::routeName('registrar.students.show'), ['student' => $student, 'enrollment_id' => $enrollment->enrollment_ID]) : null;
                     @endphp
                     <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
                         <td class="border-r border-gray-100 px-5 py-4">

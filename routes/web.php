@@ -67,6 +67,15 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::middleware('admin')->prefix('admin')->name('admin.')->group(__DIR__.'/management.php');
     Route::middleware('principal')->prefix('principal/manage')->name('principal.')->group(__DIR__.'/management.php');
 
+    foreach (['principal', 'admin'] as $portal) {
+        Route::middleware($portal)->prefix($portal)->name($portal.'.')->group(__DIR__.'/academic-records.php');
+    }
+    Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/proficiency-levels', [PrincipalDashboardController::class, 'proficiencyLevels'])->name('proficiency-levels');
+        Route::get('/reports/age-for-grade', [GuidanceDashboardController::class, 'ageForGradeReport'])->name('reports.age-for-grade');
+        Route::get('/reports/placement-test-recommendations/download', [GuidanceDashboardController::class, 'downloadPlacementTestRecommendations'])->name('reports.placement-test-recommendations.download');
+    });
+
     Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])
         ->middleware('student')
         ->name('student.dashboard');
@@ -190,6 +199,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
         ->middleware('teacher')
         ->name('teacher.sections.summary.print');
 
+    Route::get('/registrar/reports', [\App\Http\Controllers\Registrar\RegistrarReportController::class, 'index'])
+        ->middleware('registrar')
+        ->name('registrar.reports.index');
     Route::get('/registrar/dashboard', [RegistrarDashboardController::class, 'index'])
         ->middleware('registrar')
         ->name('registrar.dashboard');

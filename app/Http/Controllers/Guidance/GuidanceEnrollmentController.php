@@ -18,14 +18,14 @@ class GuidanceEnrollmentController extends Controller
     public function create(Request $request): View
     {
         return view('users.student.enrollment', StudentEnrollmentForm::viewData([
-            'layout' => 'users.guidance.layout',
+            'layout' => \App\Support\AcademicPortal::layout('guidance'),
             'pageTitle' => 'Register Student',
             'heading' => 'Register Student',
-            'subheading' => 'Enroll a student from the guidance office. The student will be temporarily enrolled and can sign in to upload remaining documents.',
-            'enrollmentStoreRoute' => 'guidance.enrollments.store',
-            'checkLrnRoute' => route('guidance.enrollments.check-lrn'),
-            'checkEmailRoute' => route('guidance.enrollments.check-email'),
-            'cancelUrl' => route('guidance.enrollments.index'),
+            'subheading' => 'Enroll a student through the school office. The student will be temporarily enrolled and can sign in to upload remaining documents.',
+            'enrollmentStoreRoute' => \App\Support\AcademicPortal::routeName('guidance.enrollments.store'),
+            'checkLrnRoute' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.check-lrn')),
+            'checkEmailRoute' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.check-email')),
+            'cancelUrl' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.index')),
             'fromSectionId' => $request->input('from_section'),
         ]));
     }
@@ -52,15 +52,15 @@ class GuidanceEnrollmentController extends Controller
         $student = $enrollment->student;
 
         return view('users.student.enrollment', StudentEnrollmentForm::viewData([
-            'layout' => 'users.guidance.layout',
+            'layout' => \App\Support\AcademicPortal::layout('guidance'),
             'pageTitle' => 'Edit Enrollment',
             'heading' => 'Edit Enrollment Details',
             'subheading' => 'Update the student\'s enrollment, personal, address, and family information.',
-            'enrollmentStoreUrl' => route('guidance.enrollments.update', $enrollment),
+            'enrollmentStoreUrl' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.update'), $enrollment),
             'enrollmentMethod' => 'PUT',
-            'checkLrnRoute' => route('guidance.enrollments.check-lrn'),
-            'checkEmailRoute' => route('guidance.enrollments.check-email'),
-            'cancelUrl' => route('guidance.enrollments.show', $this->showParameters($enrollment, $request)),
+            'checkLrnRoute' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.check-lrn')),
+            'checkEmailRoute' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.check-email')),
+            'cancelUrl' => route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $this->showParameters($enrollment, $request)),
             'submitLabel' => 'Save Changes',
             'student' => $student,
             'application' => $student,
@@ -112,7 +112,7 @@ class GuidanceEnrollmentController extends Controller
     private function redirectToShow(Enrollment $enrollment, Request $request, array $session = []): RedirectResponse
     {
         return redirect()
-            ->route('guidance.enrollments.show', $this->showParameters($enrollment, $request))
+            ->route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $this->showParameters($enrollment, $request))
             ->with($session);
     }
 

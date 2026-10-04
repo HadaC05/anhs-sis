@@ -38,7 +38,7 @@
                     </td>
                     <td class="px-4 py-4">
                         @if ($document->file_path)
-                        <a href="{{ route('registrar.students.documents.view', ['student' => $student, 'document' => $document]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg border border-[#296374]/20 px-3 py-2 text-xs font-bold text-[#296374] hover:bg-[#296374]/5" aria-label="View {{ $documentLabel }} (opens in a new tab)">View</a>
+                        <a href="{{ route(\App\Support\AcademicPortal::routeName('registrar.students.documents.view'), ['student' => $student, 'document' => $document]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg border border-[#296374]/20 px-3 py-2 text-xs font-bold text-[#296374] hover:bg-[#296374]/5" aria-label="View {{ $documentLabel }} (opens in a new tab)">View</a>
                         @else
                         <span class="text-xs text-gray-500">No file attached.</span>
                         @endif

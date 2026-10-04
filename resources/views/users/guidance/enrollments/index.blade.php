@@ -1,4 +1,4 @@
-@extends('users.guidance.layout')
+@extends(\App\Support\AcademicPortal::layout('guidance'))
 
 @section('title', 'Enrollment Management')
 
@@ -19,7 +19,7 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3">
-        <a href="{{ route('guidance.enrollments.create') }}" class="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.create')) }}" class="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95" style="background-color: #296374;">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
@@ -44,7 +44,7 @@
     </div>
 @endif
 
-<form method="GET" action="{{ route('guidance.enrollments.index') }}" class="mb-5">
+<form method="GET" action="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.index')) }}" class="mb-5">
     <input type="hidden" name="per_page" value="{{ request('per_page', 15) }}">
 
     <div class="guidance-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
@@ -115,11 +115,11 @@
             </svg>
             Apply
         </button>
-        <a href="{{ route('guidance.enrollments.index') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.index')) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
     </div>
 </form>
 
-<form method="POST" action="{{ route('guidance.enrollments.bulk-approve') }}" class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
+<form method="POST" action="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.bulk-approve')) }}" class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     @csrf
     <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div class="flex items-center gap-3">
@@ -146,7 +146,7 @@
             <button type="button" id="bulk-status-apply" class="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold uppercase tracking-wide text-gray-700 shadow-sm transition hover:bg-gray-50">
                 Apply
             </button>
-            <button type="submit" formaction="{{ route('guidance.enrollments.print-multiple') }}" formtarget="_blank" class="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-600 px-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm hover:bg-slate-700">
+            <button type="submit" formaction="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.print-multiple')) }}" formtarget="_blank" class="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-600 px-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm hover:bg-slate-700">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2m-12 0h12v4H6v-4z"></path></svg>
             </button>
         </div>
@@ -222,13 +222,13 @@
                         <td class="border-r border-gray-100 px-5 py-4 font-medium text-gray-700">{{ $enrollment->created_at?->format('M d, Y') ?? '-' }}</td>
                         <td class="px-5 py-4">
                             <div class="flex justify-end gap-1.5">
-                                <a href="{{ route('guidance.enrollments.show', $enrollment) }}" target="_blank" rel="noopener" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $enrollment) }}" target="_blank" rel="noopener" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.46 12C3.73 7.94 7.52 5 12 5s8.27 2.94 9.54 7c-1.27 4.06-5.06 7-9.54 7S3.73 16.06 2.46 12z"></path></svg>
                                 </a>
-                                <a href="{{ route('guidance.enrollments.edit', $enrollment) }}" title="Edit enrollment details" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.edit'), $enrollment) }}" title="Edit enrollment details" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 </a>
-                                <a href="{{ route('guidance.enrollments.print', $enrollment) }}" target="_blank" title="Print enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700">
+                                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.print'), $enrollment) }}" target="_blank" title="Print enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2m-12 0h12v4H6v-4z"></path></svg>
                                 </a>
                             </div>
@@ -245,7 +245,7 @@
                                 </div>
                                 <p class="font-semibold text-gray-700">No enrollments found</p>
                                 <p class="text-sm">Try adjusting the filters or search term, or register a student.</p>
-                                <a href="{{ route('guidance.enrollments.create') }}" class="mt-1 text-sm font-semibold text-[#296374] hover:underline">Register Student</a>
+                                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.create')) }}" class="mt-1 text-sm font-semibold text-[#296374] hover:underline">Register Student</a>
                             </div>
                         </td>
                     </tr>

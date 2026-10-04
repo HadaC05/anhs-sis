@@ -1,4 +1,4 @@
-@extends('users.principal.layout')
+@extends(\App\Support\AcademicPortal::layout('principal'))
 
 @section('title', 'Student Proficiency Levels')
 
@@ -30,7 +30,7 @@ $proficiencyChartPayload = [
 
 <p id="proficiency-filter-help" class="mb-3 text-sm text-gray-600">Set the filters and click Apply to view proficiency levels by subject.</p>
 
-<form aria-describedby="proficiency-filter-help" method="GET" action="{{ route('principal.proficiency-levels') }}" class="mb-6">
+<form aria-describedby="proficiency-filter-help" method="GET" action="{{ route(\App\Support\AcademicPortal::routeName('principal.proficiency-levels')) }}" class="mb-6">
     <div class="principal-filters flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
         <div class="relative min-w-[180px] flex-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +82,7 @@ $proficiencyChartPayload = [
             </svg>
             Apply
         </button>
-        <a href="{{ route('principal.proficiency-levels') }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('principal.proficiency-levels')) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Reset</a>
     </div>
 </form>
 
@@ -121,7 +121,7 @@ $proficiencyChartPayload = [
     <p class="text-sm font-semibold text-gray-700">{{ $sections->total() }} {{ Str::plural('section', $sections->total()) }} · {{ $totalStudents }} {{ Str::plural('student', $totalStudents) }}</p>
     <p class="text-xs text-gray-500">Subject averages use the DepEd proficiency scale.</p>
     @if ($totalStudents > 0)
-    <a href="{{ route('principal.proficiency-levels', ['subject_id' => $selectedSubjectId, 'academic_year_id' => $selectedAcademicYear, 'grade_level' => $selectedGradeLevel, 'proficiency_level' => $selectedProficiencyLevel, 'search' => $search, 'download' => 'csv']) }}" class="inline-flex items-center rounded-lg bg-[#296374] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e4d5c]">Download filtered details (CSV)</a>
+    <a href="{{ route(\App\Support\AcademicPortal::routeName('principal.proficiency-levels'), ['subject_id' => $selectedSubjectId, 'academic_year_id' => $selectedAcademicYear, 'grade_level' => $selectedGradeLevel, 'proficiency_level' => $selectedProficiencyLevel, 'search' => $search, 'download' => 'csv']) }}" class="inline-flex items-center rounded-lg bg-[#296374] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e4d5c]">Download filtered details (CSV)</a>
     @endif
 </div>
 

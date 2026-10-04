@@ -123,6 +123,22 @@
                     </a>
 
                     <div class="space-y-1">
+                        <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Academic Records</p>
+                        <a href="{{ route('admin.enrollments.index') }}" class="sidebar-link {{ request()->routeIs('admin.enrollments.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="font-semibold">Enrollment Management</span>
+                        </a>
+                        <a href="{{ route('admin.students') }}" class="sidebar-link {{ request()->routeIs('admin.students*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4a4 4 0 100 8 4 4 0 000-8zM6 20a6 6 0 0112 0v1H6v-1z"></path>
+                            </svg>
+                            <span class="font-semibold">Student Masterlist</span>
+                        </a>
+                    </div>
+
+                    <div class="space-y-1">
                         <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">User Management</p>
                         <a href="{{ route('admin.users') }}" class="sidebar-link {{ request()->routeIs('admin.users') || request()->routeIs('admin.users.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -196,6 +212,26 @@
 
                     <div class="space-y-1">
                         <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reports</p>
+                        <a href="{{ route('admin.proficiency-levels') }}" class="sidebar-link {{ request()->routeIs('admin.proficiency-levels') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15zM8 7h8M8 11h8M8 15h5"></path>
+                            </svg>
+                            <span class="font-semibold">Proficiency Levels</span>
+                        </a>
+                        <a href="{{ route('admin.reports.enrollment') }}" class="sidebar-link {{ request()->routeIs('admin.reports.enrollment') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-4m3 4V7m3 10v-7M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            <span class="font-semibold">Enrollment Reports</span>
+                        </a>
+                        <a href="{{ route('admin.reports.promotion') }}" class="sidebar-link {{ request()->routeIs('admin.reports.promotion') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19h16M6 15V9m6 6V5m6 10v-4"></path></svg>
+                            <span class="font-semibold">Promotion Reports</span>
+                        </a>
+                        <a href="{{ route('admin.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('admin.reports.age-for-grade') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6m-8 0h8m-8 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3m11 12h2a2 2 0 002-2V7a2 2 0 00-2-2h-3m-4 0h-4m4 0a2 2 0 11-4 0"></path>
+                            </svg>
+                            <span class="font-semibold">Age Alignment</span>
+                        </a>
                         <a href="{{ route('admin.audit-trail.index') }}" class="sidebar-link {{ request()->routeIs('admin.audit-trail.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h6"></path></svg>
                             <span class="font-semibold">Audit Trail</span>

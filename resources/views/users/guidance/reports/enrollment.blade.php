@@ -1,4 +1,4 @@
-@extends('users.guidance.layout')
+@extends(\App\Support\AcademicPortal::layout('guidance'))
 
 @section('title', 'Enrollment Reports')
 
@@ -9,12 +9,12 @@
         <p class="mt-1 text-sm text-gray-600">Enrollment totals, learner profiles, and section assignments.</p>
     </div>
     <div class="flex flex-wrap gap-2">
-        <a href="{{ route('guidance.reports.enrollment', array_merge($filters, ['download' => 'summary'])) }}" class="rounded-lg border border-[#296374] bg-white px-4 py-2 text-center text-sm font-semibold text-[#296374] hover:bg-gray-50">Download summary CSV</a>
-        <a href="{{ route('guidance.reports.enrollment', array_merge($filters, ['download' => 'csv'])) }}" class="rounded-lg bg-[#296374] px-4 py-2 text-center text-sm font-semibold text-white hover:bg-[#205060]">Download records CSV</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'summary'])) }}" class="rounded-lg border border-[#296374] bg-white px-4 py-2 text-center text-sm font-semibold text-[#296374] hover:bg-gray-50">Download summary CSV</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'csv'])) }}" class="rounded-lg bg-[#296374] px-4 py-2 text-center text-sm font-semibold text-white hover:bg-[#205060]">Download records CSV</a>
     </div>
 </div>
 
-<form method="GET" action="{{ route('guidance.reports.enrollment') }}" class="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+<form method="GET" action="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment')) }}" class="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         @php
             $filterOptions = [
@@ -46,7 +46,7 @@
     @endif
     <div class="mt-4 flex items-center gap-4">
         <button type="submit" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-semibold text-white hover:bg-[#205060]">Apply filters</button>
-        <a href="{{ route('guidance.reports.enrollment') }}" class="text-sm font-semibold text-gray-600 hover:underline">Reset</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment')) }}" class="text-sm font-semibold text-gray-600 hover:underline">Reset</a>
     </div>
 </form>
 
@@ -67,7 +67,7 @@
 <section class="mb-8 space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-lg font-bold text-gray-800">School-year comparison</h2>
-        <a href="{{ route('guidance.reports.enrollment', array_merge($filters, ['download' => 'comparison'])) }}" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-semibold text-white hover:bg-[#205060]">Download comparison CSV</a>
+        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'comparison'])) }}" class="rounded-lg bg-[#296374] px-4 py-2 text-sm font-semibold text-white hover:bg-[#205060]">Download comparison CSV</a>
     </div>
     <p class="text-sm text-gray-600">Shows up to five school years ending with the selected year, or the latest five when all years are selected. Other filters apply across these years. Counts reflect stored records, not enrollment at the same date in each year. Zero means no matching records.</p>
     @if($comparison['years']->count() < 2)
@@ -77,7 +77,7 @@
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
                 <h3 class="text-sm font-bold text-gray-800">{{ $heading }}</h3>
-                <a href="{{ route('guidance.reports.enrollment', array_merge($filters, ['download' => 'chart', 'chart' => $key])) }}" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($heading) }} as SVG">Download SVG</a>
+                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'chart', 'chart' => $key])) }}" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($heading) }} as SVG">Download SVG</a>
             </div>
             <div class="overflow-x-auto"><div class="min-w-[640px]">
                 @if($key === 'year-trend')
@@ -116,7 +116,7 @@
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
                 <h3 class="text-sm font-bold text-gray-800">{{ $chartTitle }}</h3>
-                <a href="{{ route('guidance.reports.enrollment', array_merge($filters, ['download' => 'chart', 'chart' => $chartKey])) }}" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($chartTitle) }} chart as SVG">Download SVG</a>
+                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'chart', 'chart' => $chartKey])) }}" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($chartTitle) }} chart as SVG">Download SVG</a>
             </div>
             <div class="overflow-x-auto">
                 <div class="min-w-[540px]">
@@ -173,7 +173,7 @@
                         <td class="px-4 py-3">{{ $record->learner_type_name ?? 'Unspecified' }}</td>
                         <td class="px-4 py-3"><span class="rounded-full bg-[#296374]/10 px-2 py-1 text-xs font-semibold text-[#296374]">{{ $record->status_name ?? 'Unspecified' }}</span></td>
                         <td class="px-4 py-3">{{ $record->created_at ? \Illuminate\Support\Carbon::parse($record->created_at)->format('M d, Y') : 'Unavailable' }}</td>
-                        <td class="px-4 py-3"><a href="{{ route('guidance.enrollments.show', $record->enrollment_ID) }}" class="font-semibold text-[#296374] hover:underline" aria-label="View enrollment for {{ $record->first_name }} {{ $record->last_name }}">View</a></td>
+                        <td class="px-4 py-3"><a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $record->enrollment_ID) }}" class="font-semibold text-[#296374] hover:underline" aria-label="View enrollment for {{ $record->first_name }} {{ $record->last_name }}">View</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="9" class="px-5 py-10 text-center text-gray-500">No enrollment records match these filters. Try another school year or reset the filters.</td></tr>

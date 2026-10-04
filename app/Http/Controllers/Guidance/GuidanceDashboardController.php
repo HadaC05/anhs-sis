@@ -137,7 +137,7 @@ class GuidanceDashboardController extends Controller
         );
         $nextGradeLabel = $nextEnrollment->gradeLevel()->value('grade_label') ?? 'next-grade';
 
-        return redirect()->route('guidance.enrollments.show', $nextEnrollment)
+        return redirect()->route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $nextEnrollment)
             ->with('success', "Promotion confirmed. A pending {$nextGradeLabel} enrollment was created for {$nextEnrollment->academicYear?->school_year}; assign the learner to a section to finish enrollment.");
     }
 
@@ -1117,7 +1117,7 @@ class GuidanceDashboardController extends Controller
         }
 
         return redirect()
-            ->route('guidance.enrollments.show', $parameters)
+            ->route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $parameters)
             ->with($session);
     }
 

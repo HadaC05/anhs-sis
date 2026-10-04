@@ -5,7 +5,7 @@
 @section('toolbar')
     <span class="hint">Print preview of the official 2-page Enhanced Basic Education Enrollment Form (Annex 1)</span>
     <button type="button" onclick="window.print()">Print all</button>
-    <a href="{{ route('guidance.enrollments.index') }}" class="secondary">Back to enrollment list</a>
+    <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.index')) }}" class="secondary">Back to enrollment list</a>
 @endsection
 
 @section('content')

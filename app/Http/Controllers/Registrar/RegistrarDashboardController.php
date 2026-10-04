@@ -166,7 +166,7 @@ class RegistrarDashboardController extends Controller
         abort_unless((int) $document->student_ID === (int) $student->id, 404);
 
         if (! $document->file_path || ! Storage::disk('public')->exists($document->file_path)) {
-            return redirect()->route('registrar.students.show', $student)
+            return redirect()->route(\App\Support\AcademicPortal::routeName('registrar.students.show'), $student)
                 ->withErrors(['document' => 'Document file was not found.']);
         }
 

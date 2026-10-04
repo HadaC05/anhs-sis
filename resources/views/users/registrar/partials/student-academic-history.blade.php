@@ -14,11 +14,11 @@
                         <p class="text-xs text-gray-500">Section: {{ $enrollment->section?->name ?? '—' }} | Cluster: {{ $enrollment->cluster?->name ?? '—' }} | Semester: {{ $enrollment->semester ? ucfirst($enrollment->semester) : '—' }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <a href="{{ route('registrar.students.sf9', ['student' => $student, 'enrollment' => $enrollment]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-lg bg-[#296374] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm hover:opacity-90">
+                        <a href="{{ route(\App\Support\AcademicPortal::routeName('registrar.students.sf9'), ['student' => $student, 'enrollment' => $enrollment]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-lg bg-[#296374] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm hover:opacity-90">
                             View / Print SF9
                         </a>
                         @if($loop->first)
-                        <a href="{{ route('registrar.students.sf10', $student) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-lg border border-[#296374]/30 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#296374] shadow-sm hover:bg-[#296374]/5">
+                        <a href="{{ route(\App\Support\AcademicPortal::routeName('registrar.students.sf10'), $student) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-lg border border-[#296374]/30 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#296374] shadow-sm hover:bg-[#296374]/5">
                             View / Print SF10
                         </a>
                         @endif

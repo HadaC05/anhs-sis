@@ -1,4 +1,4 @@
-@extends($layout ?? 'users.guidance.layout')
+@extends($layout ?? \App\Support\AcademicPortal::layout('guidance'))
 
 @section('title', 'Age Alignment Report')
 
@@ -21,7 +21,7 @@
         'underage' => 'Below range',
     ];
     $alignment = $alignment ?? 'overage';
-    $reportRoute = $reportRoute ?? 'guidance.reports.age-for-grade';
+    $reportRoute = $reportRoute ?? \App\Support\AcademicPortal::routeName('guidance.reports.age-for-grade');
     $showEnrollmentAction = $showEnrollmentAction ?? true;
     $expectedRanges = \App\Support\PlacementAssessmentAdvisor::expectedRanges();
 @endphp
@@ -61,7 +61,7 @@
 @endif
 
 <form method="GET" action="{{ route($reportRoute) }}" class="mb-6">
-    <div class="{{ ($layout ?? '') === 'users.principal.layout' ? 'principal-filters' : 'guidance-filters' }} flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
+    <div class="{{ ($layout ?? '') === \App\Support\AcademicPortal::layout('principal') ? 'principal-filters' : 'guidance-filters' }} flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm">
         <select name="alignment" class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none transition focus:border-[#296374] focus:ring-2 focus:ring-[#296374]/10">
             @foreach ($alignmentOptions as $value => $label)
                 <option value="{{ $value }}" {{ $alignment === $value ? 'selected' : '' }}>{{ $label }}</option>
@@ -136,7 +136,7 @@
                     <h2 class="text-sm font-bold text-gray-900">Student records</h2>
 
                 </div>
-                <a href="{{ route($recommendationsDownloadRoute ?? 'guidance.reports.placement-test-recommendations.download', request()->only(['search', 'grade_level', 'academic_year_id'])) }}" class="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#296374]/20 bg-[#296374]/5 px-3 py-2 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/10 sm:w-auto">
+                <a href="{{ route($recommendationsDownloadRoute ?? \App\Support\AcademicPortal::routeName('guidance.reports.placement-test-recommendations.download'), request()->only(['search', 'grade_level', 'academic_year_id'])) }}" class="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#296374]/20 bg-[#296374]/5 px-3 py-2 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/10 sm:w-auto">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
                     Download recommendations
                 </a>
@@ -180,7 +180,7 @@
                                 </td>
                                 @if ($showEnrollmentAction)
                                     <td class="px-5 py-3 text-right">
-                                        <a href="{{ route('guidance.enrollments.show', $enrollment) }}" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
+                                        <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $enrollment) }}" title="View enrollment" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-[#296374]/30 hover:bg-[#296374]/5 hover:text-[#296374]">
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"></path>
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.46 12C3.73 7.94 7.52 5 12 5s8.27 2.94 9.54 7c-1.27 4.06-5.06 7-9.54 7S3.73 16.06 2.46 12z"></path>

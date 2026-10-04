@@ -110,17 +110,23 @@
 
                     <div class="space-y-1">
                         <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Academic Records</p>
+                        <a href="{{ route('principal.enrollments.index') }}" class="sidebar-link {{ request()->routeIs('principal.enrollments.*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414A1 1 0 0117 7.414V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="font-semibold">Enrollment Management</span>
+                        </a>
+                        <a href="{{ route('principal.students') }}" class="sidebar-link {{ request()->routeIs('principal.students*') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4a4 4 0 100 8 4 4 0 000-8zM6 20a6 6 0 0112 0v1H6v-1z"></path>
+                            </svg>
+                            <span class="font-semibold">Student Masterlist</span>
+                        </a>
                         <a href="{{ route('principal.grade-releases') }}" class="sidebar-link {{ request()->routeIs('principal.grade-releases*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path>
                             </svg>
                             <span class="font-semibold">Grade Releases</span>
-                        </a>
-                        <a href="{{ route('principal.proficiency-levels') }}" class="sidebar-link {{ request()->routeIs('principal.proficiency-levels') ? 'active' : '' }}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15zM8 7h8M8 11h8M8 15h5"></path>
-                            </svg>
-                            <span class="font-semibold">Proficiency Levels</span>
                         </a>
                         <a href="{{ route('principal.promotions.index') }}" class="sidebar-link {{ request()->routeIs('principal.promotions.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
@@ -200,6 +206,20 @@
 
                     <div class="space-y-1">
                         <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reports</p>
+                        <a href="{{ route('principal.proficiency-levels') }}" class="sidebar-link {{ request()->routeIs('principal.proficiency-levels') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15zM8 7h8M8 11h8M8 15h5"></path>
+                            </svg>
+                            <span class="font-semibold">Proficiency Levels</span>
+                        </a>
+                        <a href="{{ route('principal.reports.enrollment') }}" class="sidebar-link {{ request()->routeIs('principal.reports.enrollment') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-4m3 4V7m3 10v-7M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            <span class="font-semibold">Enrollment Reports</span>
+                        </a>
+                        <a href="{{ route('principal.reports.promotion') }}" class="sidebar-link {{ request()->routeIs('principal.reports.promotion') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19h16M6 15V9m6 6V5m6 10v-4"></path></svg>
+                            <span class="font-semibold">Promotion Reports</span>
+                        </a>
                         <a href="{{ route('principal.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('principal.reports.age-for-grade') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3M4 6h16M6 6v14h12V6M9 6V4h6v2"></path>

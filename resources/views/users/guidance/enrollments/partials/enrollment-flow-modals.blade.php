@@ -54,7 +54,7 @@
                 <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">Enrollment</p>
                 <h3 id="enrollmentStatusTitle" class="mt-1 text-lg font-bold tracking-tight text-white">Update enrollment status</h3>
             </div>
-            <form id="enrollment-status-form" action="{{ route('guidance.enrollments.status', $enrollment) }}" method="POST">
+            <form id="enrollment-status-form" action="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.status'), $enrollment) }}" method="POST">
                 @csrf
                 @method('PATCH')
                 <input type="hidden" name="step" value="{{ $activeStep ?? 'enrollment' }}" data-guidance-step-field>
