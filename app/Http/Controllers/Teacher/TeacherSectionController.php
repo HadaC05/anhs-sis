@@ -16,6 +16,7 @@ use App\Models\GradingTerm;
 use App\Models\Section;
 use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
+use App\Models\Sf2Configuration;
 use App\Models\Sf9Configuration;
 use App\Models\Student;
 use App\Models\StudentGuardian;
@@ -604,6 +605,7 @@ class TeacherSectionController extends Controller
             'schoolDays' => $schoolDays,
             'rows' => $rows,
             'sf2Uploads' => $sf2Uploads,
+            'sf2Configuration' => Sf2Configuration::current(),
             'attendanceView' => $attendanceView,
             'selectedMonth' => $selectedMonth,
             'selectedUpload' => $selectedUpload,
@@ -617,7 +619,11 @@ class TeacherSectionController extends Controller
         abort_unless(Storage::disk('local')->exists($upload->storage_path), 404);
 
         return response()->file(Storage::disk('local')->path($upload->storage_path), [
-            'Content-Type' => 'application/pdf',
+            'Content-Type' => match (strtolower(pathinfo($upload->storage_path, PATHINFO_EXTENSION))) {
+                'xls' => 'application/vnd.ms-excel',
+                'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                default => 'application/pdf',
+            },
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
         ]);
@@ -708,13 +714,13 @@ class TeacherSectionController extends Controller
 
         $validated = $request->validate([
             'report_month' => ['required', 'integer', 'in:'.implode(',', array_keys($section->academicYear->attendanceMonths()))],
-            'sf2_file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
-        ]);
+            'sf2_file' => ['required', 'file', 'mimes:pdf,xls,xlsx', 'max:10240'],
+        ], ['sf2_file.mimes' => 'Upload an SF2 PDF or Excel file (.xls or .xlsx).']);
 
         $file = $validated['sf2_file'];
         $path = $file->storeAs(
             'sf2-uploads/'.$section->section_ID,
-            Str::uuid().'.pdf',
+            Str::uuid().'.'.$file->extension(),
             'local'
         );
 
@@ -732,7 +738,7 @@ class TeacherSectionController extends Controller
         $upload->refresh();
 
         $message = match ($upload->status) {
-            'failed' => $upload->parse_notes ?: 'Attendance could not be imported. Please check the PDF and try again.',
+            'failed' => $upload->parse_notes ?: 'Attendance could not be imported. Please check the SF2 file and try again.',
             'partial' => 'SF2 attendance uploaded with unmatched learners. Review the monthly record.',
             default => 'SF2 attendance uploaded successfully.',
         };

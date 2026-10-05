@@ -144,9 +144,9 @@
                             </svg>
                             <span class="font-semibold">Users</span>
                         </a>
-                        <a href="{{ route('principal.sf9-configuration.edit') }}" class="sidebar-link {{ request()->routeIs('principal.sf9-configuration.*') ? 'active' : '' }}">
+                        <a href="{{ route('principal.school-forms.edit') }}" class="sidebar-link {{ request()->routeIs('principal.sf9-configuration.*', 'principal.school-forms.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M5 3h10l4 4v14H5z" /></svg>
-                            <span class="font-semibold">SF9 Form Configuration</span>
+                            <span class="font-semibold">School Forms</span>
                         </a>
                         <a href="{{ route('principal.school-information.edit') }}" class="sidebar-link {{ request()->routeIs('principal.school-information.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h1m4 0h1M9 12h1m4 0h1"></path></svg>
@@ -223,6 +223,10 @@
                         <a href="{{ route('principal.reports.promotion') }}" class="sidebar-link {{ request()->routeIs('principal.reports.promotion') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19h16M6 15V9m6 6V5m6 10v-4"></path></svg>
                             <span class="font-semibold">Promotion Reports</span>
+                        </a>
+                        <a href="{{ route('principal.reports.attendance') }}" class="sidebar-link {{ request()->routeIs('principal.reports.attendance') ? 'active' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14H3V6a2 2 0 012-2zm3 10h2m4 0h2m-8 4h2"></path></svg>
+                            <span class="font-semibold">Attendance &amp; Movement</span>
                         </a>
                         <a href="{{ route('principal.reports.age-for-grade') }}" class="sidebar-link {{ request()->routeIs('principal.reports.age-for-grade') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">

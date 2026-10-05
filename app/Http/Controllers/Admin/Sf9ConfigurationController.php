@@ -7,6 +7,7 @@ use App\Models\AcademicYear;
 use App\Models\Enrollment;
 use App\Models\GradingTerm;
 use App\Models\Section;
+use App\Models\Sf2Configuration;
 use App\Models\Sf9Configuration;
 use App\Support\Sf9ReportCardBuilder;
 use Illuminate\Http\Request;
@@ -14,10 +15,13 @@ use Illuminate\Validation\Rule;
 
 class Sf9ConfigurationController extends Controller
 {
-    public function edit()
+    public function edit(Request $request)
     {
         return view('users.admin.sf9-configuration', [
             'configuration' => Sf9Configuration::current(),
+            'sf2Configuration' => Sf2Configuration::current(),
+            'sf2Formats' => Sf2Configuration::formats(),
+            'tab' => $request->query('tab') === 'sf2' ? 'sf2' : 'sf9',
             'formats' => Sf9Configuration::formats(),
         ]);
     }
@@ -29,6 +33,16 @@ class Sf9ConfigurationController extends Controller
         Sf9Configuration::query()->updateOrCreate(['id' => 1], $data);
 
         return back()->with('status', 'SF9 formats saved. Future generation will use these selections.');
+    }
+
+    public function updateSf2(Request $request)
+    {
+        $data = $request->validate(['format' => ['required', 'string', Rule::in(array_keys(Sf2Configuration::formats()))]]);
+        Sf2Configuration::query()->updateOrCreate(['id' => 1], $data);
+        $portal = $request->routeIs('principal.*') ? 'principal' : 'admin';
+
+        return redirect()->route($portal.'.school-forms.edit', ['tab' => 'sf2'])
+            ->with('status', 'SF2 format saved. Attendance uploads and the detailed view now use this format.');
     }
 
     public function preview(string $format)

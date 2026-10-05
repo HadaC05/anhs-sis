@@ -12,7 +12,7 @@ function sf9Manager(string $role): Staff
 test('managers share SF9 selections and can restore the original format', function () {
     $admin = sf9Manager('admin');
     $principal = sf9Manager('principal');
-    $this->actingAs($admin)->get(route('admin.sf9-configuration.edit'))->assertOk()->assertSee('SF9 Form Configuration');
+    $this->actingAs($admin)->get(route('admin.sf9-configuration.edit'))->assertOk()->assertSee('School Forms');
     $this->put(route('admin.sf9-configuration.update'), ['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current'])->assertSessionHasNoErrors();
     expect(Sf9Configuration::current()->junior_high)->toBe('jhs_2026');
     $this->actingAs($principal)->get(route('principal.sf9-configuration.edit'))->assertOk()->assertSee('jhs_2026');
@@ -66,3 +66,39 @@ test('SF9 previews use the saved school profile logo and active school year', fu
     $this->get($url)->assertOk()->assertSee('Renamed School')->assertSee('SCHOOLS DIVISION OF New City')
         ->assertDontSee('Updated National High School')->assertDontSee('alt="School logo"', false);
 });
+
+test('school forms tabs share SF2 selection without changing SF9 settings', function () {
+    $admin = sf9Manager('admin');
+    $principal = sf9Manager('principal');
+    Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    $this->actingAs($admin)->get(route('admin.school-forms.edit'))->assertOk()
+        ->assertSee('School Forms')->assertSee('Save SF9 Formats')->assertDontSee('Save SF2 Format');
+    $this->get(route('admin.school-forms.edit', ['tab' => 'sf2']))->assertOk()
+        ->assertSee('Save SF2 Format')->assertSee('Old SF2 form')->assertSee('New SF2 form')
+        ->assertDontSee('Save SF9 Formats');
+    $this->put(route('admin.school-forms.sf2.update'), ['format' => 'lis'])
+        ->assertSessionHasNoErrors()->assertRedirect(route('admin.school-forms.edit', ['tab' => 'sf2']));
+    expect(\App\Models\Sf2Configuration::current()->format)->toBe('lis')
+        ->and(Sf9Configuration::current()->junior_high)->toBe('jhs_2026');
+    $this->actingAs($principal)->get(route('principal.school-forms.edit', ['tab' => 'sf2']))
+        ->assertOk()->assertViewHas('sf2Configuration', fn ($config) => $config->format === 'lis');
+    $this->put(route('principal.sf9-configuration.update'), ['junior_high' => 'jhs_legacy', 'senior_high' => 'shs_current'])->assertSessionHasNoErrors();
+    expect(\App\Models\Sf2Configuration::current()->format)->toBe('lis');
+    $this->put(route('principal.school-forms.sf2.update'), ['format' => 'legacy'])->assertSessionHasNoErrors();
+    expect(\App\Models\Sf2Configuration::current()->format)->toBe('legacy');
+    $this->assertDatabaseCount('sf2_configurations', 1);
+});
+
+test('school forms rejects an unknown SF2 format', function () {
+    $this->actingAs(sf9Manager('admin'))->put(route('admin.school-forms.sf2.update'), ['format' => 'unknown'])->assertSessionHasErrors('format');
+    $this->assertDatabaseCount('sf2_configurations', 0);
+});
+
+test('other staff cannot change school forms', function (string $role) {
+    $this->actingAs(sf9Manager($role));
+    foreach (['admin', 'principal'] as $portal) {
+        $this->get(route($portal.'.school-forms.edit', ['tab' => 'sf2']))->assertForbidden();
+        $this->put(route($portal.'.school-forms.sf2.update'), ['format' => 'lis'])->assertForbidden();
+    }
+    $this->assertDatabaseCount('sf2_configurations', 0);
+})->with(['teacher', 'registrar']);

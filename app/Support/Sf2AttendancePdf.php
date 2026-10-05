@@ -17,6 +17,10 @@ class Sf2AttendancePdf
             throw new Sf2ImportException('The PDF could not be read. Upload an original text-based SF2 PDF, not a scanned image.');
         }
 
+        if (preg_match('/ABSENT\s+PRESENT/i', implode("\n", $pages))) {
+            return (new Sf2AttendanceLisPdf)->read($document);
+        }
+
         $report = $this->parsePages($pages);
         $report['layout'] = (new Sf2SheetLayout)->extract($document, $report);
 

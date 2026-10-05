@@ -258,6 +258,9 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/principal/dashboard', [PrincipalDashboardController::class, 'index'])
         ->middleware('principal')
         ->name('principal.dashboard');
+    Route::get('/principal/reports/attendance', [\App\Http\Controllers\Principal\AttendanceReportController::class, 'index'])
+        ->middleware('principal')
+        ->name('principal.reports.attendance');
     Route::get('/principal/grade-releases', [PrincipalDashboardController::class, 'gradeReleases'])
         ->middleware('principal')
         ->name('principal.grade-releases');

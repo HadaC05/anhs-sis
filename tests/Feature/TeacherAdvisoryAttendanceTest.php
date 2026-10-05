@@ -422,7 +422,7 @@ test('the removed school year override cannot bypass matching the section school
     $upload = SectionSf2Upload::query()->firstOrFail();
     expect($upload->status)->toBe('failed')
         ->and($upload->use_section_school_year)->toBeFalse()
-        ->and($upload->parse_notes)->toContain('Upload a PDF with the matching school year')
+        ->and($upload->parse_notes)->toContain('Upload an SF2 file with the matching school year')
         ->and(EnrollmentMonthlyAttendance::query()->count())->toBe(0);
 });
 
@@ -464,3 +464,123 @@ test('no matching names leaves existing records and class days unchanged', funct
         ->and(EnrollmentMonthlyAttendance::query()->firstOrFail()->days_present)->toBe(18)
         ->and(SectionAttendanceSetting::query()->count())->toBe(0);
 });
+
+test('teacher can upload LIS Excel attendance and use its present column in SF9', function () {
+    \App\Models\Sf2Configuration::create(['format' => 'lis']);
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    $response = $this->actingAs($teacher)->post(route('teacher.advisory.attendance.sf2', $section), [
+        'report_month' => 9,
+        'sf2_file' => new UploadedFile(base_path('tests/Fixtures/sf2-lis-september-2026.xls'), 'SF2.xls', 'application/vnd.ms-excel', null, true),
+    ]);
+    $response->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('status');
+    $upload = SectionSf2Upload::query()->firstOrFail();
+    expect($upload->status)->toBe('partial')->and($upload->storage_path)->toEndWith('.xls');
+    Storage::disk('local')->assertExists($upload->storage_path);
+    $record = EnrollmentMonthlyAttendance::query()->firstOrFail();
+    expect($record->days_present)->toBe(3)->and($record->days_absent)->toBe(1)
+        ->and($record->days_tardy)->toBe(1)->and($record->source_sf2_upload_id)->toBe($upload->id);
+    $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, Sf9AttendanceSummary::schoolDaysForSection($section));
+    expect($summary['days_present'][9])->toBe(3)->and($summary['days_absent'][9])->toBe(1);
+    $this->get(route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => 9]))
+        ->assertOk()->assertSee('Recreated from SF2.xls')->assertSee('Santos,Maria');
+});
+
+test('Excel month mismatch preserves previously saved attendance', function () {
+    \App\Models\Sf2Configuration::create(['format' => 'lis']);
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    EnrollmentMonthlyAttendance::query()->create(['enrollment_ID' => $enrollment->enrollment_ID, 'month' => 8, 'days_present' => 18, 'days_absent' => 2]);
+    $this->actingAs($teacher)->post(route('teacher.advisory.attendance.sf2', $section), [
+        'report_month' => 8,
+        'sf2_file' => new UploadedFile(base_path('tests/Fixtures/sf2-lis-september-2026.xls'), 'SF2.xls', 'application/vnd.ms-excel', null, true),
+    ])->assertSessionHas('attendance_import_error');
+    expect(EnrollmentMonthlyAttendance::query()->sole()->days_present)->toBe(18)
+        ->and(SectionAttendanceSetting::query()->count())->toBe(0);
+});
+
+test('SF2 selection checks form columns rather than restricting PDF or Excel extensions', function (string $format, string $rejected, string $mime) {
+    Storage::fake('local');
+    \App\Models\Sf2Configuration::create(['format' => $format]);
+    ['teacher' => $teacher, 'section' => $section] = createAdvisoryAttendanceFixtures();
+    $this->actingAs($teacher)->get(route('teacher.advisory.attendance', $section))->assertOk()
+        ->assertSee('accept="application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pdf,.xls,.xlsx"', false);
+    $this->post(route('teacher.advisory.attendance.sf2', $section), [
+        'report_month' => 9,
+        'sf2_file' => new UploadedFile(base_path('tests/Fixtures/'.$rejected), $rejected, $mime, null, true),
+    ])->assertSessionHasNoErrors()->assertSessionHas('attendance_import_error');
+    $upload = SectionSf2Upload::query()->sole();
+    expect($upload->status)->toBe('failed')->and($upload->parse_notes)->toContain('different SF2 form');
+    expect(EnrollmentMonthlyAttendance::query()->count())->toBe(0);
+})->with([
+    ['legacy', 'sf2-lis-september-2026.xls', 'application/vnd.ms-excel'],
+    ['lis', 'sf2-september-2026-sample.pdf', 'application/pdf'],
+]);
+
+test('switching SF2 formats changes existing detail columns without modifying attendance or SF9', function () {
+    Storage::fake('local');
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createSf2ImportFixtures();
+    uploadSampleSf2($this, $teacher, $section)->assertSessionHas('status');
+    $before = EnrollmentMonthlyAttendance::query()->get()->toArray();
+    $url = route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => 9]);
+    $this->get($url)->assertOk()->assertSee('data-sf2-format="legacy"', false)
+        ->assertSee('data-test="sf2-second-total">Tardy</th>', false);
+    $config = \App\Models\Sf2Configuration::create(['format' => 'lis']);
+    $this->get($url)->assertOk()->assertSee('data-sf2-format="lis"', false)
+        ->assertSee('data-test="sf2-second-total">Present</th>', false)
+        ->assertDontSee('data-test="sf2-second-total">Tardy</th>', false);
+    $config->update(['format' => 'legacy']);
+    $this->get($url)->assertOk()->assertSee('data-test="sf2-second-total">Tardy</th>', false);
+    expect(EnrollmentMonthlyAttendance::query()->get()->toArray())->toBe($before);
+    $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, Sf9AttendanceSummary::schoolDaysForSection($section));
+    expect($summary['days_present'][9])->toBe(21)->and($summary['days_absent'][9])->toBe(1);
+});
+
+test('new form sample imports from PDF and XLSX into the same monthly record', function () {
+    Storage::fake('local');
+    \App\Models\Sf2Configuration::create(['format' => 'lis']);
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    $section->update(['name' => 'G7-E']);
+    $section->academicYear->update(['school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31']);
+    $enrollment->student->update(['last_name' => 'Bautista', 'first_name' => 'Gabriel Joy', 'middle_name' => 'A.']);
+    foreach (['pdf' => 'application/pdf', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] as $extension => $mime) {
+        $file = 'sf2-lis-june-2025-sample.'.$extension;
+        $this->actingAs($teacher)->post(route('teacher.advisory.attendance.sf2', $section), [
+            'report_month' => 6,
+            'sf2_file' => new UploadedFile(base_path('tests/Fixtures/'.$file), $file, $mime, null, true),
+        ])->assertSessionHasNoErrors()->assertSessionHas('status');
+        $upload = SectionSf2Upload::query()->latest('id')->firstOrFail();
+        expect($upload->status)->toBe('partial')->and($upload->import_rows)->toHaveCount(15)
+            ->and($upload->school_days)->toBe(21)->and($upload->storage_path)->toEndWith('.'.$extension);
+        $record = EnrollmentMonthlyAttendance::query()->sole();
+        expect($record->days_present)->toBe(13)->and($record->days_absent)->toBe(8)
+            ->and($record->days_tardy)->toBe(0)->and($record->source_sf2_upload_id)->toBe($upload->id);
+        $this->get(route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => 6]))
+            ->assertOk()->assertSee('data-test="sf2-second-total">Present</th>', false)->assertSee('76.51%')->assertSee('11.48');
+        $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, Sf9AttendanceSummary::schoolDaysForSection($section));
+        expect($summary['days_present'][6])->toBe(13)->and($summary['days_absent'][6])->toBe(8);
+    }
+    expect(SectionSf2Upload::query()->count())->toBe(2);
+});
+
+test('old SF2 accepts Excel uploads and retains tardy separately from present counts', function (string $extension, string $mime) {
+    Storage::fake('local');
+    \App\Models\Sf2Configuration::create(['format' => 'legacy']);
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisoryAttendanceFixtures();
+    $file = 'sf2-legacy-september-2026.'.$extension;
+    $this->actingAs($teacher)->post(route('teacher.advisory.attendance.sf2', $section), [
+        'report_month' => 9,
+        'sf2_file' => new UploadedFile(base_path('tests/Fixtures/'.$file), $file, $mime, null, true),
+    ])->assertSessionHasNoErrors()->assertSessionHas('status');
+    $upload = SectionSf2Upload::query()->sole();
+    expect($upload->status)->toBe('partial')->and($upload->storage_path)->toEndWith('.'.$extension);
+    $record = EnrollmentMonthlyAttendance::query()->sole();
+    expect($record->days_present)->toBe(3)->and($record->days_absent)->toBe(1)->and($record->days_tardy)->toBe(1);
+    $this->get(route('teacher.advisory.attendance', ['section' => $section, 'view' => 'detailed', 'month' => 9]))
+        ->assertOk()->assertSee('data-sf2-format="legacy"', false)->assertSee('data-test="sf2-second-total">Tardy</th>', false);
+    $summary = Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, Sf9AttendanceSummary::schoolDaysForSection($section));
+    expect($summary['days_present'][9])->toBe(3)->and($summary['days_absent'][9])->toBe(1);
+})->with([
+    ['xls', 'application/vnd.ms-excel'],
+    ['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+]);

@@ -15,6 +15,8 @@
         "laravel/tinker": "^2.10.1",
         "livewire/flux": "^2.9.0",
         "livewire/livewire": "^4.0",
+        "shuchkin/simplexls": "^1.0",
+        "shuchkin/simplexlsx": "^1.1",
         "smalot/pdfparser": "2.12"
     },
     "require-dev": {

@@ -278,7 +278,13 @@ it('includes additional senior high terms in report averages columns and observa
     $html = view('users.teacher.advisory.sf9-print', [
         'cards' => [$card], 'section' => $fixtures['section'], 'periods' => \App\Models\GradingTerm::seniorHighPeriods(),
     ])->render();
-    expect($html)->toContain('colspan="4">TERM')->toContain('100');
+    expect($html)->toContain('colspan="4">TERM')
+        ->toContain('class="sheet jhs-updated" data-school-level="senior-high"')
+        ->toContain('class="shs-grid jhs-panels"')
+        ->toContain('Track (SHS only):')
+        ->toContain('ACADEMIC')
+        ->toContain('Term 4')
+        ->toContain('100');
 });
 
 it('rejects reducing senior high maximum when an excluded term has saved grades', function () {

@@ -456,7 +456,7 @@
             $observedPeriods = $card['observed_periods'] ?? $periods;
             $observedPeriodCount = count($observedPeriods);
         @endphp
-        @if (! $isSeniorHigh && ($sf9Formats['junior_high'] ?? 'jhs_legacy') === 'jhs_2026')
+        @if ($isSeniorHigh || ($sf9Formats['junior_high'] ?? 'jhs_legacy') === 'jhs_2026')
             @include('users.teacher.advisory.sf9-jhs-2026')
         @elseif ($isSeniorHigh)
             @php

@@ -150,9 +150,9 @@
 
                     <div class="space-y-1">
                         <p class="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">School Management</p>
-                        <a href="{{ route('admin.sf9-configuration.edit') }}" class="sidebar-link {{ request()->routeIs('admin.sf9-configuration.*') ? 'active' : '' }}">
+                        <a href="{{ route('admin.school-forms.edit') }}" class="sidebar-link {{ request()->routeIs('admin.sf9-configuration.*', 'admin.school-forms.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M5 3h10l4 4v14H5z" /></svg>
-                            <span class="font-semibold">SF9 Form Configuration</span>
+                            <span class="font-semibold">School Forms</span>
                         </a>
                         <a href="{{ route('admin.school-information.edit') }}" class="sidebar-link {{ request()->routeIs('admin.school-information.*') ? 'active' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h1m4 0h1M9 12h1m4 0h1"></path></svg>

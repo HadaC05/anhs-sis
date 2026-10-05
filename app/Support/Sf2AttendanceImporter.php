@@ -8,6 +8,7 @@ use App\Models\EnrollmentStatus;
 use App\Models\Section;
 use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
+use App\Models\Sf2Configuration;
 use App\Models\Student;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +21,10 @@ class Sf2AttendanceImporter
     public function import(SectionSf2Upload $upload): void
     {
         try {
-            $report = $this->reader->read(Storage::disk('local')->path($upload->storage_path));
+            $path = Storage::disk('local')->path($upload->storage_path);
+            $report = in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['xls', 'xlsx'], true)
+                ? app(Sf2AttendanceXls::class)->read($path, $this->reportYear($upload))
+                : $this->reader->read($path);
             $upload->update([
                 'report_year' => $report['year'],
                 'source_school_year' => $report['school_year'],
@@ -52,7 +56,7 @@ class Sf2AttendanceImporter
                     };
                     if ($row['enrollment_ID']) {
                         if (in_array($row['enrollment_ID'], $matchedIds, true)) {
-                            throw new Sf2ImportException('The PDF contains duplicate attendance rows for '.$row['name'].'. No attendance was changed.');
+                            throw new Sf2ImportException('The SF2 contains duplicate attendance rows for '.$row['name'].'. No attendance was changed.');
                         }
                         $matchedIds[] = $row['enrollment_ID'];
                     }
@@ -62,7 +66,7 @@ class Sf2AttendanceImporter
 
                 if ($matchedIds === []) {
                     // Commit the matching diagnostics without changing any attendance.
-                    $upload->update(['status' => 'failed', 'parse_notes' => 'No PDF names matched enrolled learners in this section and school year. Check the class list and school year, then upload again. No attendance was changed.']);
+                    $upload->update(['status' => 'failed', 'parse_notes' => 'No SF2 names matched enrolled learners in this section and school year. Check the class list and school year, then upload again. No attendance was changed.']);
 
                     return;
                 }
@@ -101,7 +105,7 @@ class Sf2AttendanceImporter
                 $upload->update([
                     'status' => $unmatched > 0 || $missing > 0 ? 'partial' : 'imported',
                     'imported_at' => now(),
-                    'parse_notes' => count($matchedIds).' learner records imported. '.$unmatched.' PDF names could not be matched; '.$missing.' enrolled learners were not included. Unmatched or omitted learners were not changed. Present = '.$report['school_days'].' class days minus absences. Tardy is recorded separately.',
+                    'parse_notes' => count($matchedIds).' learner records imported. '.$unmatched.' SF2 names could not be matched; '.$missing.' enrolled learners were not included. Unmatched or omitted learners were not changed. Present = '.$report['school_days'].' class days minus absences. Tardy is recorded separately.',
                 ]);
             });
         } catch (Sf2ImportException $exception) {
@@ -112,14 +116,32 @@ class Sf2AttendanceImporter
         }
     }
 
+    private function reportYear(SectionSf2Upload $upload): ?int
+    {
+        $academicYear = Section::query()->findOrFail($upload->section_ID)->academicYear;
+        $years = [];
+        for ($year = (int) $academicYear->start_date->format('Y'); $year <= (int) $academicYear->end_date->format('Y'); $year++) {
+            $month = sprintf('%04d-%02d', $year, $upload->report_month);
+            if ($month >= $academicYear->start_date->format('Y-m') && $month <= $academicYear->end_date->format('Y-m')) {
+                $years[] = $year;
+            }
+        }
+
+        return count($years) === 1 ? $years[0] : null;
+    }
+
     private function validateReport(Section $section, SectionSf2Upload $upload, array $report): void
     {
+        $configuration = Sf2Configuration::current();
+        if (($report['format'] ?? 'legacy') !== $configuration->format) {
+            throw new Sf2ImportException('This file uses a different SF2 form. School Forms is configured for '.$configuration->selectedFormat()['label'].'. Upload that form as PDF or Excel, or ask your administrator or principal to change the selection. No attendance was changed.');
+        }
         $academicYear = $section->academicYear;
         if ($report['month'] !== $upload->report_month) {
-            throw new Sf2ImportException('The PDF report month does not match the selected upload month. No attendance was changed.');
+            throw new Sf2ImportException('The SF2 report month does not match the selected upload month. No attendance was changed.');
         }
         if ($report['school_year'] !== $academicYear->school_year) {
-            throw new Sf2ImportException('The PDF is for school year '.$report['school_year'].' but this section is in '.$academicYear->school_year.'. Upload a PDF with the matching school year. No attendance was changed.');
+            throw new Sf2ImportException('The SF2 is for school year '.$report['school_year'].' but this section is in '.$academicYear->school_year.'. Upload an SF2 file with the matching school year. No attendance was changed.');
         }
         $reportDate = sprintf('%04d-%02d', $report['year'], $report['month']);
         if ($reportDate < $academicYear->start_date->format('Y-m') || $reportDate > $academicYear->end_date->format('Y-m')) {
@@ -127,7 +149,7 @@ class Sf2AttendanceImporter
         }
         preg_match('/\d+/', $section->getRelation('gradeLevel')?->grade_label ?? '', $grade);
         if ($report['grade'] !== (int) ($grade[0] ?? 0) || self::sectionKey($report['section'], $report['grade']) !== self::sectionKey($section->name, $report['grade'])) {
-            throw new Sf2ImportException('The PDF grade/section ('.$report['grade'].' / '.$report['section'].') does not match '.$section->name.'. No attendance was changed.');
+            throw new Sf2ImportException('The SF2 grade/section ('.$report['grade'].' / '.$report['section'].') does not match '.$section->name.'. No attendance was changed.');
         }
     }
 

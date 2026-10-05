@@ -1,11 +1,17 @@
 @php
     $attendance = $card['attendance'] ?? \App\Support\Sf9AttendanceSummary::empty();
     $attendanceMonths = $card['attendance_months'] ?? \App\Support\Sf9ReportCardBuilder::seniorHighAttendanceMonthKeys();
+    $isSeniorHigh = (bool) ($card['is_senior_high'] ?? false);
+    $formPeriods = $isSeniorHigh ? ($card['senior_high_terms'] ?? []) : $periods;
+    $gradeValueKey = $isSeniorHigh ? 'terms' : 'quarters';
+    $gradeRows = $isSeniorHigh ? $card['subjects'] : \App\Support\Sf9ReportCardBuilder::updatedJuniorHighRows($card['subjects']);
     $division = trim($card['school_division'] ?? '');
     $divisionHeading = $division !== '' && ! preg_match('/^(?:schools?\s+)?division\b/i', $division) ? 'SCHOOLS DIVISION OF '.$division : $division;
     $displayedSchoolDays = collect($attendanceMonths)->sum(fn ($month) => (int) ($attendance['school_days'][$month] ?? 0));
+    $displayedPresent = collect($attendanceMonths)->sum(fn ($month) => (int) ($attendance['days_present'][$month] ?? 0));
+    $displayedAbsent = collect($attendanceMonths)->sum(fn ($month) => (int) ($attendance['days_absent'][$month] ?? 0));
 @endphp
-<section class="sheet jhs-updated">
+<section class="sheet jhs-updated" data-school-level="{{ $isSeniorHigh ? 'senior-high' : 'junior-high' }}">
     <div class="shs-grid jhs-panels">
         <div>
             <header class="jhs-report-header">
@@ -39,7 +45,7 @@
                     <div class="jhs-field"><span>Grade:</span><span class="jhs-entry">{{ preg_replace('/^grade\s+/i', '', $card['grade']) }}</span></div>
                     <div class="jhs-field"><span>Section:</span><span class="jhs-entry">{{ $card['section_name'] }}</span></div>
                 </div>
-                <div class="jhs-field jhs-track"><span>Track (SHS only):</span><span class="jhs-entry"></span></div>
+                <div class="jhs-field jhs-track"><span>Track (SHS only):</span><span class="jhs-entry">{{ $card['shs_track'] ?? '' }}</span></div>
             </div>
 
             <div class="shs-letter">
@@ -50,26 +56,26 @@
 
             <div class="jhs-signatures"><div><span>{{ $card['principal'] ?? '' }}</span>School Head</div><div><span>{{ $card['adviser'] ?? '' }}</span>Adviser</div></div>
             <div class="shs-section-title">Learning Progress and Achievement</div>
-            <table class="shs-grades" style="--jhs-grade-row-height: {{ count($card['subjects']) > 10 ? '4.35mm' : '5.22mm' }};">
+            <table class="shs-grades" style="--jhs-grade-row-height: {{ count($gradeRows) > 10 ? '4.35mm' : '5.22mm' }};">
                 <thead>
                     <tr>
                         <th rowspan="2" class="learning-area">Learning Areas</th>
-                        <th colspan="{{ count($periods) }}">TERM</th>
+                        <th colspan="{{ count($formPeriods) }}">TERM</th>
                         <th rowspan="2">Final Grade</th>
                         <th rowspan="2">Remarks</th>
                     </tr>
                     <tr>
-                        @foreach ($periods as $term)
-                            <th>{{ preg_match('/^term\s+\d+$/i', $term['label']) ? 'T'.\App\Models\GradingTerm::periodColumnLabel($term['label']) : \App\Models\GradingTerm::periodColumnLabel($term['label']) }}</th>
+                        @foreach ($formPeriods as $term)
+                            <th>{{ $isSeniorHigh ? $loop->iteration : (preg_match('/^term\s+\d+$/i', $term['label']) ? 'T'.\App\Models\GradingTerm::periodColumnLabel($term['label']) : \App\Models\GradingTerm::periodColumnLabel($term['label'])) }}</th>
                         @endforeach
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (\App\Support\Sf9ReportCardBuilder::updatedJuniorHighRows($card['subjects']) as $row)
+                    @foreach ($gradeRows as $row)
                         @if ($row['category'] ?? false)
                             <tr class="shs-category">
                                 <td>{{ $row['label'] }}</td>
-                                @foreach ($periods as $term)
+                                @foreach ($formPeriods as $term)
                                     <td></td>
                                 @endforeach
                                 <td></td>
@@ -78,8 +84,8 @@
                         @else
                             <tr class="{{ ($row['child'] ?? false) ? 'shs-child' : '' }}">
                                 <td>{{ $row['label'] !== '' ? $row['label'] : ' ' }}</td>
-                                @foreach ($periods as $term)
-                                    <td class="center">{{ $row['quarters'][$term['key']] ?? '' }}</td>
+                                @foreach ($formPeriods as $term)
+                                    <td class="center">{{ $row[$gradeValueKey][$term['key']] ?? '' }}</td>
                                 @endforeach
                                 <td class="center bold">{{ $row['final'] ?? '' }}</td>
                                 <td class="center">{{ $row['remarks'] ?? '' }}</td>
@@ -87,7 +93,7 @@
                         @endif
                     @endforeach
                     <tr>
-                        <td colspan="{{ count($periods) + 1 }}" class="bold center">General Average</td>
+                        <td colspan="{{ count($formPeriods) + 1 }}" class="bold center">General Average</td>
                         <td class="center bold">{{ $card['general_average'] ?? '' }}</td>
                         <td class="center">{{ $card['general_remarks'] ?? '' }}</td>
                     </tr>
@@ -141,14 +147,14 @@
                         @foreach ($attendanceMonths as $monthKey)
                             <td class="center">{{ $attendance['days_present'][$monthKey] ?? '' }}</td>
                         @endforeach
-                        <td class="center">{{ $attendance['total_present'] ?? '' }}</td>
+                        <td class="center">{{ $displayedPresent > 0 ? $displayedPresent : '' }}</td>
                     </tr>
                     <tr>
                         <td>No. of Days Absent</td>
                         @foreach ($attendanceMonths as $monthKey)
                             <td class="center">{{ $attendance['days_absent'][$monthKey] ?? '' }}</td>
                         @endforeach
-                        <td class="center">{{ $attendance['total_absent'] ?? '' }}</td>
+                        <td class="center">{{ $displayedAbsent > 0 ? $displayedAbsent : '' }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -156,7 +162,7 @@
             <div class="shs-section-title jhs-comments-title">Teacher's Comments / Remarks</div>
             <table class="shs-comments">
                 <tbody>
-                    @foreach($periods as $period)
+                    @foreach($formPeriods as $period)
                         <tr><td>{{ $period['label'] }}<div class="jhs-comment-text">{{ $card['teacher_comments'][$period['key']] ?? '' }}</div></td></tr>
                     @endforeach
                 </tbody>
@@ -164,7 +170,7 @@
 
             <div class="shs-section-title jhs-parent-title">Parent/s Guardian's Signature</div>
             <div class="jhs-parent-signatures">
-                @foreach ($periods as $period)
+                @foreach ($formPeriods as $period)
                     <div class="jhs-field"><span>{{ $period['label'] }}</span><span class="jhs-entry"></span></div>
                 @endforeach
             </div>
