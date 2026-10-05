@@ -251,3 +251,21 @@ test('advisory teacher can print the senior high sf9 performance report layout',
     $response->assertDontSee('Quarter 1');
     $response->assertDontSee('1st Quarter');
 });
+
+test('configured updated junior high SF9 is used for teacher and academic record printing and can be reverted', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisorySf9Fixtures(isSeniorHigh: false);
+    $settings = \App\Models\Sf9Configuration::create(['id' => 1, 'junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section))->assertOk()
+        ->assertSee('jhs-updated')->assertSee('GMRC / Values Education')->assertSee('Benchmarking')->assertDontSee('Report on Learner');
+    $this->post(route('teacher.advisory.sf9', $section), ['enrollment_ids' => [$enrollment->enrollment_ID]])->assertOk()->assertSee('GMRC / Values Education');
+    $registrar = Staff::create(['role_id' => Role::firstOrCreate(['role_name' => 'registrar'])->id, 'username' => 'sf9.registrar', 'password' => 'password', 'first_name' => 'Record', 'last_name' => 'Manager', 'status' => 'active']);
+    $this->actingAs($registrar)->get(route('registrar.students.sf9', ['student' => $enrollment->student_ID, 'enrollment' => $enrollment]))->assertOk()->assertSee('GMRC / Values Education');
+    $settings->update(['junior_high' => 'jhs_legacy']);
+    $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section))->assertOk()->assertSee('SF 9 - JHS')->assertDontSee('GMRC / Values Education');
+});
+
+test('updated junior high selection does not change senior high SF9', function () {
+    ['teacher' => $teacher, 'section' => $section] = createAdvisorySf9Fixtures(isSeniorHigh: true);
+    \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section))->assertOk()->assertSee('Life')->assertDontSee('GMRC / Values Education');
+});

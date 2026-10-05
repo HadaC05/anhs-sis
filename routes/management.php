@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/audit-trail', [\App\Http\Controllers\AuditTrailController::class, 'index'])->name('audit-trail.index');
 
+Route::get('/sf9-configuration', [\App\Http\Controllers\Admin\Sf9ConfigurationController::class, 'edit'])->name('sf9-configuration.edit');
+Route::put('/sf9-configuration', [\App\Http\Controllers\Admin\Sf9ConfigurationController::class, 'update'])->name('sf9-configuration.update');
+Route::get('/sf9-configuration/preview/{format}', [\App\Http\Controllers\Admin\Sf9ConfigurationController::class, 'preview'])->name('sf9-configuration.preview');
+
 Route::get('/school-information', [\App\Http\Controllers\Admin\SchoolInformationController::class, 'edit'])->name('school-information.edit');
 Route::put('/school-information', [\App\Http\Controllers\Admin\SchoolInformationController::class, 'update'])->name('school-information.update');
 

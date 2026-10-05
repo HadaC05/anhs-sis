@@ -733,6 +733,22 @@ class Sf9ReportCardBuilder
         ];
     }
 
+    /** Keep the recorded MAPEH grouping; a form choice must not reinterpret grades. */
+    public static function updatedJuniorHighRows(array $rows): array
+    {
+        return array_map(function (array $row): array {
+            $row['label'] = match ($row['label']) {
+                'Edukasyon sa Pagpapakatao (EsP)' => 'GMRC / Values Education',
+                'Edukasyong Pantahanan at Pangkabuhayan' => 'EPP/TLE',
+                'Music & Arts' => 'Music and Arts',
+                'Physical Education & Health' => 'Physical Education and Health',
+                default => $row['label'],
+            };
+
+            return $row;
+        }, $rows);
+    }
+
     public static function juniorHighSubjectSlot(string $subject): ?string
     {
         $normalized = Str::of($subject)->lower()->replaceMatches('/[^a-z0-9]+/', ' ')->squish()->value();
@@ -743,7 +759,7 @@ class Sf9ReportCardBuilder
             str_contains($normalized, 'mathematics'), str_contains($normalized, 'math') => 'mathematics',
             str_contains($normalized, 'science') => 'science',
             str_contains($normalized, 'araling panlipunan'), $normalized === 'ap' => 'ap',
-            str_contains($normalized, 'edukasyon sa pagpapakatao'), $normalized === 'esp' => 'esp',
+            str_contains($normalized, 'edukasyon sa pagpapakatao'), str_contains($normalized, 'values education'), str_contains($normalized, 'gmrc'), $normalized === 'esp' => 'esp',
             str_contains($normalized, 'edukasyong pantahanan'),
             str_contains($normalized, 'technology and livelihood'),
             preg_match('/^(?:tle|epp)(?:\s+\d+)?$/', $normalized) === 1 => 'epp_tle',

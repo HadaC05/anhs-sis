@@ -1,4 +1,5 @@
 @php
+    $sf9Formats = $sf9Formats ?? \App\Models\Sf9Configuration::current()->only(['junior_high', 'senior_high']);
     $periodCount = count($periods);
     $periodGroupLabel = \App\Models\GradingTerm::periodGroupLabel($periods);
     $periodColumnWidth = $periodCount > 0 ? round(42 / $periodCount, 2) : 10.5;
@@ -422,7 +423,36 @@
             margin: 0 0 2mm;
         }
 
+        @page jhs2026 { size: A4 landscape; margin: 10mm; }
+        .jhs-updated { page: jhs2026; font-family: "Times New Roman", serif; padding: 0; }
+        .jhs-updated .shs-grid { gap: 14mm; }
+        .jhs-updated .shs-grid > div { border: 1px solid #111; padding: 5mm; }
+        .jhs-updated .shs-header { font-weight: normal; }
+        .jhs-updated .shs-letter { margin: 2mm 0; }
+        .jhs-updated .shs-letter p { margin: 1mm 0; }
+        .jhs-updated .shs-header { margin-bottom: 1mm; }
+        .jhs-updated .shs-meta p { margin-bottom: 1mm; }
+        .jhs-updated .shs-section-title { margin: 2mm 0 1mm; }
+        .jhs-updated .shs-title { font-size: 11px; }
+        .jhs-updated .shs-meta p { font-weight: normal; font-size: 10px; }
+        .jhs-updated .shs-grades td { height: 4.5mm; }
+        .jhs-updated .shs-grades .learning-area { width: 38%; }
+        .jhs-updated .shs-grades th:last-child { width: 22%; }
+        .jhs-updated .shs-child td:first-child { padding-left: 3px; font-style: italic; }
+        .jhs-updated .shs-descriptors th, .jhs-updated .shs-descriptors td { border: 0; padding: 0; }
+        .jhs-updated .shs-comments td { height: 13mm; }
+        .jhs-updated .shs-attendance th:first-child { width: 15%; }
+        .jhs-updated .shs-attendance th:last-child { width: 15%; }
+        .jhs-updated .shs-attendance td, .jhs-updated .shs-attendance th { font-size: 9px; padding: 1px; }
+        .jhs-updated .shs-sign { margin: 5mm 10mm; }
+        .jhs-updated .shs-transfer { margin-top: 5mm; }
+        .jhs-signatures { display: flex; gap: 10mm; margin: 4mm 0; font-size: 10px; text-align: center; }
+        .jhs-signatures > div { flex: 1; }
+        .jhs-signatures span { display: block; border-bottom: 1px solid; min-height: 4mm; }
+        .sheet:last-child { page-break-after: auto; }
         @media print {
+            .jhs-updated { break-inside: avoid; page-break-after: always; }
+            .jhs-updated:last-child { page-break-after: auto; }
             body {
                 background: #fff;
             }
@@ -443,6 +473,7 @@
 </head>
 <body>
     <div class="toolbar">
+<span style="margin-right:auto;align-self:center;font-size:13px;">{{ $previewLabel ?? \App\Models\Sf9Configuration::formats()[($cards[0]['is_senior_high'] ?? false) ? 'senior_high' : 'junior_high'][$sf9Formats[($cards[0]['is_senior_high'] ?? false) ? 'senior_high' : 'junior_high']] }}</span>
         <button type="button" onclick="window.print()">Print SF9</button>
     </div>
 
@@ -452,7 +483,9 @@
             $observedPeriods = $card['observed_periods'] ?? $periods;
             $observedPeriodCount = count($observedPeriods);
         @endphp
-        @if ($isSeniorHigh)
+        @if (! $isSeniorHigh && ($sf9Formats['junior_high'] ?? 'jhs_legacy') === 'jhs_2026')
+            @include('users.teacher.advisory.sf9-jhs-2026')
+        @elseif ($isSeniorHigh)
             @php
                 $attendance = $card['attendance'] ?? \App\Support\Sf9AttendanceSummary::empty();
                 $attendanceMonths = $card['attendance_months'] ?? \App\Support\Sf9ReportCardBuilder::seniorHighAttendanceMonthKeys();
