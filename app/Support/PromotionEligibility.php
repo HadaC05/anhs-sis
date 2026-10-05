@@ -8,6 +8,7 @@ use App\Models\GradeStatus;
 use App\Models\GradingPeriodStatus;
 use App\Models\GradingTerm;
 use App\Models\PromotionStatus;
+use App\Models\Sf9Configuration;
 use App\Models\StudentObservedValue;
 use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
@@ -24,7 +25,7 @@ class PromotionEligibility
         if ($enrollments->isEmpty()) {
             return [];
         }
-        $enrollments->loadMissing(['academicYear', 'curriculumGradeLevel', 'section.gradeLevel', 'section.curriculum', 'gradingSemester.status', 'studentSubjects']);
+        $enrollments->loadMissing(['academicYear', 'curriculumGradeLevel', 'section.gradeLevel', 'section.curriculum', 'gradingSemester.status', 'studentSubjects', 'sf9Comments']);
         $laterEnrollments = Enrollment::query()->with(['academicYear', 'curriculumGradeLevel'])
             ->whereIn('student_ID', $enrollments->pluck('student_ID'))->get()->groupBy('student_ID');
         $assignments = TeacherSubjectAssignment::query()->whereIn('section_ID', $enrollments->pluck('section_ID')->filter())
@@ -183,7 +184,12 @@ class PromotionEligibility
             $averages[$assignment->assignment_ID] = round((float) $subjectGrades->avg('numeric_grade'), 2);
         }
 
-        if (! self::hasCompleteObservedValues($enrollment, $periodKeys, $batch)) {
+        if (Sf9Configuration::usesTeacherComments($section)) {
+            $comments = $enrollment->sf9Comments->keyBy('grading_period');
+            if ($periodKeys->contains(fn ($key) => trim($comments->get($key)?->comment ?? '') === '')) {
+                return self::pending('Complete teacher comments / remarks are required before promotion.');
+            }
+        } elseif (! self::hasCompleteObservedValues($enrollment, $periodKeys, $batch)) {
             return self::pending('Complete observed values are required before promotion.');
         }
 

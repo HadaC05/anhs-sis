@@ -38,7 +38,7 @@
                 $tools = [
                     ['label' => 'Class List', 'description' => 'View and import learners', 'route' => 'teacher.advisory.class-list.index', 'color' => 'bg-[#296374]/10 text-[#296374]', 'icon' => 'users'],
                     ['label' => 'Student Grades', 'description' => 'Review grades and forms', 'route' => 'teacher.advisory.show', 'color' => 'bg-emerald-100 text-emerald-700', 'icon' => 'chart'],
-                    ['label' => 'Observed Values', 'description' => 'Record learner behavior', 'route' => 'teacher.advisory.observed-values', 'color' => 'bg-violet-100 text-violet-700', 'icon' => 'star'],
+                    ['label' => \App\Models\Sf9Configuration::advisoryTabLabel($section), 'description' => (\App\Models\Sf9Configuration::usesTeacherComments($section) ? 'Write SF9 comments by term' : 'Record learner behavior'), 'route' => 'teacher.advisory.observed-values', 'color' => 'bg-violet-100 text-violet-700', 'icon' => 'star'],
                     ['label' => 'Attendance', 'description' => 'Manage SF9 and SF2 records', 'route' => 'teacher.advisory.attendance', 'color' => 'bg-sky-100 text-sky-700', 'icon' => 'calendar'],
                     ['label' => 'Promotion', 'description' => 'Evaluate learner eligibility', 'route' => 'teacher.advisory.promotions.index', 'color' => 'bg-amber-100 text-amber-700', 'icon' => 'trend'],
                 ];

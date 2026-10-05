@@ -46,7 +46,7 @@
                     @foreach ([
                         ['Class list', 'View and import learners', 'teacher.advisory.class-list.index'],
                         ['Attendance', 'Manage SF2 and SF9 attendance', 'teacher.advisory.attendance'],
-                        ['Observed values', 'Record learner behavior', 'teacher.advisory.observed-values'],
+                        [\App\Models\Sf9Configuration::advisoryTabLabel($section), (\App\Models\Sf9Configuration::usesTeacherComments($section) ? 'Write SF9 comments by term' : 'Record learner behavior'), 'teacher.advisory.observed-values'],
                         ['Grades & school forms', 'Review grades, SF9 and SF10', 'teacher.advisory.show'],
                         ['Promotion', 'Evaluate learner eligibility', 'teacher.advisory.promotions.index'],
                     ] as [$label, $description, $route])

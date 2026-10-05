@@ -697,3 +697,43 @@ test('registrar digest retries without partial delivery when notification persis
     expect($registrar->notifications()->count())->toBe(1);
     $this->assertDatabaseCount('pending_grade_submissions', 0);
 });
+
+test('subject summaries use the configured SF9 descriptors and expose class statistics', function (bool $senior, string $format, string $descriptor) {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    if (! $senior) {
+        $assignment->section->update(['grade_ID' => GradeLevel::idForValue('grade_7')]);
+    }
+    \App\Models\Sf9Configuration::create(['junior_high' => $format, 'senior_high' => 'shs_current']);
+    $assignment->curriculumSubject->curriculumGradeLevel->update(['grade_ID' => GradeLevel::idForValue($senior ? 'grade_11' : 'grade_7'), 'semester_ID' => \App\Models\GradingSemester::idFor($senior ? 'first' : \App\Models\GradingSemester::FULL_YEAR)]);
+    $assignment->refresh();
+    $periods = GradingTerm::periodsForSection($assignment->section->fresh(), $assignment->curriculumSubject->semester);
+    $roster = \App\Models\StudentSubject::where('enrollment_ID', $enrollment->enrollment_ID)->firstOrFail();
+    StudentSubjectGrade::create(['student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $assignment->assignment_ID, 'term_ID' => StudentSubjectGrade::termIdForPeriodKey($periods[0]['key']), 'numeric_grade' => 85, 'posted_by' => $teacher->staff_id]);
+    $this->actingAs($teacher)->get(route('teacher.sections.show', $assignment))->assertOk()->assertSee('Descriptor guide')->assertSee($descriptor)->assertSee('Class Statistics')->assertSee('Download PNG')->assertSee('data-summary-descriptor', false);
+    $print = $this->get(route('teacher.sections.summary.print', $assignment))->assertOk()->assertSee($descriptor)->assertSee('Passed');
+    foreach ($periods as $period) {
+        $print->assertSee($period['label']);
+    }
+})->with([[false, 'jhs_legacy', 'Very Satisfactory'], [false, 'jhs_2026', 'Benchmarking'], [true, 'jhs_legacy', 'Benchmarking']]);
+
+test('full subject summary includes saved archived terms and averages every recorded term', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $assignment->section->update(['grade_ID' => GradeLevel::idForValue('grade_7')]);
+    $periods = GradingTerm::configuredPeriods();
+    $roster = \App\Models\StudentSubject::firstOrCreate(['enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $assignment->curr_subj_ID]);
+    foreach (array_slice($periods, 0, 2) as $index => $period) {
+        StudentSubjectGrade::create([
+            'student_subject_ID' => $roster->student_subject_ID,
+            'assignment_ID' => $assignment->assignment_ID,
+            'term_ID' => StudentSubjectGrade::termIdForPeriodKey($period['key']),
+            'numeric_grade' => $index === 0 ? 80 : 90,
+            'posted_by' => $teacher->staff_id,
+        ]);
+    }
+    GradingTerm::where('key', $periods[0]['key'])->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::idFor('archived')]);
+    $this->actingAs($teacher)->get(route('teacher.sections.summary.print', $assignment))
+        ->assertOk()
+        ->assertSee($periods[0]['label'])
+        ->assertSee($periods[1]['label'])
+        ->assertViewHas('summaries', fn ($summaries) => (float) $summaries[$enrollment->enrollment_ID]['average'] === 85.0);
+});

@@ -269,3 +269,95 @@ test('updated junior high selection does not change senior high SF9', function (
     \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
     $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section))->assertOk()->assertSee('Life')->assertDontSee('GMRC / Values Education');
 });
+
+test('new SF9 replaces observed values with persisted term comments and preserves both when switching formats', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisorySf9Fixtures(false);
+    $settings = \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    \App\Models\GradingTerm::query()->juniorHigh()->where('key', 'term_1')->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    \App\Models\StudentObservedValue::create(['enrollment_ID' => $enrollment->enrollment_ID, 'statement_key' => 'maka_diyos_spiritual_respect', 'grading_period' => 'term_1', 'marking' => 'AO', 'status' => 'recorded', 'posted_by' => $teacher->staff_id]);
+    $this->actingAs($teacher)->get(route('teacher.advisory.observed-values', $section))->assertOk()->assertSee('Teacher Remarks')->assertDontSee('Save Observed Values');
+    $url = route('teacher.advisory.comments.store', $section);
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => 'Shows steady progress.']])->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('student_sf9_comments', ['enrollment_ID' => $enrollment->enrollment_ID, 'grading_period' => 'term_1', 'comment' => 'Shows steady progress.', 'posted_by' => $teacher->staff_id]);
+    $this->get(route('teacher.advisory.sf9', $section))->assertOk()->assertSee('Shows steady progress.');
+    $this->post(route('teacher.advisory.sf9', $section), ['enrollment_ids' => [$enrollment->enrollment_ID]])->assertOk()->assertSee('Shows steady progress.');
+    $registrarView = (new \App\Http\Controllers\Registrar\RegistrarDashboardController)->studentSf9($enrollment->student, $enrollment->fresh());
+    expect($registrarView->render())->toContain('Shows steady progress.');
+    $this->post(route('teacher.advisory.observed-values.store', $section), [])->assertForbidden();
+    $this->post(route('teacher.advisory.observed-values.bulk', $section), [])->assertForbidden();
+    $settings->update(['junior_high' => 'jhs_legacy']);
+    $this->get(route('teacher.advisory.observed-values', $section))->assertOk()->assertSee('Save Observed Values')->assertDontSee('Save Remarks');
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => 'Changed']])->assertForbidden();
+    $this->assertDatabaseCount('student_observed_values', 1);
+    $settings->update(['junior_high' => 'jhs_2026']);
+    $this->get(route('teacher.advisory.observed-values', $section))->assertSee('Shows steady progress.');
+});
+
+test('SF9 comments enforce term locks ownership length and safe output', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisorySf9Fixtures(false);
+    \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    \App\Models\GradingTerm::query()->juniorHigh()->where('key', 'term_1')->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    $this->actingAs($teacher);
+    $url = route('teacher.advisory.comments.store', $section);
+    $this->post($url, ['grading_period' => 'term_2', 'comments' => [$enrollment->enrollment_ID => 'Locked']])->assertSessionHasErrors('grading_period');
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => str_repeat('x', 241)]])->assertSessionHasErrors('comments.'.$enrollment->enrollment_ID);
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [999999 => 'Other learner']])->assertForbidden();
+    $this->assertDatabaseCount('student_sf9_comments', 0);
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => '<script>alert(1)</script>']])->assertSessionHasNoErrors();
+    $this->get(route('teacher.advisory.sf9', $section))->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false)->assertDontSee('<script>alert(1)</script>', false);
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => '']])->assertSessionHasNoErrors();
+    $this->assertDatabaseCount('student_sf9_comments', 0);
+    \App\Models\GradingTerm::closeAllJuniorHighTerms();
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => 'Closed']])->assertSessionHasErrors('grading_period');
+    $other = Staff::create(['role_id' => $teacher->role_id, 'username' => 'other.adviser', 'password' => 'password', 'first_name' => 'Other', 'last_name' => 'Teacher', 'status' => 'active']);
+    $this->actingAs($other)->get(route('teacher.advisory.observed-values', $section))->assertForbidden();
+    $this->post($url, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => 'Unauthorized']])->assertForbidden();
+});
+
+test('senior high retains observed values when junior high uses comments', function () {
+    ['teacher' => $teacher, 'section' => $section] = createAdvisorySf9Fixtures(true);
+    \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    $this->actingAs($teacher)->get(route('teacher.advisory.observed-values', $section))->assertOk()->assertSee('Observed Values')->assertDontSee('Teacher Remarks');
+    $this->post(route('teacher.advisory.comments.store', $section), [])->assertForbidden();
+});
+
+test('teacher remarks separates active input from the read only overview and uses result toasts', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisorySf9Fixtures(false);
+    \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    \App\Models\GradingTerm::query()->juniorHigh()->where('key', 'term_1')->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    \App\Models\StudentSf9Comment::create(['enrollment_ID' => $enrollment->enrollment_ID, 'grading_period' => 'term_2', 'comment' => 'Previously saved remarks']);
+    $page = route('teacher.advisory.observed-values', $section);
+    $save = route('teacher.advisory.comments.store', $section);
+    $response = $this->actingAs($teacher)->get($page)->assertOk()->assertSee('Teacher Remarks')->assertSee('Overview');
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    expect($xpath->query('//*[@id="remarks-input-panel"]//textarea')->length)->toBe(1)
+        ->and($xpath->query('//*[@id="remarks-input-panel"]//thead/th | //*[@id="remarks-input-panel"]//thead/tr/th')->length)->toBe(2)
+        ->and($xpath->query('//*[@id="remarks-overview-panel"]//textarea')->length)->toBe(0)
+        ->and($document->getElementById('remarks-overview-panel')->hasAttribute('hidden'))->toBeTrue()
+        ->and($document->getElementById('remarks-overview-panel')->textContent)->toContain('Previously saved remarks');
+    $this->from($page)->post($save, ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => 'Saved remarks']])->assertRedirect($page);
+    $this->get($page)->assertSee('data-test="teacher-remarks-status"', false)->assertSee('Teacher remarks saved successfully.');
+    $this->from($page)->post($save, ['grading_period' => 'term_2', 'comments' => [$enrollment->enrollment_ID => 'Keep this draft']])->assertSessionHasErrors('grading_period');
+    $this->get($page)->assertSee('data-test="teacher-remarks-error"', false)->assertSee('Keep this draft');
+    \App\Models\GradingTerm::closeAllJuniorHighTerms();
+    $response = $this->get($page)->assertOk()->assertSee('No grading term is open.')->assertSee('Previously saved remarks');
+    expect($response->getContent())->not->toContain('<textarea');
+});
+
+test('teacher remarks save failures show an error toast and keep the draft', function () {
+    ['teacher' => $teacher, 'section' => $section, 'enrollment' => $enrollment] = createAdvisorySf9Fixtures(false);
+    \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    \App\Models\GradingTerm::query()->juniorHigh()->where('key', 'term_1')->update(['junior_high_grading_period_status_ID' => \App\Models\GradingPeriodStatus::openId()]);
+    $database = \Illuminate\Support\Facades\DB::getFacadeRoot();
+    \Illuminate\Support\Facades\Exceptions::fake();
+    $mockDatabase = Mockery::mock($database);
+    $mockDatabase->shouldReceive('transaction')->once()->andThrow(new RuntimeException('Simulated storage failure'));
+    \Illuminate\Support\Facades\DB::swap($mockDatabase);
+    $page = route('teacher.advisory.observed-values', $section);
+    $this->actingAs($teacher)->from($page)->post(route('teacher.advisory.comments.store', $section), ['grading_period' => 'term_1', 'comments' => [$enrollment->enrollment_ID => 'Unsaved draft']])->assertRedirect($page)->assertSessionHas('error');
+    \Illuminate\Support\Facades\DB::swap($database);
+    $this->get($page)->assertOk()->assertSee('data-test="teacher-remarks-error"', false)->assertSee('Teacher remarks could not be saved.')->assertSee('Unsaved draft');
+    $this->assertDatabaseCount('student_sf9_comments', 0);
+});

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grade Summary - {{ $section->name }}</title>
     <style>
+        @page { size: A4 landscape; margin: 10mm; }
+        thead { display: table-header-group; }
+        tr { break-inside: avoid; }
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; margin: 0; padding: 16px; color: #111; }
         @media print { .no-print { display: none; } body { padding: 0; } }
@@ -23,6 +26,7 @@
     </div>
 
     @php
+        $descriptorBands = \App\Support\Sf9PerformanceScale::forSection($section);
         $subject = $assignment->curriculumSubject?->subject;
         $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
         $gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $section->grade_level));
@@ -34,6 +38,7 @@
         <div class="subtitle">School Year: {{ $section->academicYear?->school_year ?? 'N/A' }}</div>
     </div>
 
+    <p>All configured and recorded terms &middot; Saved grades only &middot; Averages use available grades.</p>
     <table>
         <thead>
             <tr>
@@ -41,7 +46,7 @@
                 @foreach($periods as $period)
                     <th>{{ $period['label'] }}</th>
                 @endforeach
-                <th>Average</th>
+                <th>Average</th><th>Remarks</th><th>Descriptor</th>
             </tr>
         </thead>
         <tbody>
@@ -55,6 +60,8 @@
                         <td class="right">{{ $gradeSet->get($period['key'])?->numeric_grade ?? '' }}</td>
                     @endforeach
                     <td class="right">{{ $summary['average'] !== null ? $summary['average'] : '' }}</td>
+                    <td>{{ $summary['average'] === null ? '' : ($summary['average'] >= 75 ? 'Passed' : 'Failed') }}</td>
+                    <td>{{ \App\Support\Sf9PerformanceScale::descriptor($summary['average'], $descriptorBands) ?? '' }}</td>
                 </tr>
             @endforeach
         </tbody>

@@ -49,3 +49,20 @@ test('updated SF9 labels retain configured paired MAPEH grades', function () {
     }
     expect(\App\Support\Sf9ReportCardBuilder::juniorHighSubjectSlot('GMRC / Values Education'))->toBe('esp');
 });
+
+test('SF9 previews use the saved school profile logo and active school year', function () {
+    \Illuminate\Support\Facades\Storage::fake('public');
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aO1sAAAAASUVORK5CYII=');
+    \Illuminate\Support\Facades\Storage::disk('public')->put('school-logos/current.png', $png);
+    $school = \App\Models\SchoolInformation::create(['name' => 'Updated National High School', 'school_id' => '123456', 'region' => 'Region VII', 'division' => 'Schools Division of Example City', 'district' => 'Example District', 'logo_path' => 'school-logos/current.png']);
+    \App\Models\AcademicYear::create(['school_year' => '2027-2028', 'start_date' => '2027-06-01', 'end_date' => '2028-03-31', 'status' => true]);
+    $url = route('admin.sf9-configuration.preview', 'jhs_2026');
+    $this->actingAs(sf9Manager('admin'))->get($url)->assertOk()
+        ->assertSee('Updated National High School')->assertSee('123456')->assertSee('Region VII')
+        ->assertSee('Schools Division of Example City')->assertSee('Example District')
+        ->assertSee('School Year 2027-2028')->assertSee($school->logoDataUri(), false)
+        ->assertDontSee('SCHOOLS DIVISION OF Schools Division');
+    $school->update(['division' => 'New City', 'name' => 'Renamed School', 'logo_path' => null]);
+    $this->get($url)->assertOk()->assertSee('Renamed School')->assertSee('SCHOOLS DIVISION OF New City')
+        ->assertDontSee('Updated National High School')->assertDontSee('alt="School logo"', false);
+});

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicYear;
 use App\Models\Enrollment;
 use App\Models\GradingTerm;
 use App\Models\Section;
@@ -36,12 +37,12 @@ class Sf9ConfigurationController extends Controller
         abort_if($level === false, 404);
         $section = new Section;
         $section->grade_level = $level === 'senior_high' ? 'grade_11' : 'grade_7';
+        $section->setRelation('academicYear', AcademicYear::query()->where('status', true)->orderByDesc('SY_ID')->first());
         $periods = GradingTerm::configuredPeriods();
         $card = Sf9ReportCardBuilder::buildCard(new Enrollment, $section, collect(), collect(), collect(), $periods);
 
         $card['name'] = 'SAMPLE, Learner';
         $card['section_name'] = 'Sample';
-        $card['school_year'] = '2026-2027';
 
         return view('users.teacher.advisory.sf9-print', [
             'cards' => [$card],

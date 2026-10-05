@@ -147,6 +147,7 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/teacher/advisory/{section}/attendance/sf2/{upload}', [TeacherSectionController::class, 'viewAdvisorySf2'])
         ->middleware('teacher')
         ->name('teacher.advisory.attendance.sf2.view');
+    Route::post('/teacher/advisory/{section}/comments', [TeacherSectionController::class, 'storeAdvisoryComments'])->middleware('teacher')->name('teacher.advisory.comments.store');
     Route::post('/teacher/advisory/{section}/observed-values', [TeacherSectionController::class, 'storeAdvisoryObservedValues'])
         ->middleware('teacher')
         ->name('teacher.advisory.observed-values.store');

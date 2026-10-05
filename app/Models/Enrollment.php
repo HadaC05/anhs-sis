@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Support\PlacementAssessmentAdvisor;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -52,6 +52,11 @@ class Enrollment extends Model
         'placement_status',
         'promotion_status',
     ];
+
+    public function sf9Comments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(StudentSf9Comment::class, 'enrollment_ID', 'enrollment_ID');
+    }
 
     public function getRouteKeyName(): string
     {

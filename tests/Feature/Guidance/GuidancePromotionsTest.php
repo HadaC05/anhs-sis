@@ -549,3 +549,16 @@ test('promotion SF5 separates sections into workbooks', function () {
         unlink($path);
     }
 });
+
+test('updated junior high SF9 requires comments instead of observed values for promotion', function () {
+    ['enrollment' => $enrollment] = guidancePromotionFixtures();
+    \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
+    StudentObservedValue::where('enrollment_ID', $enrollment->enrollment_ID)->delete();
+    expect(PromotionEligibility::evaluate($enrollment->fresh())['reason'])->toBe('Complete teacher comments / remarks are required before promotion.');
+    foreach (GradingTerm::configuredPeriods() as $period) {
+        \App\Models\StudentSf9Comment::create(['enrollment_ID' => $enrollment->enrollment_ID, 'grading_period' => $period['key'], 'comment' => 'Consistent progress.']);
+    }
+    expect(PromotionEligibility::evaluate($enrollment->fresh())['status'])->toBe(PromotionStatus::ELIGIBLE);
+    $batch = PromotionEligibility::synchronizeMany(Enrollment::whereKey($enrollment->enrollment_ID)->get());
+    expect($batch[$enrollment->enrollment_ID]['status'])->toBe(PromotionStatus::ELIGIBLE);
+});

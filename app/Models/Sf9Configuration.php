@@ -21,6 +21,17 @@ class Sf9Configuration extends Model
         ];
     }
 
+    public static function usesTeacherComments(?Section $section): bool
+    {
+        return $section !== null && ! GradingTerm::isSeniorHighSection($section)
+            && self::current()->junior_high === 'jhs_2026';
+    }
+
+    public static function advisoryTabLabel(Section $section): string
+    {
+        return self::usesTeacherComments($section) ? 'Teacher Remarks' : 'Observed Values';
+    }
+
     public static function current(): self
     {
         return self::query()->find(1) ?? new self([

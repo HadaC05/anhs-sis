@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-$gradeLabel = $section->gradeLevel?->grade_label
+$gradeLabel = $section->loadMissing('gradeLevel')->getRelation('gradeLevel')?->grade_label
 ?? ($section->grade_level ? str_replace(['grade_', '_'], ['Grade ', ' '], $section->grade_level) : '—');
 $subject = $assignment->curriculumSubject?->subject;
 $subjectCode = $subject?->code ?? 'SUBJ';
@@ -13,7 +13,8 @@ $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
 $lockedPeriodKeys = $lockedPeriodKeys ?? [];
 $studentCount = $enrollments->count();
 $inputColspan = 3 + 2 * count($inputPeriods);
-$summaryColspan = 4 + count($periods);
+$summaryColspan = 5 + count($periods);
+$descriptorBands = \App\Support\Sf9PerformanceScale::forSection($section);
 $gradeReturnReasons = $gradeReturnReasons ?? collect();
 $currentTermLabel = \App\Models\GradingTerm::currentEditablePeriodLabelForSection($section, $assignment->curriculumSubject?->semester);
 $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorHighSection($section)
@@ -99,13 +100,14 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
             </div>
         </div>
 
-        <div class="flex border-b border-gray-200 bg-gray-50/60">
-            <button type="button" data-grade-tab="input" class="grade-tab flex flex-1 items-center justify-center border-b-2 border-[#296374] bg-white px-4 py-3.5 text-sm font-semibold text-[#296374] transition sm:flex-none sm:px-6">
+        <div class="grid grid-cols-3 gap-2 border-y border-slate-300 bg-slate-200 p-2" role="group" aria-label="Grade sheet views">
+            <button type="button" data-grade-tab="input" aria-pressed="true" class="grade-tab flex min-w-0 items-center justify-center rounded-lg border border-[#296374] bg-[#296374] px-2 py-3.5 text-sm font-bold text-white shadow-md transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#296374] sm:px-6">
                 Grade Input
             </button>
-            <button type="button" data-grade-tab="summary" class="grade-tab flex flex-1 items-center justify-center border-b-2 border-transparent px-4 py-3.5 text-sm font-semibold text-gray-500 transition hover:text-gray-700 sm:flex-none sm:px-6">
+            <button type="button" data-grade-tab="summary" aria-pressed="false" class="grade-tab flex min-w-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#296374] sm:px-6">
                 Grade Summary
             </button>
+            <button type="button" data-grade-tab="statistics" aria-pressed="false" class="grade-tab flex min-w-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#296374] sm:px-6">Class Statistics</button>
         </div>
 
         <div data-grade-panel="input">
@@ -245,9 +247,19 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                     <p id="gradeSummaryDescription" class="mt-1 text-xs leading-relaxed text-gray-500">{{ $studentCount }} {{ Str::plural('student', $studentCount) }} &middot; Averages use available periods. Unrecorded grades appear as &mdash;.</p>
                 </div>
                 <a href="{{ route('teacher.sections.summary.print', $assignment) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-[#296374]/40 hover:text-[#296374]">
-                    Print Summary
+                    Print Full Summary
                 </a>
             </div>
+
+            <aside aria-labelledby="descriptor-guide-title" class="border-b border-gray-200 bg-slate-50 px-6 py-4">
+                <h3 id="descriptor-guide-title" class="text-sm font-bold text-gray-800">Descriptor guide</h3>
+                <p class="mt-1 text-xs text-gray-500">Based on the selected {{ $descriptorBands[0]['description'] === 'Advancing' ? 'SF9 Performance Report' : 'original SF9 Progress Report' }}. Descriptors use the average shown below; missing grades have no descriptor.</p>
+                <dl class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                    @foreach($descriptorBands as $band)
+                        <div class="rounded-lg border border-gray-200 bg-white px-3 py-2"><dt class="text-xs font-semibold text-gray-800">{{ $band['description'] }}</dt><dd class="mt-1 text-xs text-gray-500">{{ $band['scale'] }} &middot; {{ $band['remarks'] }}</dd></div>
+                    @endforeach
+                </dl>
+            </aside>
 
             <div class="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#296374]" role="region" aria-labelledby="gradeSummaryHeading" tabindex="0">
                 <table class="w-full border-collapse text-sm text-gray-800" aria-labelledby="gradeSummaryHeading" aria-describedby="gradeSummaryDescription">
@@ -260,6 +272,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                             @endforeach
                             <th scope="col" class="w-32 min-w-28 border-b border-l border-[#296374]/15 bg-[#296374]/10 px-4 py-4 text-center text-[#296374]">Average</th>
                             <th scope="col" class="min-w-28 border-b border-gray-200 px-4 py-4 text-center">Remarks</th>
+                            <th scope="col" class="min-w-40 border-b border-gray-200 px-4 py-4 text-center">Descriptor</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -309,6 +322,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                                 {{ $average !== null ? $average : '—' }}
                             </td>
                             <td class="border-b border-gray-100 px-4 py-3.5 text-center text-xs font-semibold {{ $averageClass }}" data-summary-remarks>{{ $average === null ? '—' : ($average >= 75 ? 'Passed' : 'Failed') }}</td>
+                            <td class="border-b border-gray-100 px-4 py-3.5 text-center text-xs font-semibold text-gray-700" data-summary-descriptor>{{ \App\Support\Sf9PerformanceScale::descriptor($average, $descriptorBands) ?? '?' }}</td>
                         </tr>
                         @empty
                         <tr>
@@ -329,6 +343,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
             </div>
             @endif
         </div>
+        @include('users.teacher.sections.statistics')
     </div>
 
 </div>
@@ -781,14 +796,14 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
         const panels = document.querySelectorAll('[data-grade-panel]');
 
         function activateTab(name) {
-            if (name === 'summary') {
+            if (name === 'summary' || name === 'statistics') {
                 document.querySelectorAll('[data-summary-enrollment]').forEach(cell => {
                     const input = document.getElementById('gradeForm')?.elements.namedItem(`grades[${cell.dataset.summaryEnrollment}][${cell.dataset.periodColumn}][grade]`);
                     if (input && !input.disabled) cell.textContent = input.value === '' ? '—' : input.value;
                 });
                 document.querySelectorAll('[data-summary-average]').forEach(cell => {
                     const values = [...cell.parentElement.querySelectorAll('[data-summary-enrollment]')]
-                        .map(item => item.textContent.trim()).filter(value => value !== '' && Number.isFinite(Number(value))).map(Number);
+                        .map(item => item.textContent.trim()).filter(value => value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100).map(Number);
                     const average = values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length * 100) / 100 : null;
                     cell.textContent = average === null ? '—' : average;
                     cell.classList.toggle('text-gray-400', average === null);
@@ -800,16 +815,15 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
             }
             tabs.forEach((tab) => {
                 const isActive = tab.dataset.gradeTab === name;
-                tab.classList.toggle('border-[#296374]', isActive);
-                tab.classList.toggle('bg-white', isActive);
-                tab.classList.toggle('text-[#296374]', isActive);
-                tab.classList.toggle('border-transparent', !isActive);
-                tab.classList.toggle('text-gray-500', !isActive);
+                tab.setAttribute('aria-pressed', String(isActive));
+                ['border-[#296374]', 'bg-[#296374]', 'text-white', 'shadow-md'].forEach(className => tab.classList.toggle(className, isActive));
+                ['border-slate-300', 'bg-white', 'text-slate-700', 'hover:bg-slate-100'].forEach(className => tab.classList.toggle(className, !isActive));
             });
 
             panels.forEach((panel) => {
                 panel.classList.toggle('hidden', panel.dataset.gradePanel !== name);
             });
+            document.dispatchEvent(new CustomEvent('grade-sheet-updated'));
         }
 
         tabs.forEach((tab) => {

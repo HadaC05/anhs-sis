@@ -16,9 +16,11 @@ use App\Models\GradingTerm;
 use App\Models\Section;
 use App\Models\SectionAttendanceSetting;
 use App\Models\SectionSf2Upload;
+use App\Models\Sf9Configuration;
 use App\Models\Student;
 use App\Models\StudentGuardian;
 use App\Models\StudentObservedValue;
+use App\Models\StudentSf9Comment;
 use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\TeacherSubjectAssignment;
@@ -806,6 +808,7 @@ class TeacherSectionController extends Controller
                 ->groupBy('statement_key')
                 ->map(fn ($statementValues) => $statementValues->keyBy('grading_period')));
 
+        $enrollments->loadMissing('sf9Comments');
         $principalName = Sf9ReportCardBuilder::principalName();
         $cards = $enrollments->map(fn (Enrollment $enrollment): array => Sf9ReportCardBuilder::buildCard(
             $enrollment,
@@ -867,6 +870,19 @@ class TeacherSectionController extends Controller
         $this->authorizeAdvisorySection($request, $section);
 
         $section->load(['academicYear', 'cluster', 'gradeLevel']);
+        if (Sf9Configuration::usesTeacherComments($section)) {
+            return view('users.teacher.advisory.comments', [
+                'section' => $section,
+                'enrollments' => Enrollment::query()->with(['student', 'sf9Comments'])
+                    ->where('section_ID', $section->section_ID)
+                    ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
+                    ->join('students', 'enrollments.student_ID', '=', 'students.id')
+                    ->orderBy('students.last_name')->orderBy('students.first_name')
+                    ->select('enrollments.*')->get(),
+                'periods' => GradingTerm::periodsForSection($section),
+                'editablePeriodKey' => $this->isGradingInputOpen($section) ? GradingTerm::currentEditablePeriodKeyForSection($section) : null,
+            ]);
+        }
         $statements = Sf9ReportCardBuilder::observedValueStatements();
         $coreValues = array_values(array_unique(array_column($statements, 'core_value')));
         $activeCoreValue = $request->string('core')->toString();
@@ -916,9 +932,50 @@ class TeacherSectionController extends Controller
         ]);
     }
 
+    public function storeAdvisoryComments(Request $request, Section $section): RedirectResponse
+    {
+        $this->authorizeAdvisorySection($request, $section);
+        abort_unless(Sf9Configuration::usesTeacherComments($section), 403);
+        $data = $request->validate([
+            'grading_period' => ['required', 'string'],
+            'comments' => ['required', 'array'],
+            'comments.*' => ['nullable', 'string', 'max:240'],
+        ]);
+        if (! $this->isGradingInputOpen($section) || $data['grading_period'] !== GradingTerm::currentEditablePeriodKeyForSection($section)) {
+            return back()->withInput()->withErrors(['grading_period' => 'Only the current open grading term can be edited.']);
+        }
+        $allowed = Enrollment::query()->where('section_ID', $section->section_ID)
+            ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())->pluck('enrollment_ID')->map(fn ($id) => (string) $id)->all();
+        foreach (array_keys($data['comments']) as $id) {
+            abort_unless(in_array((string) $id, $allowed, true), 403);
+        }
+        try {
+            DB::transaction(function () use ($data, $request): void {
+                foreach ($data['comments'] as $id => $comment) {
+                    $comment = trim(preg_replace('/\s+/u', ' ', $comment ?? ''));
+                    if ($comment === '') {
+                        StudentSf9Comment::query()->where('enrollment_ID', $id)->where('grading_period', $data['grading_period'])->delete();
+                    } else {
+                        StudentSf9Comment::query()->updateOrCreate(
+                            ['enrollment_ID' => $id, 'grading_period' => $data['grading_period']],
+                            ['comment' => $comment, 'posted_by' => $request->user()->staff_id],
+                        );
+                    }
+                }
+            });
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->withInput()->with('error', 'Teacher remarks could not be saved. Please try again.');
+        }
+
+        return redirect()->route('teacher.advisory.observed-values', $section)->with('status', 'Teacher remarks saved successfully.');
+    }
+
     public function storeAdvisoryObservedValues(Request $request, Section $section): RedirectResponse
     {
         $this->authorizeAdvisorySection($request, $section);
+        abort_if(Sf9Configuration::usesTeacherComments($section), 403, 'Observed values are disabled for the selected SF9 format.');
 
         $validated = $request->validate([
             'markings' => ['nullable', 'array'],
@@ -1014,6 +1071,7 @@ class TeacherSectionController extends Controller
     public function bulkStoreAdvisoryObservedValues(Request $request, Section $section): RedirectResponse
     {
         $this->authorizeAdvisorySection($request, $section);
+        abort_if(Sf9Configuration::usesTeacherComments($section), 403, 'Observed values are disabled for the selected SF9 format.');
 
         $validated = $request->validate([
             'enrollment_ids' => ['required', 'array', 'min:1'],
@@ -1480,14 +1538,30 @@ class TeacherSectionController extends Controller
             ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
             ->values();
 
-        $periods = $this->gradingInputPeriods($section, $semester);
+        $periods = GradingTerm::isSeniorHighSection($section)
+            ? GradingTerm::seniorHighPeriods($semester)
+            : GradingTerm::configuredPeriods();
         $grades = StudentSubjectGrade::query()
-            ->with('studentSubject')
+            ->with(['studentSubject', 'term'])
             ->where('assignment_ID', $assignment->assignment_ID)
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
             ->get()
             ->groupBy(fn (StudentSubjectGrade $grade) => $grade->studentSubject?->enrollment_ID)
             ->map(fn ($items) => $items->keyBy('grading_period'));
+
+        // Retain saved results even when a term was subsequently archived or removed from the configured count.
+        $knownKeys = array_column($periods, 'key');
+        foreach ($grades as $gradeSet) {
+            foreach ($gradeSet as $key => $grade) {
+                if (! in_array($key, $knownKeys, true)) {
+                    $periods[] = ['key' => $key, 'label' => $grade->term?->label ?? Str::headline($key)];
+                    $knownKeys[] = $key;
+                }
+            }
+        }
+
+        $termOrder = GradingTerm::query()->whereIn('key', $knownKeys)->pluck('sort_order', 'key');
+        $periods = collect($periods)->sortBy(fn (array $period) => $termOrder->get($period['key'], PHP_INT_MAX))->values()->all();
 
         $summaries = $this->buildSummaries($enrollments, $grades, $periods);
 

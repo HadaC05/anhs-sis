@@ -92,13 +92,7 @@ class Sf9ReportCardBuilder
      */
     public static function seniorHighPerformanceDescriptors(): array
     {
-        return [
-            ['scale' => '90-100', 'description' => 'Advancing', 'remarks' => 'Passed'],
-            ['scale' => '80-89', 'description' => 'Benchmarking', 'remarks' => 'Passed'],
-            ['scale' => '75-79', 'description' => 'Connecting', 'remarks' => 'Passed'],
-            ['scale' => '65-74', 'description' => 'Developing', 'remarks' => 'Failed'],
-            ['scale' => '0-64', 'description' => 'Emerging', 'remarks' => 'Failed'],
-        ];
+        return array_map(fn ($band) => array_diff_key($band, ['min' => true]), Sf9PerformanceScale::updated());
     }
 
     /**
@@ -203,6 +197,7 @@ class Sf9ReportCardBuilder
                     $periods,
                     array_keys($periods),
                 ),
+            'teacher_comments' => $enrollment->exists ? $enrollment->sf9Comments->pluck('comment', 'grading_period')->all() : [],
             'observed_values' => self::observedRows($observedValues, $isSeniorHigh, $periodKeys),
             'attendance' => $schoolDaysByMonth !== []
                 ? Sf9AttendanceSummary::forEnrollment($enrollment->enrollment_ID, $schoolDaysByMonth, $attendanceMonths)
