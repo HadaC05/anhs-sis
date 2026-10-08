@@ -39,6 +39,10 @@ services:
       # deliberately want to create the application's demo users and data.
       - key: RUN_DATABASE_SEEDER
         value: "false"
+      # A full reset is destructive. Set true with a unique DATABASE_RESET_TOKEN
+      # for one deployment, then set it back to false.
+      - key: RUN_DATABASE_FRESH
+        value: "false"
       # Set this to the public Render URL after the first deployment.
       - key: APP_URL
         sync: false

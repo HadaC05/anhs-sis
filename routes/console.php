@@ -1,8 +1,50 @@
 <?php
 
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
+
+Artisan::command('database:reset-once', function () {
+    $token = (string) getenv('DATABASE_RESET_TOKEN');
+
+    if (strlen($token) < 16) {
+        $this->error('DATABASE_RESET_TOKEN must be a unique value of at least 16 characters.');
+
+        return 1;
+    }
+
+    $tokenHash = hash('sha256', $token);
+
+    if (Schema::hasTable('database_reset_runs')
+        && DB::table('database_reset_runs')->where('token_hash', $tokenHash)->exists()) {
+        $this->info('Database reset already completed for this token; skipping.');
+
+        return 0;
+    }
+
+    $this->warn('Resetting all database tables and seeding default data.');
+
+    $result = $this->call('migrate:fresh', [
+        '--seed' => true,
+        '--force' => true,
+        '--no-interaction' => true,
+    ]);
+
+    if ($result !== 0) {
+        return $result;
+    }
+
+    DB::table('database_reset_runs')->insert([
+        'token_hash' => $tokenHash,
+        'completed_at' => now(),
+    ]);
+
+    $this->info('Database reset completed and recorded.');
+
+    return 0;
+})->purpose('Run a full database reset and default seed once per token');
 
 Artisan::command('registrar:grade-digest', function () {
     $count = \App\Support\RegistrarGradeDigest::sendWhenDue();

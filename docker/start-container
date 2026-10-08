@@ -14,11 +14,23 @@ if [ ! -e public/storage ]; then
 fi
 
 php artisan package:discover --ansi
+
+# A unique token records a completed reset in PostgreSQL, so a Render restart
+# cannot repeat it while the environment flag remains enabled.
+if [ "${RUN_DATABASE_FRESH:-false}" = "true" ]; then
+    if [ "${RUN_DATABASE_SEEDER:-false}" = "true" ]; then
+        echo "Set RUN_DATABASE_SEEDER=false when using RUN_DATABASE_FRESH; the reset already seeds once." >&2
+        exit 1
+    fi
+
+    php artisan database:reset-once
+fi
+
 php artisan migrate --force
 
 # Disabled by default. Set RUN_DATABASE_SEEDER=true only for a deliberate,
 # one-time test-data setup, then set it back to false and redeploy.
-if [ "${RUN_DATABASE_SEEDER:-false}" = "true" ]; then
+if [ "${RUN_DATABASE_FRESH:-false}" != "true" ] && [ "${RUN_DATABASE_SEEDER:-false}" = "true" ]; then
     php artisan db:seed --force
 fi
 

@@ -1,5 +1,29 @@
 # Render deployment on the free plan
 
+## One-time full database reset
+
+The Docker startup script supports a full reset without a Render shell. This
+**deletes every database table and record**, then runs all migrations and the
+default seeders. Back up the database first using its external URL and
+`pg_dump`; the web service's `DB_URL` is an internal URL and does not work from
+your computer.
+
+1. Commit and push the intended application code. Set `RUN_DATABASE_SEEDER=false`.
+2. In the web service's **Environment** page, set `RUN_DATABASE_FRESH=true` and
+   `DATABASE_RESET_TOKEN` to a new unique value of at least 16 characters (for
+   example, a UUID). Choose **Save, rebuild, and deploy** so Render uses the
+   latest commit even if its earlier deployment failed during migration.
+3. In the deploy logs, confirm `Database reset completed and recorded.` and
+   that the deployment becomes live. The same token is stored as a hash in the
+   database, so a restart with the same settings skips the reset.
+4. Set `RUN_DATABASE_FRESH=false` and choose **Save and deploy**. Leave
+   `RUN_DATABASE_SEEDER=false` so later restarts do not overwrite seeded records.
+
+Changing `DATABASE_RESET_TOKEN` while `RUN_DATABASE_FRESH=true` requests a new
+full reset. Never set both `RUN_DATABASE_FRESH` and `RUN_DATABASE_SEEDER` to true.
+The default seeders create sample staff accounts with password `password`;
+change or disable them before opening the site to others.
+
 The Docker web service runs Nginx, PHP-FPM, and one Laravel database queue worker
 under Supervisor. No separate Render Background Worker service is needed.
 Supervisor restarts the queue process if it exits, and startup runs migrations
