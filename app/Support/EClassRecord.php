@@ -10,7 +10,7 @@ use ZipArchive;
 class EClassRecord
 {
     /** Read saved term grades, never the annual FINAL GRADES sheet or raw scores. */
-    public static function read(string $path, int $term): array
+    public static function read(string $path, int $term, ?string $componentSheet = null): array
     {
         $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
@@ -21,14 +21,23 @@ class EClassRecord
             $workbook = self::xml($zip, 'xl/workbook.xml');
             $relationships = self::xml($zip, 'xl/_rels/workbook.xml.rels');
             $ids = [];
+            $componentIds = [];
             foreach ($workbook->xpath('//*[local-name()="sheet"]') as $sheet) {
-                if (preg_match('/^TERM\s*0?'.$term.'$/i', trim((string) $sheet['name']))) {
+                $name = trim((string) $sheet['name']);
+                if (preg_match('/^TERM\s*0?'.$term.'$/i', $name)) {
                     $attributes = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
                     $ids[] = (string) $attributes['id'];
+                } elseif ($componentSheet !== null && preg_match('/^TERM\s*0?'.$term.'\s+'.preg_quote($componentSheet, '/').'$/i', $name)) {
+                    $attributes = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+                    $componentIds[] = (string) $attributes['id'];
                 }
             }
+            if ($componentSheet !== null && $componentIds !== []) {
+                $ids = $componentIds;
+            }
             if (count($ids) !== 1) {
-                throw new RuntimeException("The workbook must contain exactly one TERM {$term} sheet. No other term was read.");
+                $expected = $componentSheet !== null ? "TERM {$term} {$componentSheet} or TERM {$term}" : "TERM {$term}";
+                throw new RuntimeException("The workbook must contain exactly one {$expected} sheet. No other term or component was read.");
             }
             $sheetPath = null;
             foreach ($relationships->xpath('//*[local-name()="Relationship"]') as $relationship) {

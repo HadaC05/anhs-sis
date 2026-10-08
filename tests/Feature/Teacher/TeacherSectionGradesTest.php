@@ -136,6 +136,36 @@ test('class record import supports the junior high open term', function () {
     ])->assertOk()->assertJsonPath('grades.0.grade', 87)->assertJsonPath('period', 'term_1');
 });
 
+test('class record import matches a workbook middle initial when the enrolled learner has no middle name', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $enrollment->student->update(['first_name' => 'Adrian Miguel', 'last_name' => 'Abad', 'middle_name' => null]);
+    $assignment->section->update(['grade_ID' => GradeLevel::idForValue('grade_7')]);
+
+    $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'term_1',
+        'class_record' => \Tests\Support\EClassRecordFixture::upload(['TERM 1' => [['Abad, Adrian Miguel P.', '66']]]),
+    ])->assertOk()
+        ->assertJsonPath('grades.0.enrollment_id', $enrollment->enrollment_ID)
+        ->assertJsonPath('grades.0.grade', 66)
+        ->assertJsonCount(0, 'issues');
+});
+
+test('class record import skips an initial-only name when two enrolled learners share the same name', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
+    $enrollment->student->update(['first_name' => 'Adrian Miguel', 'last_name' => 'Abad', 'middle_name' => null]);
+    $duplicateStudent = $enrollment->student->replicate();
+    $duplicateStudent->lrn = '555555555555';
+    $duplicateStudent->save();
+    $duplicateEnrollment = $enrollment->replicate();
+    $duplicateEnrollment->student_ID = $duplicateStudent->id;
+    $duplicateEnrollment->save();
+
+    $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1',
+        'class_record' => \Tests\Support\EClassRecordFixture::upload(['TERM 1' => [['Abad, Adrian Miguel P.', '66']]]),
+    ])->assertOk()->assertJsonCount(0, 'grades')->assertJsonPath('issues.0', 'Row 18 — Abad, Adrian Miguel P.: name matches more than one learner.');
+});
+
 test('class record import rejects a closed or forged term', function (string $period) {
     ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
     $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [

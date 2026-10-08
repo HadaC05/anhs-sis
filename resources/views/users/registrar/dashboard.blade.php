@@ -47,8 +47,8 @@
         @endforeach
     </div>
 
-    <div class="grid items-start gap-6 lg:grid-cols-3">
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2" aria-labelledby="review-queue-title">
+    <div class="grid items-start gap-6 xl:grid-cols-3">
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2" aria-labelledby="review-queue-title">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-5">
                 <div>
                     <h2 id="review-queue-title" class="text-lg font-bold text-gray-800">Ready for review</h2>
@@ -97,8 +97,8 @@
             <dl class="space-y-4">
                 @foreach ($statusRows as $row)
                 <div class="flex items-center justify-between gap-2 text-sm">
-                    <dt><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $row['dot'] }}">{{ $row['label'] }}</span></dt>
-                    <dd class="font-bold tabular-nums text-gray-700">{{ number_format($gradeCounts[$row['key']]) }}</dd>
+                    <dt class="min-w-0"><span class="inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-semibold leading-5 {{ $row['dot'] }}">{{ $row['label'] }}</span></dt>
+                    <dd class="shrink-0 font-bold tabular-nums text-gray-700">{{ number_format($gradeCounts[$row['key']]) }}</dd>
                 </div>
                 @endforeach
             </dl>

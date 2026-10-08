@@ -117,7 +117,7 @@
 
 <div class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg shadow-gray-200/70">
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[960px] border-collapse text-left">
+        <table class="w-full min-w-[1100px] border-collapse text-left">
             <thead>
                 <tr class="border-b border-gray-300 bg-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-600">
                     <th class="border-r border-gray-200 px-5 py-4">Student</th>
@@ -170,7 +170,7 @@
                         </td>
                         <td class="border-r border-gray-100 px-5 py-4 font-mono text-xs font-semibold text-gray-700">{{ $student?->lrn ?? '-' }}</td>
                         <td class="border-r border-gray-100 px-5 py-4">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusClasses }}">
+                            <span class="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $statusClasses }}">
                                 {{ $enrollment->enrollment_status_label ?: '-' }}
                             </span>
                         </td>

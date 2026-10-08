@@ -13,10 +13,15 @@ class EClassRecordGrades
     public static function match(array $records, Collection $enrollments, TeacherSubjectAssignment $assignment, string $period): array
     {
         $index = [];
+        $withoutMiddleName = [];
         foreach ($enrollments as $enrollment) {
             $student = $enrollment->student;
             if (! $student) {
                 continue;
+            }
+            if (blank($student->middle_name)) {
+                $key = EClassRecord::normalize("{$student->last_name}, {$student->first_name}");
+                $withoutMiddleName[$key][$enrollment->enrollment_ID] = true;
             }
             foreach (array_unique([$student->middle_name, mb_substr($student->middle_name ?? '', 0, 1), '']) as $middle) {
                 foreach ([
@@ -36,6 +41,10 @@ class EClassRecordGrades
         $issues = [];
         foreach ($records as $record) {
             $ids = array_keys($index[EClassRecord::normalize($record['name'])] ?? []);
+            if ($ids === [] && preg_match('/^(.+),\s*(.+?)\s+[\pL]\.?$/u', $record['name'], $parts)) {
+                $key = EClassRecord::normalize($parts[1].', '.$parts[2]);
+                $ids = array_keys($withoutMiddleName[$key] ?? []);
+            }
             if (count($ids) !== 1) {
                 $issues[] = 'Row '.$record['row'].' — '.$record['name'].': '.(count($ids) ? 'name matches more than one learner.' : 'no matching learner in this class.');
 

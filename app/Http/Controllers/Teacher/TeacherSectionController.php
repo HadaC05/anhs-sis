@@ -1216,8 +1216,15 @@ class TeacherSectionController extends Controller
         if (! preg_match('/term_(\d+)$/', $data['period'], $match)) {
             throw \Illuminate\Validation\ValidationException::withMessages(['period' => 'This grading period cannot be mapped to a TERM worksheet.']);
         }
+        $mapehComponent = \App\Models\MapehConfiguration::forSection($assignment->section)?->components
+            ->first(fn ($component) => (int) $component->curriculumSubject->subject_ID === (int) $assignment->subject_ID);
+        $componentSheet = match ($mapehComponent?->key) {
+            'music_arts' => 'M and A',
+            'pe_health' => 'PE and H',
+            default => null,
+        };
         try {
-            $records = \App\Support\EClassRecord::read($request->file('class_record')->getRealPath(), (int) $match[1]);
+            $records = \App\Support\EClassRecord::read($request->file('class_record')->getRealPath(), (int) $match[1], $componentSheet);
         } catch (\RuntimeException $exception) {
             throw \Illuminate\Validation\ValidationException::withMessages(['class_record' => $exception->getMessage()]);
         }

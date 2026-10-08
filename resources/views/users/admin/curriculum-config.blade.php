@@ -451,6 +451,7 @@
     </div>
 </div>
 
+@push('modals')
 <div id="gradeLevelModal" role="dialog" aria-modal="true" aria-labelledby="gradeLevelModalTitle" data-open="{{ $gradeLevelModalOpen ? 'true' : 'false' }}"
     class="fixed inset-0 z-[105] {{ $gradeLevelModalOpen ? 'flex' : 'hidden' }} items-center justify-center bg-slate-900/70 p-4">
     <div class="w-full max-w-xl overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl">
@@ -1050,4 +1051,5 @@
         setTimeout(closeCurriculumSuccessToast, 4000);
     }
 </script>
+@endpush
 @endsection

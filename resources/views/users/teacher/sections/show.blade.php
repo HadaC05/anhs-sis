@@ -10,6 +10,13 @@ $subject = $assignment->subject;
 $subjectCode = $subject?->code ?? 'SUBJ';
 $subjectTitle = $subject?->title ?? 'Subject';
 $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
+$mapehComponent = \App\Models\MapehConfiguration::forSection($section)?->components
+    ->first(fn ($component) => (int) $component->curriculumSubject->subject_ID === (int) $assignment->subject_ID);
+$mapehSheetSuffix = match ($mapehComponent?->key) {
+    'music_arts' => 'M and A',
+    'pe_health' => 'PE and H',
+    default => null,
+};
 $lockedPeriodKeys = $lockedPeriodKeys ?? [];
 $studentCount = $enrollments->count();
 $inputColspan = 3 + 2 * count($inputPeriods);
@@ -364,13 +371,14 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                 <h2 id="classRecordImportTitle" class="text-base font-bold text-gray-800">Import Class Record</h2>
                 <button type="button" id="classRecordImportClose" class="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</button>
             </div>
+            <p class="mb-3 text-xs font-semibold text-gray-700">Importing into {{ $section->name }} · {{ $subjectTitle }} · {{ $section->academicYear?->school_year }}</p>
             <label for="classRecordPeriod" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Term</label>
             <select id="classRecordPeriod" name="period" required class="mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
                 @foreach ($inputPeriods as $period)
                     <option value="{{ $period['key'] }}" @selected($period['key'] === $editablePeriodKey)>{{ $period['label'] }}</option>
                 @endforeach
             </select>
-            <p id="classRecordImportHelp" class="mb-3 text-xs text-gray-500">Upload a completed Excel class record. Grades from the selected TERM sheet are matched to learners by name. Recalculate and save the workbook in Excel before uploading, then review and save the imported grades.</p>
+            <p id="classRecordImportHelp" class="mb-3 text-xs text-gray-500">Upload a completed Excel class record. An LRN column is not required: grades are matched to enrolled learners by name. @if ($mapehSheetSuffix) This component uses the selected TERM number's {{ $mapehSheetSuffix }} worksheet when present; a plain TERM worksheet is also accepted. @else Grades come from the selected TERM worksheet. @endif Recalculate and save the workbook in Excel before uploading, then review and save the imported grades.</p>
             <input id="classRecordFile" name="class_record" type="file" accept=".xlsx" required class="sr-only" aria-label="Excel class record" aria-describedby="classRecordImportHelp">
             <div id="classRecordDropzone" class="cursor-pointer rounded-xl border-2 border-dashed border-[#4bb878]/45 bg-[#f8fcfb] px-6 py-10 text-center transition hover:border-[#4bb878] hover:bg-[#f1faf6]">
                 <svg class="mx-auto h-11 w-11 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 16V4m0 0L8 8m4-4 4 4M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 13h16v4H4z"></path></svg>
@@ -546,7 +554,10 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                     message = imported
                         ? `${imported} grades filled for ${periodLabel}. Review and save, or submit from Grade Summary.`
                         : `No grades were imported for ${periodLabel}. Existing inputs were kept.`;
-                    summary.textContent = `${message} ${data.unchanged} learner inputs unchanged.`;
+                    const allNamesUnmatched = imported === 0 && data.issues.length > 0
+                        && data.issues.every(issue => issue.includes('no matching learner in this class.'));
+                    summary.textContent = `${message} ${data.unchanged} learner inputs unchanged.`
+                        + (allNamesUnmatched ? ' Check that the workbook names match students enrolled in this section and school year.' : '');
                     data.issues.forEach(issue => {
                         const item = document.createElement('li');
                         item.textContent = issue;

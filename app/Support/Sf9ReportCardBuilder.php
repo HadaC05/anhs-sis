@@ -302,7 +302,7 @@ class Sf9ReportCardBuilder
             $subjectGrades[$slot] = [
                 'title' => $subject?->title ?? 'Subject',
                 'quarters' => $quarterGrades,
-                'final' => count($values) && (! $assignment->computed_mapeh || count($values) === count($periodKeys)) ? round(array_sum($values) / count($values)) : null,
+                'final' => count($values) ? round(array_sum($values) / count($values)) : null,
             ];
         }
 

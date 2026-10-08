@@ -174,6 +174,27 @@ test('SF9 combines paired components once and shows their correct labels', funct
         ->and($card['general_average'])->toBe(90);
 });
 
+test('SF9 shows the MAPEH final and general average when only the first term has grades', function () {
+    $f = mapehFixtures();
+    MapehSetup::save($f['curriculum'], array_replace($f['data'], ['mode' => 'paired']));
+    mapehComponentGrades($f, [83, 85]);
+    $assignments = TeacherSubjectAssignment::with('subject')->get();
+    $grades = StudentSubjectGrade::get()->groupBy('assignment_ID')->map(fn ($items) => $items->keyBy('grading_period'));
+    $periods = [
+        ['key' => 'term_1', 'label' => 'Term 1'],
+        ['key' => 'term_2', 'label' => 'Term 2'],
+    ];
+
+    $card = Sf9ReportCardBuilder::buildCard($f['enrollment'], $f['section']->fresh(), $assignments, $grades, collect(), $periods);
+    $rows = collect($card['subjects'])->keyBy('label');
+
+    expect($rows['MAPEH']['quarters']['term_1'])->toBe(84.0)
+        ->and($rows['MAPEH']['quarters']['term_2'])->toBeNull()
+        ->and($rows['MAPEH']['final'])->toBe(84.0)
+        ->and($rows['MAPEH']['remarks'])->toBe('Passed')
+        ->and($card['general_average'])->toBe(84);
+});
+
 test('legacy MAPEH grades are preserved until component entry begins for that term', function () {
     $f = mapehFixtures();
     $legacy = StudentSubjectGrade::create(['student_subject_ID' => StudentSubject::sole()->student_subject_ID, 'assignment_ID' => $f['assignment']->assignment_ID, 'term_ID' => StudentSubjectGrade::termIdForPeriodKey('term_1'), 'numeric_grade' => 91, 'status' => 'released', 'posted_by' => $f['teacher']->staff_id]);
@@ -227,6 +248,49 @@ test('component teachers can import and save their own grades without editing an
     }
     expect(StudentSubjectGrade::count())->toBe(4)->and(StudentSubjectGrade::where('assignment_ID', $f['assignment']->assignment_ID)->count())->toBe(0);
     $this->post(route('teacher.sections.grades.store', $componentAssignments[0]), ['grades' => [$f['enrollment']->enrollment_ID => ['term_1' => ['grade' => 100]]]])->assertForbidden();
+});
+
+test('paired MAPEH component imports use their own worksheet in a shared workbook', function () {
+    $f = mapehFixtures();
+    $config = MapehSetup::save($f['curriculum'], array_replace($f['data'], ['mode' => 'paired']));
+    $expected = ['music_arts' => 83, 'pe_health' => 85];
+    $workbook = [
+        'TERM 1' => [['Santos, Ana', '70']],
+        'TERM 1 M and A' => [['Santos, Ana', '83']],
+        'TERM 1 PE and H' => [['Santos, Ana', '85']],
+    ];
+
+    foreach ($config->components as $component) {
+        $assignment = TeacherSubjectAssignment::create([
+            'section_ID' => $f['section']->section_ID,
+            'subject_ID' => $component->curriculumSubject->subject_ID,
+            'staff_ID' => $f['teacher']->staff_id,
+            'SY_ID' => $f['year']->SY_ID,
+        ]);
+        $this->actingAs($f['teacher'])->get(route('teacher.sections.show', $assignment))
+            ->assertOk()->assertSee(($component->key === 'music_arts' ? 'M and A' : 'PE and H').' worksheet');
+        $this->actingAs($f['teacher'])->postJson(route('teacher.sections.grades.import', $assignment), [
+            'period' => 'term_1',
+            'class_record' => \Tests\Support\EClassRecordFixture::upload($workbook),
+        ])->assertOk()->assertJsonPath('grades.0.grade', $expected[$component->key]);
+    }
+});
+
+test('paired MAPEH import refuses another component worksheet', function () {
+    $f = mapehFixtures();
+    $config = MapehSetup::save($f['curriculum'], array_replace($f['data'], ['mode' => 'paired']));
+    $music = $config->components->firstWhere('key', 'music_arts');
+    $assignment = TeacherSubjectAssignment::create([
+        'section_ID' => $f['section']->section_ID,
+        'subject_ID' => $music->curriculumSubject->subject_ID,
+        'staff_ID' => $f['teacher']->staff_id,
+        'SY_ID' => $f['year']->SY_ID,
+    ]);
+
+    $this->actingAs($f['teacher'])->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'term_1',
+        'class_record' => \Tests\Support\EClassRecordFixture::upload(['TERM 1 PE and H' => [['Santos, Ana', '85']]]),
+    ])->assertUnprocessable()->assertJsonValidationErrors('class_record');
 });
 
 test('student grades advisory SF10 and SF5 use the combined MAPEH grade', function () {
