@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-    $subject = $assignment->curriculumSubject?->subject;
+    $subject = $assignment->subject;
     $teacher = $assignment->staff;
     $gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $section->grade_level ?? ''));
     $gradeInitial = strtoupper(str_replace('grade_', 'G', $section->grade_level ?? ''));
@@ -12,7 +12,7 @@
     $subjectTitle = $subject?->title ?? 'Subject';
     $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
     $teacherName = $teacher ? trim($teacher->last_name.', '.$teacher->first_name) : 'Unassigned';
-    $semester = $assignment->curriculumSubject?->semester;
+    $semester = $assignment->section?->curriculum?->gradingSemester?->key;
     $unlockableCount = collect($termSummaries)->filter(fn (array $term): bool => $term['can_unlock'] || $term['is_registrar_unlocked'])->count();
 @endphp
 

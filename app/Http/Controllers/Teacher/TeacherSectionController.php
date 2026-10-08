@@ -69,11 +69,11 @@ class TeacherSectionController extends Controller
             ]);
 
             $assignmentScope = function ($query) use ($staff, $gradeStatusIds, $currentTermIds): void {
-                $query->withoutMapehParents()->with(['curriculumSubject.subject'])
-                    ->where('staff_ID', $staff->staff_id)
-                    ->join('curriculum_subjects', 'teacher_subject_assignments.curr_subj_ID', '=', 'curriculum_subjects.curr_subj_ID')
-                    ->join('curriculum_grade_levels', 'curriculum_subjects.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
-                    ->leftJoin('subjects', 'curriculum_subjects.subject_ID', '=', 'subjects.subject_ID')
+                $query->withoutMapehParents()->with(['subject'])
+                    ->where('teacher_subject_assignments.staff_ID', $staff->staff_id)
+                    ->join('sections', 'teacher_subject_assignments.section_ID', '=', 'sections.section_ID')
+                    ->join('curriculum_grade_levels', 'sections.curriculum_grade_level_ID', '=', 'curriculum_grade_levels.curriculum_ID')
+                    ->leftJoin('subjects', 'teacher_subject_assignments.subject_ID', '=', 'subjects.subject_ID')
                     ->orderBy('curriculum_grade_levels.semester_ID')
                     ->orderBy('subjects.title')
                     ->select('teacher_subject_assignments.*')
@@ -103,12 +103,12 @@ class TeacherSectionController extends Controller
                     $subQuery->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
                 }])
                 ->whereHas('teacherSubjectAssignments', function ($query) use ($staff, $search): void {
-                    $query->withoutMapehParents()->where('staff_ID', $staff->staff_id)
+                    $query->withoutMapehParents()->where('teacher_subject_assignments.staff_ID', $staff->staff_id)
                         ->when($search !== '', function ($assignmentQuery) use ($search): void {
                             $assignmentQuery->where(function ($inner) use ($search): void {
                                 $inner->whereHas('section', function ($sectionQuery) use ($search): void {
                                     $sectionQuery->where('name', 'like', '%'.$search.'%');
-                                })->orWhereHas('curriculumSubject.subject', function ($subjectQuery) use ($search): void {
+                                })->orWhereHas('subject', function ($subjectQuery) use ($search): void {
                                     $subjectQuery->where('title', 'like', '%'.$search.'%')
                                         ->orWhere('code', 'like', '%'.$search.'%');
                                 });
@@ -118,7 +118,7 @@ class TeacherSectionController extends Controller
                 ->when($search !== '', function ($query) use ($search): void {
                     $query->where(function ($inner) use ($search): void {
                         $inner->where('name', 'like', '%'.$search.'%')
-                            ->orWhereHas('teacherSubjectAssignments.curriculumSubject.subject', function ($subjectQuery) use ($search): void {
+                            ->orWhereHas('teacherSubjectAssignments.subject', function ($subjectQuery) use ($search): void {
                                 $subjectQuery->where('title', 'like', '%'.$search.'%')
                                     ->orWhere('code', 'like', '%'.$search.'%');
                             });
@@ -226,10 +226,10 @@ class TeacherSectionController extends Controller
             ->values();
 
         $assignments = TeacherSubjectAssignment::query()
-            ->with(['curriculumSubject.subject', 'staff'])
+            ->with(['subject', 'staff'])
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
-            ->orderBy('curr_subj_ID')
+            ->orderBy('subject_ID')
             ->get();
         $sourceAssignments = $assignments;
         $assignments = \App\Support\MapehGrades::assignments($section, $assignments);
@@ -774,7 +774,7 @@ class TeacherSectionController extends Controller
             ->values();
 
         $enrollments = Enrollment::query()
-            ->with(['student', 'cluster', 'preferredCourse', 'academicYear'])
+            ->with(['student', 'cluster', 'track', 'electives', 'studentSubjects', 'academicYear'])
             ->where('section_ID', $section->section_ID)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->when($selectedEnrollmentIds->isNotEmpty(), function ($query) use ($selectedEnrollmentIds): void {
@@ -789,7 +789,7 @@ class TeacherSectionController extends Controller
         }
 
         $assignments = TeacherSubjectAssignment::query()
-            ->with(['curriculumSubject.subject'])
+            ->with(['subject.subjectType'])
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
             ->get();
@@ -1139,17 +1139,18 @@ class TeacherSectionController extends Controller
     {
         $this->authorizeAssignment($request, $assignment);
         if (\App\Support\MapehGrades::isComputed($assignment)) {
-            return redirect()->route('teacher.sections.index')->with('status', 'MAPEH grades are handled through the component subjects.');
+            return redirect()->route('teacher.sections.index')->with('status', 'This combined grade is handled through its component subjects.');
         }
 
-        $assignment->load(['section.academicYear', 'section.cluster', 'section.gradeLevel', 'curriculumSubject.subject']);
+        $assignment->load(['section.academicYear', 'section.cluster', 'section.gradeLevel', 'section.curriculum.gradingSemester', 'subject']);
         $section = $assignment->section;
-        $semester = $assignment->curriculumSubject?->semester;
+        $semester = $section->curriculum?->gradingSemester?->key;
         // A section's roster spans both Senior High semesters. The active
         // semester chooses the subject and grading period, not its students.
         $enrollments = Enrollment::query()
             ->with(['student'])
             ->where('section_ID', $section->section_ID)
+            ->whereHas('studentSubjects', fn ($query) => $query->where('subject_ID', $assignment->subject_ID))
             ->orderBy('enrollment_status_ID')
             ->get()
             ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
@@ -1207,7 +1208,7 @@ class TeacherSectionController extends Controller
             'class_record' => ['required', 'file', 'mimes:xlsx', 'extensions:xlsx', 'max:10240'],
             'period' => ['required', 'string'],
         ]);
-        $assignment->load('section.gradeLevel', 'curriculumSubject');
+        $assignment->load('section.gradeLevel', 'section.curriculum.gradingSemester');
         $periods = $this->assignmentGradingInputPeriods($assignment);
         if (! in_array($data['period'], array_column($periods, 'key'), true)) {
             throw \Illuminate\Validation\ValidationException::withMessages(['period' => 'This term is not open for grade input. Refresh the grade sheet and select an editable term.']);
@@ -1231,15 +1232,16 @@ class TeacherSectionController extends Controller
     {
         $this->authorizeAssignment($request, $assignment);
 
-        $assignment->load('section.gradeLevel', 'curriculumSubject');
+        $assignment->load('section.gradeLevel', 'section.curriculum.gradingSemester');
         $section = $assignment->section;
-        $semester = $assignment->curriculumSubject?->semester;
+        $semester = $assignment->section?->curriculum?->gradingSemester?->key;
         $periods = $this->assignmentGradingInputPeriods($assignment);
         $periodKeys = array_column($periods, 'key');
         $editablePeriodKeys = array_flip($periodKeys);
 
         $enrollmentIds = Enrollment::query()
             ->where('section_ID', $section->section_ID)
+            ->whereHas('studentSubjects', fn ($query) => $query->where('subject_ID', $assignment->subject_ID))
             ->pluck('enrollment_ID')
             ->toArray();
 
@@ -1268,7 +1270,7 @@ class TeacherSectionController extends Controller
 
                 $studentSubject = StudentSubject::query()
                     ->where('enrollment_ID', $enrollmentId)
-                    ->where('curr_subj_ID', $assignment->curr_subj_ID)
+                    ->where('subject_ID', $assignment->subject_ID)
                     ->first();
 
                 if (! $studentSubject) {
@@ -1444,7 +1446,7 @@ class TeacherSectionController extends Controller
                     ],
                     [
                         'curriculum_grade_level_ID' => $section->curriculum_grade_level_ID,
-                        'course_ID' => null,
+                        'track_ID' => $section->cluster?->track_ID,
                         'learner_type' => 'regular',
                         'enrollment_status' => EnrollmentStatus::ENROLLED,
                     ],
@@ -1470,11 +1472,12 @@ class TeacherSectionController extends Controller
     {
         $this->authorizeAssignment($request, $assignment);
 
-        $assignment->load('section.gradeLevel', 'curriculumSubject');
+        $assignment->load('section.gradeLevel', 'section.curriculum.gradingSemester');
         $section = $assignment->section;
-        $semester = $assignment->curriculumSubject?->semester;
+        $semester = $assignment->section?->curriculum?->gradingSemester?->key;
         $enrollmentIds = Enrollment::query()
             ->where('section_ID', $section->section_ID)
+            ->whereHas('studentSubjects', fn ($query) => $query->where('subject_ID', $assignment->subject_ID))
             ->pluck('enrollment_ID')
             ->toArray();
 
@@ -1533,12 +1536,13 @@ class TeacherSectionController extends Controller
     {
         $this->authorizeAssignment($request, $assignment);
 
-        $assignment->load(['section.gradeLevel', 'curriculumSubject.subject']);
+        $assignment->load(['section.gradeLevel', 'section.curriculum.gradingSemester', 'subject']);
         $section = $assignment->section;
-        $semester = $assignment->curriculumSubject?->semester;
+        $semester = $section->curriculum?->gradingSemester?->key;
         $enrollments = Enrollment::query()
             ->with(['student'])
             ->where('section_ID', $section->section_ID)
+            ->whereHas('studentSubjects', fn ($query) => $query->where('subject_ID', $assignment->subject_ID))
             ->orderBy('enrollment_status_ID')
             ->get()
             ->sortBy(fn (Enrollment $enrollment) => $this->studentSortKey($enrollment))
@@ -1594,7 +1598,7 @@ class TeacherSectionController extends Controller
             return [];
         }
         $section = $assignment->section;
-        $semester = $assignment->curriculumSubject?->semester;
+        $semester = $assignment->section?->curriculum?->gradingSemester?->key;
         $keys = AssignmentGradeTermUnlocker::unlockedPeriodKeysFor($assignment->assignment_ID);
         if ($this->isGradingInputOpen($section, $semester)) {
             $keys = array_merge($keys, array_column($this->gradingInputPeriods($section, $semester), 'key'));

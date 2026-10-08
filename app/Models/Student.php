@@ -126,6 +126,13 @@ class Student extends Authenticatable
         return $this->hasMany(Enrollment::class, 'student_ID');
     }
 
+    public function isSeniorHighStudent(): bool
+    {
+        return $this->enrollments()
+            ->whereHas('gradeLevel', fn ($query) => $query->whereIn('grade_label', ['Grade 11', 'Grade 12']))
+            ->exists();
+    }
+
     public function profile(): HasOne
     {
         return $this->hasOne(StudentProfile::class, 'student_ID');

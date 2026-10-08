@@ -176,7 +176,11 @@ class StudentSubjectGrade extends Model
 
     public function isSeniorHigh(): bool
     {
-        return $this->enrollment?->semester !== null;
+        if ($this->term?->school_level) {
+            return $this->term->school_level === 'senior_high';
+        }
+
+        return (bool) $this->studentSubject?->enrollment?->isSeniorHigh();
     }
 
     public function isJuniorHigh(): bool
@@ -187,7 +191,11 @@ class StudentSubjectGrade extends Model
     /** Derived from the enrollment's curriculum-grade-level offering. */
     public function getSemesterIdAttribute(): ?int
     {
-        return $this->enrollment?->curriculumGradeLevel?->semester_ID;
+        $semesterId = $this->studentSubject?->enrollment?->curriculumGradeLevel?->semester_ID
+            ?? $this->assignment?->section?->curriculum?->semester_ID
+            ?? $this->assignment?->curriculumSubject?->semester_ID;
+
+        return $semesterId ?? ($this->isSeniorHigh() ? GradingSemester::idFor(GradingSemester::FIRST) : null);
     }
 
     /** Resolve the legacy/UI period key through the canonical grading term. */

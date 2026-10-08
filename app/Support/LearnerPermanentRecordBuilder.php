@@ -52,7 +52,7 @@ class LearnerPermanentRecordBuilder
             })
             ->all();
 
-        while (count($scholasticRecords) < 6) {
+        while (count($scholasticRecords) < 5) {
             $scholasticRecords[] = self::emptyScholasticRecord($periods);
         }
 
@@ -75,7 +75,7 @@ class LearnerPermanentRecordBuilder
             'birthdate' => $student->birthdate?->format('m/d/Y') ?? '',
             'sex' => $student->sex ? Str::title($student->sex) : '',
             'eligibility' => self::buildEligibility($firstEnrollment),
-            'scholastic_records' => array_slice($scholasticRecords, 0, 6),
+            'scholastic_records' => $scholasticRecords,
             'school_meta' => array_merge(self::defaultSchoolMeta(), $schoolMeta),
             'last_school_year' => $enrollments->sortByDesc(fn (Enrollment $enrollment): string => $enrollment->academicYear?->school_year ?? '')
                 ->first()
@@ -99,9 +99,23 @@ class LearnerPermanentRecordBuilder
         array $periods,
         array $schoolMeta = [],
     ): array {
+        $periods = self::periodsForRecord($enrollment, $grades, $periods);
         $periodKeys = array_column($periods, 'key');
+        $assignments = self::assignmentsForEnrollment($enrollment, $assignments);
         $gradesByAssignment = $grades->groupBy('assignment_ID')
             ->map(fn (Collection $assignmentGrades) => $assignmentGrades->keyBy('grading_period'));
+
+        if ($enrollment->isSeniorHigh()) {
+            return self::buildSeniorHighScholasticRecord(
+                $enrollment,
+                $section,
+                $assignments,
+                $gradesByAssignment,
+                $periods,
+                $schoolMeta,
+            );
+        }
+
         if ($section) {
             $assignments = MapehGrades::assignments($section, $assignments);
             $gradesByAssignment = MapehGrades::grades($assignments, $gradesByAssignment, $periodKeys);
@@ -110,7 +124,7 @@ class LearnerPermanentRecordBuilder
         $subjectGrades = [];
 
         foreach ($assignments as $assignment) {
-            $subject = $assignment->curriculumSubject?->subject;
+            $subject = $assignment->subject;
             $slot = $assignment->mapeh_slot ?: self::subjectSlot((string) ($subject?->title ?? $subject?->code ?? ''));
             $assignmentGrades = $gradesByAssignment->get($assignment->assignment_ID, collect());
             $quarterGrades = [];
@@ -198,6 +212,84 @@ class LearnerPermanentRecordBuilder
             'general_average' => $generalAverage,
             'general_remarks' => $generalAverage === null ? '' : ($generalAverage >= 75 ? 'Passed' : 'Failed'),
             'is_empty' => false,
+            'is_senior_high' => false,
+            'periods' => $periods,
+        ];
+    }
+
+    /** The archived fourth term identifies records from the four-quarter curriculum. */
+    private static function periodsForRecord(Enrollment $enrollment, Collection $grades, array $configuredPeriods): array
+    {
+        if ($enrollment->isSeniorHigh() || ! $grades->contains(fn ($grade): bool => $grade->grading_period === 'term_4')) {
+            return $configuredPeriods;
+        }
+
+        return array_map(fn (int $number): array => [
+            'key' => 'term_'.$number,
+            'label' => 'Quarter '.$number,
+        ], range(1, 4));
+    }
+
+    /**
+     * SHS permanent records use the learner's actual enlisted subjects instead
+     * of attempting to squeeze them into the fixed Junior High learning areas.
+     *
+     * @param  Collection<int, TeacherSubjectAssignment>  $assignments
+     * @param  Collection<int, Collection<string, mixed>>  $gradesByAssignment
+     * @param  array<int, array{key: string, label: string}>  $periods
+     * @param  array<string, mixed>  $schoolMeta
+     * @return array<string, mixed>
+     */
+    private static function buildSeniorHighScholasticRecord(
+        Enrollment $enrollment,
+        ?Section $section,
+        Collection $assignments,
+        Collection $gradesByAssignment,
+        array $periods,
+        array $schoolMeta,
+    ): array {
+        $periodKeys = array_column($periods, 'key');
+        $rows = $assignments->map(function (TeacherSubjectAssignment $assignment) use ($gradesByAssignment, $periodKeys): array {
+            $grades = $gradesByAssignment->get($assignment->assignment_ID, collect());
+            $termGrades = collect($periodKeys)->mapWithKeys(function (string $periodKey) use ($grades): array {
+                $value = $grades->get($periodKey)?->numeric_grade;
+
+                return [$periodKey => $value === null || $value === '' ? null : (int) round((float) $value)];
+            })->all();
+            $recorded = array_values(array_filter($termGrades, fn ($value): bool => $value !== null));
+            $final = $recorded === [] ? null : (int) round(array_sum($recorded) / count($recorded));
+            $subject = $assignment->subject;
+
+            return [
+                'label' => $subject?->title ?? $subject?->code ?? 'Subject',
+                'child' => false,
+                'quarters' => $termGrades,
+                'final' => $final,
+                'remarks' => $final === null ? '' : ($final >= 75 ? 'Passed' : 'Failed'),
+            ];
+        })->values()->all();
+
+        $generalAverageValues = collect($rows)->pluck('final')->filter(fn ($value) => $value !== null);
+        $generalAverage = $generalAverageValues->isEmpty() ? null : (int) round($generalAverageValues->avg());
+        $meta = array_merge(self::defaultSchoolMeta(), $schoolMeta);
+        $adviser = $section?->adviser;
+
+        return [
+            'school' => $meta['name'],
+            'school_id' => $meta['id'],
+            'district' => $meta['district'],
+            'division' => $meta['division'],
+            'region' => $meta['region'],
+            'grade' => $section ? strtoupper(str_replace('grade_', 'Grade ', $section->grade_level)) : '',
+            'section' => $section?->name ?? '',
+            'school_year' => $section?->academicYear?->school_year ?? $enrollment->academicYear?->school_year ?? '',
+            'adviser' => $adviser ? trim(($adviser->first_name ?? '').' '.($adviser->last_name ?? '')) : '',
+            'subjects' => $rows,
+            'general_average' => $generalAverage,
+            'general_remarks' => $generalAverage === null ? '' : ($generalAverage >= 75 ? 'Passed' : 'Failed'),
+            'is_empty' => false,
+            'is_senior_high' => true,
+            'periods' => $periods,
         ];
     }
 
@@ -230,6 +322,8 @@ class LearnerPermanentRecordBuilder
             'general_average' => null,
             'general_remarks' => '',
             'is_empty' => true,
+            'is_senior_high' => false,
+            'periods' => $periods,
         ];
     }
 
@@ -366,7 +460,7 @@ class LearnerPermanentRecordBuilder
         $studentIds = $selectedEnrollments->pluck('student_ID')->unique()->values();
 
         $allEnrollments = Enrollment::query()
-            ->with(['student', 'section.academicYear', 'section.adviser', 'section.gradeLevel', 'academicYear', 'gradeLevel'])
+            ->with(['student', 'section.academicYear', 'section.adviser', 'section.gradeLevel', 'academicYear', 'gradeLevel', 'studentSubjects'])
             ->whereIn('student_ID', $studentIds)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->get();
@@ -376,7 +470,7 @@ class LearnerPermanentRecordBuilder
         }
 
         $assignments = TeacherSubjectAssignment::query()
-            ->with(['curriculumSubject.subject'])
+            ->with(['subject.subjectType'])
             ->where(function ($query) use ($allEnrollments): void {
                 foreach ($allEnrollments->unique(fn (Enrollment $enrollment): string => "{$enrollment->section_ID}:{$enrollment->SY_ID}") as $enrollment) {
                     $query->orWhere(function ($inner) use ($enrollment): void {
@@ -392,7 +486,7 @@ class LearnerPermanentRecordBuilder
             ->all();
 
         $gradesByEnrollment = \App\Models\StudentSubjectGrade::query()
-            ->with('studentSubject')
+            ->with(['studentSubject.enrollment', 'term'])
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $allEnrollments->pluck('enrollment_ID')))
             ->whereIn('assignment_ID', $assignments->pluck('assignment_ID'))
             ->get()
@@ -405,14 +499,31 @@ class LearnerPermanentRecordBuilder
 
             $studentEnrollments = $allEnrollments
                 ->where('student_ID', $student->id)
+                ->filter(fn (Enrollment $history): bool => $history->isSeniorHigh() === $enrollment->isSeniorHigh())
                 ->values();
 
-            return self::buildStudentCard(
+            $card = self::buildStudentCard(
                 $student,
                 $studentEnrollments,
                 $assignmentsBySectionYear,
                 $gradesByEnrollment,
             );
+
+            $card['is_senior_high'] = $enrollment->isSeniorHigh();
+
+            return $card;
         });
+    }
+
+    /** Keep a scholastic record scoped to the learner's enlisted subjects. */
+    private static function assignmentsForEnrollment(Enrollment $enrollment, Collection $assignments): Collection
+    {
+        $subjectIds = $enrollment->relationLoaded('studentSubjects')
+            ? $enrollment->studentSubjects->pluck('subject_ID')
+            : $enrollment->studentSubjects()->pluck('subject_ID');
+
+        return $assignments
+            ->whereIn('subject_ID', $subjectIds->map(fn (mixed $id): int => (int) $id)->all())
+            ->values();
     }
 }

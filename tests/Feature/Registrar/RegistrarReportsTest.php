@@ -31,10 +31,10 @@ function registrarReportFixture(string $yearLabel, bool $active): array
     $subject = Subject::query()->create(['code' => 'R'.$year->SY_ID, 'title' => '=Report subject '.$yearLabel, 'type' => 'core', 'status' => 'active']);
     $curriculumSubject = CurriculumSubject::query()->create(['curriculum_ID' => $curriculum->curriculum_ID, 'subject_ID' => $subject->subject_ID, 'grade_level' => 'grade_11', 'semester' => 'first']);
     $section = Section::query()->create(['name' => 'Report section '.$yearLabel, 'grade_ID' => GradeLevel::idForValue('grade_11'), 'SY_ID' => $year->SY_ID, 'curriculum_ID' => $curriculum->curriculum_ID, 'capacity' => 40]);
-    $assignment = TeacherSubjectAssignment::query()->create(['section_ID' => $section->section_ID, 'curr_subj_ID' => $curriculumSubject->curr_subj_ID, 'SY_ID' => $year->SY_ID, 'staff_ID' => test()->registrar->staff_id]);
+    $assignment = TeacherSubjectAssignment::query()->create(['section_ID' => $section->section_ID, 'subject_ID' => $curriculumSubject->subject_ID, 'SY_ID' => $year->SY_ID, 'staff_ID' => test()->registrar->staff_id]);
     $student = Student::query()->create(['lrn' => (string) (123456780000 + $year->SY_ID), 'first_name' => 'Test', 'last_name' => 'Learner', 'status' => 'active']);
     $enrollment = Enrollment::query()->create(['student_ID' => $student->id, 'section_ID' => $section->section_ID, 'SY_ID' => $year->SY_ID, 'enrollment_status' => 'enrolled']);
-    $roster = StudentSubject::query()->firstOrCreate(['enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $curriculumSubject->curr_subj_ID]);
+    $roster = StudentSubject::query()->firstOrCreate(['enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $curriculumSubject->subject_ID]);
     $term = GradingTerm::query()->where('key', 'term_1')->firstOrFail();
     StudentSubjectGrade::query()->create(['student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $assignment->assignment_ID, 'term_ID' => $term->term_ID, 'numeric_grade' => 90, 'status' => 'submitted', 'posted_by' => test()->registrar->staff_id]);
 

@@ -27,9 +27,9 @@ class TeacherGradeNotifier
 
     public static function assignmentSummary(TeacherSubjectAssignment $assignment): string
     {
-        $assignment->loadMissing(['section', 'curriculumSubject.subject']);
+        $assignment->loadMissing(['section', 'subject']);
 
-        $subject = $assignment->curriculumSubject?->subject;
+        $subject = $assignment->subject;
         $code = trim((string) ($subject?->code ?? ''));
         $title = trim((string) ($subject?->title ?? ''));
         $subjectName = match (true) {

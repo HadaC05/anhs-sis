@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TeacherSubjectAssignment extends Model
 {
@@ -22,7 +23,7 @@ class TeacherSubjectAssignment extends Model
 
     protected $fillable = [
         'section_ID',
-        'curr_subj_ID',
+        'subject_ID',
         'staff_ID',
         'SY_ID',
     ];
@@ -37,7 +38,8 @@ class TeacherSubjectAssignment extends Model
     {
         return $query->whereNotExists(function ($subquery): void {
             $subquery->selectRaw('1')->from('mapeh_configurations')
-                ->whereColumn('mapeh_configurations.parent_curr_subj_ID', 'teacher_subject_assignments.curr_subj_ID')
+                ->join('curriculum_subjects', 'curriculum_subjects.curr_subj_ID', '=', 'mapeh_configurations.parent_curr_subj_ID')
+                ->whereColumn('curriculum_subjects.subject_ID', 'teacher_subject_assignments.subject_ID')
                 ->whereColumn('mapeh_configurations.SY_ID', 'teacher_subject_assignments.SY_ID');
         });
     }
@@ -47,9 +49,15 @@ class TeacherSubjectAssignment extends Model
         return $this->belongsTo(Section::class, 'section_ID', 'section_ID');
     }
 
-    public function curriculumSubject(): BelongsTo
+    public function subject(): BelongsTo
     {
-        return $this->belongsTo(CurriculumSubject::class, 'curr_subj_ID', 'curr_subj_ID');
+        return $this->belongsTo(Subject::class, 'subject_ID', 'subject_ID');
+    }
+
+    /** Compatibility relation for curriculum metadata; electives may not have one. */
+    public function curriculumSubject(): HasOne
+    {
+        return $this->hasOne(CurriculumSubject::class, 'subject_ID', 'subject_ID');
     }
 
     public function staff(): BelongsTo

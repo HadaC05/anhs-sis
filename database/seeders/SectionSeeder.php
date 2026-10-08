@@ -49,9 +49,9 @@ class SectionSeeder extends Seeder
 
         $clusterIds = Cluster::query()->pluck('cluster_ID', 'name');
 
-        foreach (CurriculumSeeder::SENIOR_HIGH_TRACKS as $track) {
-            if (! isset($clusterIds[$track])) {
-                throw new RuntimeException("Missing senior high cluster: {$track}. Run ClusterSeeder first.");
+        foreach (CurriculumSeeder::SENIOR_HIGH_CLUSTERS as $cluster) {
+            if (! isset($clusterIds[$cluster])) {
+                throw new RuntimeException("Missing senior high cluster: {$cluster}. Run ClusterSeeder first.");
             }
         }
 
@@ -78,7 +78,7 @@ class SectionSeeder extends Seeder
                 'name' => $section['name'],
                 'grade_level' => $section['grade_level'],
                 'semester_ID' => $section['semester'] === 'first' ? $firstSemesterId : $secondSemesterId,
-                'cluster_ID' => $clusterIds[$section['track']],
+                'cluster_ID' => $clusterIds[$section['cluster']],
             ];
         }
 

@@ -51,12 +51,12 @@ return new class extends Migration
         Schema::create('student_subjects', function (Blueprint $table): void {
             $table->increments('student_subject_ID');
             $table->unsignedInteger('enrollment_ID');
-            $table->unsignedInteger('curr_subj_ID');
+            $table->unsignedInteger('subject_ID');
             $table->timestamps();
 
             $table->foreign('enrollment_ID')->references('enrollment_ID')->on('enrollments')->cascadeOnDelete();
-            $table->foreign('curr_subj_ID')->references('curr_subj_ID')->on('curriculum_subjects')->restrictOnDelete();
-            $table->unique(['enrollment_ID', 'curr_subj_ID'], 'student_subjects_enrollment_curriculum_subject_unique');
+            $table->foreign('subject_ID')->references('subject_ID')->on('subjects')->restrictOnDelete();
+            $table->unique(['enrollment_ID', 'subject_ID'], 'student_subjects_enrollment_subject_unique');
         });
 
         DB::table('enrollments')->orderBy('enrollment_ID')->each(function (object $enrollment): void {
@@ -65,7 +65,7 @@ return new class extends Migration
                 ->orderBy('curr_subj_ID')
                 ->each(function (object $subject) use ($enrollment): void {
                     DB::table('student_subjects')->updateOrInsert(
-                        ['enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $subject->curr_subj_ID],
+                        ['enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $subject->subject_ID],
                         ['created_at' => now(), 'updated_at' => now()],
                     );
                 });
@@ -76,13 +76,13 @@ return new class extends Migration
         });
 
         DB::table('student_subject_grades')->orderBy('grade_ID')->each(function (object $grade): void {
-            $curriculumSubjectId = DB::table('teacher_subject_assignments')
+            $subjectId = DB::table('teacher_subject_assignments')
                 ->where('assignment_ID', $grade->assignment_ID)
-                ->value('curr_subj_ID');
+                ->value('subject_ID');
 
             $studentSubjectId = DB::table('student_subjects')
                 ->where('enrollment_ID', $grade->enrollment_ID)
-                ->where('curr_subj_ID', $curriculumSubjectId)
+                ->where('subject_ID', $subjectId)
                 ->value('student_subject_ID');
 
             if (! $studentSubjectId) {

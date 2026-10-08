@@ -5,7 +5,7 @@
 @section('content')
 @php
     $section = $assignment->section;
-    $subject = $assignment->curriculumSubject?->subject;
+    $subject = $assignment->subject;
     $teacher = $assignment->staff;
     $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
     $teacherName = $teacher ? trim($teacher->last_name . ', ' . $teacher->first_name . ' ' . $teacher->middle_name) : 'N/A';

@@ -103,7 +103,7 @@ function createTeacherAssignmentPageFixtures(string $username): array
         'cluster_ID' => $cluster->cluster_ID,
         'code' => 'PRECAL11',
         'title' => 'Pre-Calculus',
-        'type' => 'specialized',
+        'type' => 'elective',
         'status' => 'active',
     ]);
 
@@ -117,7 +117,7 @@ function createTeacherAssignmentPageFixtures(string $username): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -194,7 +194,7 @@ test('admin can search subject assignments', function () {
 
     TeacherSubjectAssignment::query()->create([
         'section_ID' => $unassignedSection->section_ID,
-        'curr_subj_ID' => $englishCurriculumSubject->curr_subj_ID,
+        'subject_ID' => $englishCurriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $unassignedSection->SY_ID,
     ]);
@@ -269,7 +269,7 @@ test('management can copy subject assignments to matching sections in a previous
     $this->post(route($role.'.teacher-assignments.copy'), $payload)->assertRedirect($url)->assertSessionHasNoErrors();
     $copy = TeacherSubjectAssignment::query()->where('section_ID', $destination->section_ID)->sole();
     expect($copy->staff_ID)->toBe($teacher->staff_id)
-        ->and($copy->curr_subj_ID)->toBe($original->curr_subj_ID)
+        ->and($copy->subject_ID)->toBe($original->subject_ID)
         ->and($copy->SY_ID)->toBe($year->SY_ID)
         ->and($copy->grades()->count())->toBe(0)
         ->and($destination->fresh()->staff_ID)->toBeNull()
@@ -356,7 +356,7 @@ test('admin can bulk assign a teacher to compatible section subjects', function 
 
     expect(TeacherSubjectAssignment::query()
         ->where('section_ID', $section->section_ID)
-        ->where('curr_subj_ID', $curriculumSubject->curr_subj_ID)
+        ->where('subject_ID', $curriculumSubject->subject_ID)
         ->where('staff_ID', $teacher->staff_id)
         ->exists())->toBeTrue();
 });

@@ -46,7 +46,7 @@
     $sectionName = $currentEnrollment?->section?->name ?? 'Not Assigned';
     $isSeniorHigh = $currentEnrollment?->isSeniorHigh() ?? false;
     $clusterName = $currentEnrollment?->cluster?->name ?? '—';
-    $preferredCourseName = $currentEnrollment?->preferredCourse?->name ?? '—';
+    $trackName = $currentEnrollment?->track?->name ?? $currentEnrollment?->cluster?->track?->name ?? '—';
     $semesterLabel = $currentEnrollment?->semester ? ucfirst($currentEnrollment->semester).' Semester' : null;
     $schoolYear = $currentEnrollment?->academicYear?->school_year ?? $activeYear?->school_year ?? '—';
     $needsEnrollment = $currentEnrollment === null;
@@ -64,8 +64,8 @@
             $infoRows[] = ['label' => 'Semester', 'value' => $semesterLabel];
         }
 
+        $infoRows[] = ['label' => 'Track', 'value' => $trackName];
         $infoRows[] = ['label' => 'Cluster', 'value' => $clusterName];
-        $infoRows[] = ['label' => 'Preferred Course', 'value' => $preferredCourseName];
     }
 
     $quickLinks = [

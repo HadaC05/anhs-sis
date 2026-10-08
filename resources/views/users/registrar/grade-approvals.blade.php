@@ -52,7 +52,7 @@
                 @forelse($assignments as $assignment)
                     @php
                         $section = $assignment->section;
-                        $subject = $assignment->curriculumSubject?->subject;
+                        $subject = $assignment->subject;
                         $teacher = $assignment->staff;
                         $grades = $assignment->grades ?? collect();
                         $rowStatus = $grades->contains('status', 'submitted') ? 'submitted' : ($grades->contains('status', 'approved') ? 'approved' : 'released');

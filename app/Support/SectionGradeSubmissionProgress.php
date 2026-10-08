@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\EnrollmentStatus;
 use App\Models\GradeStatus;
+use App\Models\MapehConfiguration;
 use App\Models\TeacherSubjectAssignment;
 use Illuminate\Support\Facades\DB;
 
@@ -21,6 +22,15 @@ class SectionGradeSubmissionProgress
             return [];
         }
         $sections = $assignments->map(fn ($assignment) => $assignment->section)->filter()->unique('section_ID');
+        $mapehConfigurations = MapehConfiguration::query()
+            ->with(['components.curriculumSubject.subject', 'parentSubject.subject'])
+            ->whereIn('curriculum_grade_level_ID', $sections->pluck('curriculum_grade_level_ID')->filter()->unique())
+            ->whereIn('SY_ID', $sections->pluck('SY_ID')->filter()->unique())
+            ->get()
+            ->keyBy(fn (MapehConfiguration $configuration): string => $configuration->curriculum_grade_level_ID.':'.$configuration->SY_ID);
+        foreach ($sections as $section) {
+            $section->setRelation('mapehConfiguration', $mapehConfigurations->get($section->curriculum_grade_level_ID.':'.$section->SY_ID));
+        }
         $assignments = $assignments->reject(fn ($assignment) => MapehGrades::inputBlocked($assignment));
 
         $roster = DB::table('teacher_subject_assignments as assignments')
@@ -30,7 +40,7 @@ class SectionGradeSubmissionProgress
             })
             ->join('student_subjects as roster', function ($join): void {
                 $join->on('roster.enrollment_ID', '=', 'enrollments.enrollment_ID')
-                    ->on('roster.curr_subj_ID', '=', 'assignments.curr_subj_ID');
+                    ->on('roster.subject_ID', '=', 'assignments.subject_ID');
             })
             ->whereIn('assignments.assignment_ID', $assignments->pluck('assignment_ID'))
             ->whereIn('enrollments.enrollment_status_ID', EnrollmentStatus::activeIds());
@@ -79,8 +89,8 @@ class SectionGradeSubmissionProgress
 
         foreach ($sections as $section) {
             if ($configuration = \App\Models\MapehConfiguration::forSection($section)) {
-                $missing = $configuration->components->pluck('curr_subj_ID')
-                    ->diff($assignments->where('section_ID', $section->section_ID)->pluck('curr_subj_ID'))->count();
+                $missing = $configuration->components->pluck('curriculumSubject.subject_ID')
+                    ->diff($assignments->where('section_ID', $section->section_ID)->pluck('subject_ID'))->count();
                 $progress[$section->section_ID] ??= ['submitted' => 0, 'expected' => 0];
                 $progress[$section->section_ID]['expected'] += $missing;
             }

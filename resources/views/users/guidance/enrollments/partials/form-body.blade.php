@@ -337,11 +337,17 @@
                 </td>
                 <td class="tall">
                     <span class="field-label">Track</span>
-                    <div class="field-value">{{ $fill($enrollment->cluster?->name) }}</div>
+                    <div class="field-value">{{ $fill($enrollment->track?->name ?? $enrollment->cluster?->track?->name) }}</div>
                 </td>
                 <td class="tall">
-                    <span class="field-label">Strand</span>
-                    <div class="field-value">{{ $fill($enrollment->preferredCourse?->name) }}</div>
+                    <span class="field-label">Cluster</span>
+                    <div class="field-value">{{ $fill($enrollment->cluster?->name) }}</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="3" class="tall">
+                    <span class="field-label">Electives</span>
+                    <div class="field-value">{{ $fill($enrollment->electives->pluck('title')->join(', ')) }}</div>
                 </td>
             </tr>
         </table>

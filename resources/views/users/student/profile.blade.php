@@ -363,7 +363,7 @@
                                 <th class="border border-gray-200 px-3 py-3">Section</th>
                                 @if ($showSeniorHighHistoryColumns)
                                     <th class="border border-gray-200 px-3 py-3">Cluster</th>
-                                    <th class="border border-gray-200 px-3 py-3">Preferred Course</th>
+                                    <th class="border border-gray-200 px-3 py-3">Electives</th>
                                 @endif
                                 <th class="border border-gray-200 px-3 py-3">Status</th>
                             </tr>
@@ -376,7 +376,7 @@
                                     <td class="border border-gray-200 px-3 py-2.5">{{ $item->section?->name ?? 'Not assigned' }}</td>
                                     @if ($showSeniorHighHistoryColumns)
                                         <td class="border border-gray-200 px-3 py-2.5">{{ $item->isSeniorHigh() ? ($item->cluster?->name ?? '—') : '—' }}</td>
-                                        <td class="border border-gray-200 px-3 py-2.5">{{ $item->isSeniorHigh() ? ($item->preferredCourse?->name ?? '—') : '—' }}</td>
+                                        <td class="border border-gray-200 px-3 py-2.5">{{ $item->isSeniorHigh() ? ($item->electives->pluck('title')->join(', ') ?: '—') : '—' }}</td>
                                     @endif
                                     <td class="border border-gray-200 px-3 py-2.5">{{ $item->enrollment_status_label ?: '—' }}</td>
                                 </tr>

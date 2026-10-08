@@ -106,7 +106,7 @@ function createPeriodGrade(string $gradeLabel, string $period, ?string $semester
     ]);
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);

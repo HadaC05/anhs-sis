@@ -26,6 +26,7 @@
 </div>
 
 @if (session('show_toast'))
+    @push('toasts')
     <div id="curriculumSuccessToast" role="status" class="fixed right-5 top-5 z-[120] flex w-full max-w-sm items-start gap-3 rounded-lg border border-emerald-200 bg-white p-4 text-sm text-emerald-800 shadow-xl">
         <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"></path></svg>
@@ -35,6 +36,7 @@
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"></path></svg>
         </button>
     </div>
+    @endpush
 @elseif (session('success'))
     <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
         {{ session('success') }}
@@ -294,8 +296,8 @@
                                     <div class="border-t border-cyan-100 bg-white px-5 py-4">
                                         <div class="mb-3 flex items-center justify-between gap-3">
                                             <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Assigned Subjects</p>
-                                            @if ($item->gradeLevel?->category === 'Junior High School')
-                                            <a href="{{ route($managementRoutePrefix.'curriculum-config.mapeh.edit', $item) }}" class="ml-auto rounded-lg border border-[#296374]/30 px-3 py-1.5 text-xs font-bold text-[#296374]">Configure MAPEH</a>
+                                            @if ($assignedSubjects->contains(fn ($offering) => \App\Support\MapehSetup::isParentSubject($offering->subject)))
+                                            <a href="{{ route($managementRoutePrefix.'curriculum-config.mapeh.edit', $item) }}" class="ml-auto rounded-lg border border-[#296374]/30 px-3 py-1.5 text-xs font-bold text-[#296374]">Configure Components</a>
                                             @endif
                                             <button type="button" data-assignments='@json($assignedSubjectsPayload)' data-curriculum-name="{{ $item->name }}" onclick="event.stopPropagation(); openCurriculumSubjectModal(null, {{ $item->curriculum_ID }}, JSON.parse(this.dataset.assignments), this.dataset.curriculumName);" class="relative z-10 rounded-lg border border-[#296374]/30 bg-white px-3 py-1.5 text-xs font-bold text-[#296374] transition hover:bg-[#296374]/5">Edit</button>
                                         </div>

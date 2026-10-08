@@ -6,7 +6,7 @@
 @php
 $gradeLabel = $section->loadMissing('gradeLevel')->getRelation('gradeLevel')?->grade_label
 ?? ($section->grade_level ? str_replace(['grade_', '_'], ['Grade ', ' '], $section->grade_level) : '—');
-$subject = $assignment->curriculumSubject?->subject;
+$subject = $assignment->subject;
 $subjectCode = $subject?->code ?? 'SUBJ';
 $subjectTitle = $subject?->title ?? 'Subject';
 $subjectLabel = $subject ? ($subjectCode.' - '.$subjectTitle) : 'Subject';
@@ -16,7 +16,7 @@ $inputColspan = 3 + 2 * count($inputPeriods);
 $summaryColspan = 5 + count($periods);
 $descriptorBands = \App\Support\Sf9PerformanceScale::forSection($section);
 $gradeReturnReasons = $gradeReturnReasons ?? collect();
-$currentTermLabel = \App\Models\GradingTerm::currentEditablePeriodLabelForSection($section, $assignment->curriculumSubject?->semester);
+$currentTermLabel = \App\Models\GradingTerm::currentEditablePeriodLabelForSection($section, $section->curriculum?->gradingSemester?->key);
 $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorHighSection($section)
     ? \App\Models\GradingTerm::isCurrentSeniorHighPeriodOpen()
     : \App\Models\GradingTerm::isCurrentJuniorHighPeriodOpen());
@@ -112,7 +112,7 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
 
         <div data-grade-panel="input">
             @if (\App\Support\MapehGrades::isComputed($assignment))
-            <div class="border-b border-gray-200 bg-cyan-50 px-6 py-3 text-sm text-[#296374]">MAPEH is now calculated from the configured component subjects. Enter or import grades through each component's grade sheet. Existing standalone records below are retained for reference; the combined results appear in the advisory grade summary and reports.</div>
+            <div class="border-b border-gray-200 bg-cyan-50 px-6 py-3 text-sm text-[#296374]">This subject is calculated from its configured components. Enter or import grades through each component's grade sheet. Existing standalone records below are retained for reference; the combined results appear in the advisory grade summary and reports.</div>
             @endif
             @if (! $canEditCurrentTerm)
             <div class="border-b border-gray-200 bg-slate-50 px-6 py-3 text-sm text-slate-700">

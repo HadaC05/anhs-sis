@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\AcademicYear;
+use App\Models\Curriculum;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
 use App\Models\GradeLevel;
@@ -12,7 +13,6 @@ use App\Models\StudentAddress;
 use App\Models\StudentApplication;
 use App\Models\StudentGuardian;
 use App\Models\StudentProfile;
-use App\Models\Curriculum;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -60,7 +60,7 @@ class StudentEnrollmentRegistrar
                 'section_ID' => null,
                 'SY_ID' => $academicYear->SY_ID,
                 'curriculum_grade_level_ID' => $curriculumGradeLevelId,
-                'course_ID' => $isSeniorHigh ? $validated['course_ID'] : null,
+                'track_ID' => $isSeniorHigh ? $validated['track_ID'] : null,
                 'learner_type' => $validated['learner_type'],
                 'last_grade_level_completed' => $validated['last_grade_level_completed'] ?? null,
                 'last_school_year_completed' => $validated['last_school_year_completed'] ?? null,
@@ -69,12 +69,14 @@ class StudentEnrollmentRegistrar
                 'enrollment_status' => EnrollmentStatus::TEMPORARILY_ENROLLED,
             ]);
 
+            $enrollment->electives()->sync($isSeniorHigh ? $validated['elective_ids'] : []);
+
             $section = VacantSectionAssigner::resolve($enrollment);
             if ($section) {
                 $enrollment->update(['section_ID' => $section->section_ID]);
             }
 
-            StudentSubjectRoster::sync($enrollment);
+            StudentSubjectRoster::sync($enrollment, $validated['elective_ids']);
 
             $studentModel = Student::query()->findOrFail($student->id);
             $enrollment->setRelation('student', $studentModel);
@@ -154,13 +156,15 @@ class StudentEnrollmentRegistrar
 
             $enrollment->update([
                 'curriculum_grade_level_ID' => $curriculumGradeLevelId,
-                'course_ID' => $isSeniorHigh ? ($validated['course_ID'] ?? null) : null,
+                'track_ID' => $isSeniorHigh ? $validated['track_ID'] : null,
                 'learner_type' => $validated['learner_type'],
                 'last_grade_level_completed' => $validated['last_grade_level_completed'] ?? null,
                 'last_school_year_completed' => $validated['last_school_year_completed'] ?? null,
                 'last_school_attended' => $validated['last_school_attended'] ?? null,
                 'school_id_from_previous_school' => $validated['school_id_from_previous_school'] ?? null,
             ]);
+
+            $enrollment->electives()->sync($isSeniorHigh ? $validated['elective_ids'] : []);
 
             $curriculumGradeLevelChanged = $previousCurriculumGradeLevelId !== $curriculumGradeLevelId;
             $section = $enrollment->section;
@@ -178,9 +182,7 @@ class StudentEnrollmentRegistrar
                 $enrollment->update(['section_ID' => $assigned?->section_ID]);
             }
 
-            if ($curriculumGradeLevelChanged) {
-                StudentSubjectRoster::sync($enrollment->fresh() ?? $enrollment);
-            }
+            StudentSubjectRoster::sync($enrollment->fresh() ?? $enrollment, $validated['elective_ids']);
 
             self::syncRelatedRecords($student->id, $validated);
 

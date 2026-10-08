@@ -35,14 +35,18 @@
             @endif
             @if($enrollment->cluster || $enrollment->isSeniorHigh())
             <div>
+                <label class="{{ $labelClass }}">Track</label>
+                <div class="{{ $valueClass }}">{{ $display($enrollment->track?->name ?? $enrollment->cluster?->track?->name) }}</div>
+            </div>
+            <div>
                 <label class="{{ $labelClass }}">Cluster</label>
                 <div class="{{ $valueClass }}">{{ $display($enrollment->cluster?->name) }}</div>
             </div>
             @endif
-            @if($enrollment->preferredCourse || $enrollment->isSeniorHigh())
+            @if($enrollment->electives->isNotEmpty() || $enrollment->isSeniorHigh())
             <div>
-                <label class="{{ $labelClass }}">Preferred Course</label>
-                <div class="{{ $valueClass }}">{{ $display($enrollment->preferredCourse?->name) }}</div>
+                <label class="{{ $labelClass }}">Electives</label>
+                <div class="{{ $valueClass }}">{{ $display($enrollment->electives->pluck('title')->join(', ')) }}</div>
             </div>
             @endif
             <div>

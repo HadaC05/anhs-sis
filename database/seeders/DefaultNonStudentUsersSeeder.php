@@ -69,7 +69,7 @@ class DefaultNonStudentUsersSeeder extends Seeder
     {
         $usernames = [];
 
-        foreach (self::GRADE_LEVELS as $gradeLevel) {
+        foreach (array_keys(CurriculumSeeder::JUNIOR_HIGH_NAMES) as $gradeLevel) {
             foreach (self::SECTION_LETTERS as $letter) {
                 $usernames[self::sectionNameFor($gradeLevel, $letter)] = self::teacherUsernameFor($gradeLevel, $letter);
             }
@@ -83,21 +83,21 @@ class DefaultNonStudentUsersSeeder extends Seeder
     }
 
     /**
-     * The default SHS section for every grade, cluster, and semester.
+     * One default SHS section for every grade, cluster, and semester offering.
      *
-     * @return list<array{name: string, grade_level: string, track: string, semester: 'first'|'second'}>
+     * @return list<array{name: string, grade_level: string, cluster: string, semester: 'first'|'second'}>
      */
     public static function seniorHighSectionDefinitions(): array
     {
         $sections = [];
 
         foreach ([11, 12] as $grade) {
-            foreach (CurriculumSeeder::SENIOR_HIGH_TRACKS as $track) {
+            foreach (CurriculumSeeder::SENIOR_HIGH_CLUSTERS as $cluster) {
                 foreach (['first', 'second'] as $semester) {
                     $sections[] = [
-                        'name' => self::seniorHighSectionName($grade, $track, $semester),
+                        'name' => self::seniorHighSectionName($grade, $cluster, $semester),
                         'grade_level' => 'grade_'.$grade,
-                        'track' => $track,
+                        'cluster' => $cluster,
                         'semester' => $semester,
                     ];
                 }
@@ -107,20 +107,20 @@ class DefaultNonStudentUsersSeeder extends Seeder
         return $sections;
     }
 
-    /** @param array{name: string, grade_level: string, track: string, semester: string} $section */
+    /** @param array{name: string, grade_level: string, cluster: string, semester: string} $section */
     public static function seniorHighTeacherUsername(array $section): string
     {
         return 'teacher_'.strtolower(str_replace('-', '_', $section['name']));
     }
 
-    public static function seniorHighSectionName(int $grade, string $track, string $semester): string
+    public static function seniorHighSectionName(int $grade, string $cluster, string $semester): string
     {
-        return sprintf('G%d-%s-%s', $grade, self::clusterCode($track), $semester === 'first' ? '1ST' : '2ND');
+        return sprintf('G%d-%s-%s', $grade, self::clusterCode($cluster), $semester === 'first' ? '1ST' : '2ND');
     }
 
     private function seedSectionTeachers(Role $role): void
     {
-        foreach (self::GRADE_LEVELS as $gradeLevel) {
+        foreach (array_keys(CurriculumSeeder::JUNIOR_HIGH_NAMES) as $gradeLevel) {
             $grade = (int) str_replace('grade_', '', $gradeLevel);
 
             foreach (self::SECTION_LETTERS as $letter) {
@@ -286,7 +286,7 @@ class DefaultNonStudentUsersSeeder extends Seeder
     }
 
     /**
-     * @param  array{name: string, grade_level: string, track: string, semester: string}  $section
+     * @param  array{name: string, grade_level: string, cluster: string, semester: string}  $section
      * @return array<string, mixed>
      */
     private function dummyProfileForSeniorHighSection(array $section, int $index): array
@@ -305,7 +305,7 @@ class DefaultNonStudentUsersSeeder extends Seeder
             'appointment_status' => 'permanent',
             'fund_source' => 'government',
             'degree_earned' => 'Bachelor of Secondary Education',
-            'major_specialization' => $section['track'].' ('.ucfirst($section['semester']).' Semester)',
+            'major_specialization' => $section['cluster'].' ('.ucfirst($section['semester']).' Semester)',
             'teaching_minutes' => 1080,
             'employee_no' => 'EMP-TEACHER-'.$employeeSuffix,
             'plantilla_item_no' => 'PLN-TEACHER-'.$employeeSuffix,

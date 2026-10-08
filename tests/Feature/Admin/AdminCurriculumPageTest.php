@@ -41,7 +41,7 @@ function createCurriculumPageFixtures(string $username): array
         'cluster_ID' => $cluster->cluster_ID,
         'code' => 'PRECAL11',
         'title' => 'Pre-Calculus',
-        'type' => 'specialized',
+        'type' => 'elective',
         'status' => 'active',
     ]);
 
@@ -79,6 +79,23 @@ test('admin can view the restyled curriculum page', function () {
     $response->assertDontSee('Curriculum Configuration');
     $response->assertSee('>Edit</button>', false);
     $response->assertDontSee('>Archive</button>', false);
+});
+
+test('principal curriculum success toast renders above the top bar stacking context', function () {
+    ['admin' => $principal] = createCurriculumPageFixtures('principal.curriculum.toast');
+    $principal->update([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'principal'])->id,
+    ]);
+
+    $response = $this->actingAs($principal)
+        ->withSession(['show_toast' => true])
+        ->get(route('principal.curriculum-config.index'));
+
+    $response->assertOk()->assertSee('id="curriculumSuccessToast"', false);
+    $html = $response->getContent();
+
+    expect(strpos($html, 'id="curriculumSuccessToast"'))
+        ->toBeGreaterThan(strpos($html, '</main>'));
 });
 
 test('admin can view curriculum subjects on the restyled page', function () {

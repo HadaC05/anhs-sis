@@ -25,7 +25,7 @@ class TeacherDashboardController extends Controller
                 ->withoutMapehParents()
                 ->where('staff_ID', $staff->staff_id)
                 ->where('SY_ID', $activeYear->SY_ID)
-                ->with(['section', 'curriculumSubject.subject'])
+                ->with(['section.curriculum.gradingSemester', 'subject'])
                 ->withGradeStatusCounts()
                 ->orderBy('section_ID')->orderBy('assignment_ID')->get()
             : collect();

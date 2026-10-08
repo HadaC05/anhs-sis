@@ -301,7 +301,7 @@ test('student grade notices wait for every subject and are sent once per period'
     \App\Support\StudentSubjectRoster::sync($enrollment);
     $second = TeacherSubjectAssignment::query()->create([
         'section_ID' => $assignment->section_ID,
-        'curr_subj_ID' => $curriculumSubject->getKey(),
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $assignment->staff_ID,
         'SY_ID' => $assignment->SY_ID,
     ]);
@@ -310,7 +310,7 @@ test('student grade notices wait for every subject and are sent once per period'
     expect($student->notifications()->count())->toBe(0);
 
     $grade = StudentSubjectGrade::query()->create([
-        'student_subject_ID' => $enrollment->studentSubjects()->where('curr_subj_ID', $curriculumSubject->getKey())->firstOrFail()->getKey(),
+        'student_subject_ID' => $enrollment->studentSubjects()->where('subject_ID', $curriculumSubject->subject_ID)->firstOrFail()->getKey(),
         'assignment_ID' => $second->getKey(),
         'term_ID' => $firstGrade->term_ID,
         'numeric_grade' => 85,
@@ -718,7 +718,7 @@ function createInAppNotificationGradeAssignment(string $gradeStatus): array
     ]);
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);

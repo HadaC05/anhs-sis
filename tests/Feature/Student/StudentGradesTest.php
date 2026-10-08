@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
@@ -103,7 +104,7 @@ function createStudentGradesFixtures(bool $withReleasedGrade = true): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -153,6 +154,53 @@ test('student grades page shows session filter and released grades table', funct
     $response->assertSee('Subject Type');
     $response->assertSee('Final Grade');
     $response->assertSee('PASSED');
+});
+
+test('student grades page includes the learners elective and excludes electives selected only by classmates', function () {
+    $fixtures = createStudentGradesFixtures(withReleasedGrade: false);
+
+    $selectedElective = Subject::query()->create([
+        'cluster_ID' => $fixtures['enrollment']->cluster_ID,
+        'code' => 'ELEC-OWN',
+        'title' => 'Selected Elective',
+        'type' => 'elective',
+        'status' => 'active',
+    ]);
+    $otherElective = Subject::query()->create([
+        'cluster_ID' => $fixtures['enrollment']->cluster_ID,
+        'code' => 'ELEC-OTHER',
+        'title' => 'Classmate Elective',
+        'type' => 'elective',
+        'status' => 'active',
+    ]);
+
+    foreach ([$selectedElective, $otherElective] as $subject) {
+        $offering = CurriculumSubject::query()->create([
+            'curriculum_grade_level_ID' => $fixtures['enrollment']->curriculum_grade_level_ID,
+            'subject_ID' => $subject->subject_ID,
+        ]);
+
+        TeacherSubjectAssignment::query()->create([
+            'section_ID' => $fixtures['section']->section_ID,
+            'subject_ID' => $offering->subject_ID,
+            'staff_ID' => null,
+            'SY_ID' => $fixtures['academicYear']->SY_ID,
+        ]);
+
+        if ($subject->is($selectedElective)) {
+            StudentSubject::query()->create([
+                'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+                'subject_ID' => $offering->subject_ID,
+            ]);
+        }
+    }
+
+    $this->actingAs($fixtures['student'])->get(route('student.grades'))
+        ->assertOk()
+        ->assertSee('ELEC-OWN')
+        ->assertSee('Selected Elective')
+        ->assertDontSee('ELEC-OTHER')
+        ->assertDontSee('Classmate Elective');
 });
 
 test('student grade report shows released grades and supports printing', function () {

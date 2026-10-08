@@ -47,7 +47,7 @@ class TeacherAssignmentController extends Controller
 
         $assignments = TeacherSubjectAssignment::query()
             ->withoutMapehParents()
-            ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff.role'])
+            ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'section.curriculum.gradingSemester', 'subject', 'staff.role'])
             ->withCount([
                 'grades as locked_grades_count' => function ($query): void {
                     $query->whereStatus([GradeStatus::SUBMITTED, GradeStatus::APPROVED]);
@@ -56,7 +56,7 @@ class TeacherAssignmentController extends Controller
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->whereHas('section', fn ($q) => $q->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('curriculumSubject.subject', function ($q) use ($search): void {
+                        ->orWhereHas('subject', function ($q) use ($search): void {
                             $q->where('title', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%");
                         })
@@ -112,11 +112,11 @@ class TeacherAssignmentController extends Controller
 
         $subjectAssignmentRows = TeacherSubjectAssignment::query()
             ->withoutMapehParents()
-            ->with(['section.gradeLevel', 'section.academicYear', 'curriculumSubject.subject', 'staff'])
+            ->with(['section.gradeLevel', 'section.academicYear', 'section.curriculum.gradingSemester', 'subject', 'staff'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->whereHas('section', fn ($q) => $q->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('curriculumSubject.subject', fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                        ->orWhereHas('subject', fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
                         ->orWhereHas('staff', fn ($q) => $q->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
                 });
             })
@@ -124,7 +124,7 @@ class TeacherAssignmentController extends Controller
             ->when($clusterId !== '', fn ($q) => $q->whereHas('section', fn ($s) => $s->where('cluster_ID', $clusterId)))
             ->when($schoolYearId !== '', fn ($q) => $q->where('SY_ID', $schoolYearId))
             ->get()
-            ->groupBy('curr_subj_ID');
+            ->groupBy('subject_ID');
 
         $mapehExcludedBySection = $sections->mapWithKeys(function ($section): array {
             $config = \App\Models\MapehConfiguration::forSection($section);
@@ -136,13 +136,13 @@ class TeacherAssignmentController extends Controller
             ->pluck('parent_curr_subj_ID');
         $subjectRows = $curriculumSubjects
             ->reject(fn ($subject) => $configuredParents->contains($subject->curr_subj_ID)
-                && $subjectAssignmentRows->get($subject->curr_subj_ID, collect())->isEmpty())
+                && $subjectAssignmentRows->get($subject->subject_ID, collect())->isEmpty())
             ->when($gradeLevel !== '', fn ($items) => $items->where('grade_ID', $gradeId))
             ->when($clusterId !== '', fn ($items) => $items->where('cluster_ID', $clusterId))
             ->groupBy('subject_ID')
             ->map(function ($subjectCurriculumRows) use ($subjectAssignmentRows, $search) {
                 $allAssignments = $subjectCurriculumRows
-                    ->flatMap(fn ($row) => $subjectAssignmentRows->get($row->curr_subj_ID, collect()));
+                    ->flatMap(fn ($row) => $subjectAssignmentRows->get($row->subject_ID, collect()));
                 $subject = $subjectCurriculumRows->first()->subject;
 
                 return (object) [
@@ -152,6 +152,23 @@ class TeacherAssignmentController extends Controller
                 ];
             })
             ->filter(fn ($row) => $row->matches_search)
+            ->values();
+
+        $knownSubjectIds = $subjectRows->pluck('subject.subject_ID');
+        $electiveRows = $subjectAssignmentRows
+            ->reject(fn ($rows, $subjectId) => $knownSubjectIds->contains((int) $subjectId))
+            ->map(function ($rows) use ($search) {
+                $subject = $rows->first()?->subject;
+
+                return (object) [
+                    'subject' => $subject,
+                    'assignments' => $rows,
+                    'matches_search' => $search === '' || str_contains(strtolower(($subject?->code ?? '').' '.($subject?->title ?? '')), strtolower($search)),
+                ];
+            })
+            ->filter(fn ($row) => $row->subject?->type === 'elective' && $row->matches_search);
+
+        $subjectRows = $subjectRows->concat($electiveRows)
             ->sortBy(fn ($row) => $row->subject?->code ?? '')
             ->values();
 
@@ -213,7 +230,7 @@ class TeacherAssignmentController extends Controller
             AcademicYear::query()->whereKey($data['target_SY_ID'])->lockForUpdate()->firstOrFail();
 
             $sources = TeacherSubjectAssignment::query()
-                ->with(['section', 'curriculumSubject.curriculumGradeLevel', 'staff.role'])
+                ->with(['section', 'subject', 'staff.role'])
                 ->where('SY_ID', $data['source_SY_ID'])
                 ->whereHas('section', function ($query) use ($data): void {
                     $query->where('SY_ID', $data['source_SY_ID'])
@@ -238,15 +255,21 @@ class TeacherAssignmentController extends Controller
                     ->where('curriculum_grade_level_ID', $source->section->curriculum_grade_level_ID)
                     ->first();
 
-                if (! $destination || ! $source->curriculumSubject ||
-                    ! $this->curriculumSubjectMatchesSection($destination, $source->curriculumSubject)) {
+                $destinationOffering = $destination ? CurriculumSubject::query()
+                    ->where('curriculum_grade_level_ID', $destination->curriculum_grade_level_ID)
+                    ->where('subject_ID', $source->subject_ID)
+                    ->first() : null;
+
+                if (! $destination || ($destinationOffering
+                    ? ! $this->curriculumSubjectMatchesSection($destination, $destinationOffering)
+                    : $source->subject?->type !== 'elective')) {
                     $counts['section']++;
 
                     continue;
                 }
 
                 if (TeacherSubjectAssignment::query()->where('section_ID', $destination->section_ID)
-                    ->where('curr_subj_ID', $source->curr_subj_ID)->exists()) {
+                    ->where('subject_ID', $source->subject_ID)->exists()) {
                     $counts['existing']++;
 
                     continue;
@@ -260,7 +283,7 @@ class TeacherAssignmentController extends Controller
 
                 TeacherSubjectAssignment::query()->create([
                     'section_ID' => $destination->section_ID,
-                    'curr_subj_ID' => $source->curr_subj_ID,
+                    'subject_ID' => $source->subject_ID,
                     'staff_ID' => $source->staff_ID,
                     'SY_ID' => $data['target_SY_ID'],
                 ]);
@@ -317,7 +340,7 @@ class TeacherAssignmentController extends Controller
         TeacherSubjectAssignment::query()->updateOrCreate(
             [
                 'section_ID' => $section->section_ID,
-                'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+                'subject_ID' => $curriculumSubject->subject_ID,
             ],
             [
                 'staff_ID' => $validated['staff_ID'],
@@ -399,7 +422,7 @@ class TeacherAssignmentController extends Controller
                 TeacherSubjectAssignment::query()->updateOrCreate(
                     [
                         'section_ID' => $section->section_ID,
-                        'curr_subj_ID' => $subject->curr_subj_ID,
+                        'subject_ID' => $subject->subject_ID,
                     ],
                     [
                         'staff_ID' => $teacher->staff_id,

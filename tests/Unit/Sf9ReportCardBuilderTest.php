@@ -6,11 +6,13 @@ use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
+use App\Models\MapehConfiguration;
 use App\Models\PreferredCourse;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentSubject;
 use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
@@ -20,40 +22,48 @@ use Illuminate\Support\Facades\Hash;
 
 uses(RefreshDatabase::class);
 
-it('maps senior high subjects onto the official learning areas and averages term grades', function () {
+it('lists the enlisted senior high subjects by type and averages term grades', function () {
     $fixtures = createSf9BuilderFixtures();
+    $firstStudentSubject = StudentSubject::query()->where([
+        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'subject_ID' => $fixtures['firstAssignment']->subject_ID,
+    ])->firstOrFail();
+    $secondStudentSubject = StudentSubject::query()->where([
+        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'subject_ID' => $fixtures['secondAssignment']->subject_ID,
+    ])->firstOrFail();
 
     StudentSubjectGrade::query()->create([
-        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'student_subject_ID' => $firstStudentSubject->student_subject_ID,
         'assignment_ID' => $fixtures['firstAssignment']->assignment_ID,
-        'grading_period' => 'term_1',
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey('term_1'),
         'numeric_grade' => 90,
         'posted_by' => $fixtures['teacher']->staff_id,
     ]);
     StudentSubjectGrade::query()->create([
-        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'student_subject_ID' => $firstStudentSubject->student_subject_ID,
         'assignment_ID' => $fixtures['firstAssignment']->assignment_ID,
-        'grading_period' => 'term_2',
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey('term_2'),
         'numeric_grade' => 88,
         'posted_by' => $fixtures['teacher']->staff_id,
     ]);
     StudentSubjectGrade::query()->create([
-        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'student_subject_ID' => $secondStudentSubject->student_subject_ID,
         'assignment_ID' => $fixtures['secondAssignment']->assignment_ID,
-        'grading_period' => 'term_1',
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey('term_1'),
         'numeric_grade' => 80,
         'posted_by' => $fixtures['teacher']->staff_id,
     ]);
     StudentSubjectGrade::query()->create([
-        'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+        'student_subject_ID' => $secondStudentSubject->student_subject_ID,
         'assignment_ID' => $fixtures['secondAssignment']->assignment_ID,
-        'grading_period' => 'term_2',
+        'term_ID' => StudentSubjectGrade::termIdForPeriodKey('term_2'),
         'numeric_grade' => 82,
         'posted_by' => $fixtures['teacher']->staff_id,
     ]);
 
     $grades = StudentSubjectGrade::query()
-        ->where('enrollment_ID', $fixtures['enrollment']->enrollment_ID)
+        ->whereIn('student_subject_ID', [$firstStudentSubject->student_subject_ID, $secondStudentSubject->student_subject_ID])
         ->get()
         ->groupBy('assignment_ID')
         ->map(fn ($assignmentGrades) => $assignmentGrades->keyBy('grading_period'));
@@ -61,7 +71,7 @@ it('maps senior high subjects onto the official learning areas and averages term
     $card = Sf9ReportCardBuilder::buildCard(
         $fixtures['enrollment']->load(['student', 'cluster', 'preferredCourse']),
         $fixtures['section']->load(['academicYear', 'cluster', 'gradeLevel', 'adviser', 'curriculum']),
-        collect([$fixtures['firstAssignment']->load('curriculumSubject.subject'), $fixtures['secondAssignment']->load('curriculumSubject.subject')]),
+        collect([$fixtures['firstAssignment']->load('subject'), $fixtures['secondAssignment']->load('subject')]),
         $grades,
         collect(),
         [['key' => 'term_1', 'label' => 'Term 1'], ['key' => 'term_2', 'label' => 'Term 2']],
@@ -72,38 +82,111 @@ it('maps senior high subjects onto the official learning areas and averages term
     expect($card['is_senior_high'])->toBeTrue()
         ->and($card['shs_track'])->toBe('ACADEMIC')
         ->and($card['signature_labels'])->toBe(['Term 1', 'Term 2', 'Term 3'])
-        ->and($rows['effective_communication']['label'])->toBe('Effective Communication')
-        ->and($rows['effective_communication']['terms']['term_1'])->toBe(90)
-        ->and($rows['effective_communication']['terms']['term_2'])->toBe(88)
-        ->and($rows['effective_communication']['final'])->toBe(89)
-        ->and($rows['effective_communication_group']['final'])->toBe(89)
-        ->and($rows['elective_1']['label'])->toBe('Pre-Calculus')
-        ->and($rows['elective_1']['terms']['term_1'])->toBe(80)
-        ->and($rows['elective_1']['final'])->toBe(81)
+        ->and($rows['core_0']['label'])->toBe('Oral Communication')
+        ->and($rows['core_0']['terms']['term_1'])->toBe(90)
+        ->and($rows['core_0']['terms']['term_2'])->toBe(88)
+        ->and($rows['core_0']['final'])->toBe(89)
+        ->and($rows['elective_0']['label'])->toBe('Pre-Calculus')
+        ->and($rows['elective_0']['terms']['term_1'])->toBe(80)
+        ->and($rows['elective_0']['final'])->toBe(81)
         ->and($card['general_average'])->toBe(85)
         ->and($card['general_remarks'])->toBe('Passed')
-        ->and(collect($card['subjects'])->pluck('label'))->toContain('Core Subjects', 'Elective Subjects', 'Academic Elective 2')
+        ->and(collect($card['subjects'])->pluck('label'))->toContain('Core Subjects', 'Elective Subjects')
+        ->not->toContain('Academic Elective 1', 'Mabisang Komunikasyon')
         ->and($card['first_semester']['core'])->toBe([]);
 });
 
-it('labels techpro tracks and uses the techpro elective rows', function () {
+it('labels techpro tracks without adding non-enlisted elective rows', function () {
     $fixtures = createSf9BuilderFixtures();
-    $fixtures['enrollment']->cluster->update(['name' => 'TVL Track - ICT']);
-    $fixtures['enrollment']->load(['student', 'cluster', 'preferredCourse']);
+    $track = \App\Models\Track::query()->firstOrCreate(['name' => 'Technical Professional Track']);
+    $fixtures['enrollment']->update(['track_ID' => $track->track_ID]);
+    $fixtures['enrollment']->load(['student', 'track', 'cluster', 'preferredCourse']);
 
     $card = Sf9ReportCardBuilder::buildCard(
         $fixtures['enrollment'],
         $fixtures['section']->load(['academicYear', 'cluster', 'gradeLevel', 'adviser', 'curriculum']),
-        collect([$fixtures['firstAssignment']->load('curriculumSubject.subject')]),
+        collect([$fixtures['firstAssignment']->load('subject')]),
         collect(),
         collect(),
         [['key' => 'term_1', 'label' => 'Term 1']],
     );
 
     expect($card['shs_track'])->toBe('TECHPRO')
-        ->and(collect($card['subjects'])->pluck('label')->all())->toContain('Academic Elective 1')
-        ->and(collect($card['subjects'])->pluck('label')->all())->not->toContain('Academic Elective 2')
-        ->and(collect($card['subjects'])->pluck('label')->all())->not->toContain('Academic Elective 3');
+        ->and(collect($card['subjects'])->pluck('label')->all())->toContain('Oral Communication')
+        ->and(collect($card['subjects'])->pluck('label')->all())->not->toContain('Academic Elective 1', 'Academic Elective 2', 'Academic Elective 3');
+});
+
+it('combines the two effective communication components into one senior high final grade', function () {
+    $fixtures = createSf9BuilderFixtures();
+    $parentOffering = $fixtures['firstAssignment']->curriculumSubject;
+    $parentOffering->subject->update([
+        'code' => 'EFFCOM',
+        'title' => 'Effective Communication & Mabisang Communication',
+        'school_level' => 'Senior High School',
+    ]);
+
+    $configuration = MapehConfiguration::query()->create([
+        'curriculum_grade_level_ID' => $fixtures['section']->curriculum_grade_level_ID,
+        'SY_ID' => $fixtures['section']->SY_ID,
+        'parent_curr_subj_ID' => $parentOffering->curr_subj_ID,
+        'mode' => 'paired',
+    ]);
+    $assignments = collect();
+    $grades = collect();
+
+    foreach ([
+        'effective_communication' => ['EFFCOM-ENG', 'Effective Communication', 88],
+        'mabisang_communication' => ['EFFCOM-FIL', 'Mabisang Communication', 92],
+    ] as $key => [$code, $title, $grade]) {
+        $subject = Subject::query()->create([
+            'code' => $code,
+            'title' => $title,
+            'school_level' => 'Senior High School',
+            'type' => 'core',
+            'status' => 'active',
+        ]);
+        $offering = CurriculumSubject::query()->create([
+            'curriculum_ID' => $fixtures['section']->curriculum_grade_level_ID,
+            'subject_ID' => $subject->subject_ID,
+            'grade_level' => 'grade_11',
+            'semester' => 'first',
+        ]);
+        $configuration->components()->create(['key' => $key, 'curr_subj_ID' => $offering->curr_subj_ID]);
+        StudentSubject::query()->create([
+            'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
+            'subject_ID' => $offering->subject_ID,
+        ]);
+        $assignment = TeacherSubjectAssignment::query()->create([
+            'section_ID' => $fixtures['section']->section_ID,
+            'subject_ID' => $offering->subject_ID,
+            'staff_ID' => $fixtures['teacher']->staff_id,
+            'SY_ID' => $fixtures['section']->SY_ID,
+        ]);
+        $assignments->push($assignment->load('subject'));
+        $grades->put($assignment->assignment_ID, collect([
+            'term_1' => (object) ['numeric_grade' => $grade, 'status' => 'approved'],
+        ]));
+    }
+
+    $card = Sf9ReportCardBuilder::buildCard(
+        $fixtures['enrollment']->load(['student', 'studentSubjects']),
+        $fixtures['section']->fresh()->load(['academicYear', 'cluster', 'gradeLevel', 'adviser', 'curriculum']),
+        $assignments,
+        $grades,
+        collect(),
+        [['key' => 'term_1', 'label' => 'Term 1']],
+    );
+    $rows = collect($card['subjects'])->reject(fn (array $row) => $row['category'] ?? false)->values();
+
+    expect($rows[0]['label'])->toBe('Effective Communication & Mabisang Communication')
+        ->and($rows[0]['terms']['term_1'])->toBe(90)
+        ->and($rows[0]['final'])->toBe(90)
+        ->and($rows[0]['child'])->toBeFalse()
+        ->and($rows[1]['label'])->toBe('Effective Communication')
+        ->and($rows[1]['child'])->toBeTrue()
+        ->and($rows[2]['label'])->toBe('Mabisang Communication')
+        ->and($rows[2]['child'])->toBeTrue()
+        ->and($card['general_average'])->toBe(90);
 });
 
 it('keeps junior high report cards on the official learning areas', function () {
@@ -112,7 +195,7 @@ it('keeps junior high report cards on the official learning areas', function () 
     $card = Sf9ReportCardBuilder::buildCard(
         $fixtures['enrollment']->load(['student']),
         $fixtures['section']->load(['academicYear', 'cluster', 'gradeLevel', 'adviser', 'curriculum']),
-        collect([$fixtures['firstAssignment']->load('curriculumSubject.subject')]),
+        collect([$fixtures['firstAssignment']->load('subject')]),
         collect(),
         collect(),
         [['key' => 'term_1', 'label' => 'Term 1']],
@@ -199,7 +282,7 @@ function createSf9BuilderFixtures(bool $isSeniorHigh = true): array
 
     $firstAssignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $coreCurriculumSubject->curr_subj_ID,
+        'subject_ID' => $coreCurriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -211,7 +294,7 @@ function createSf9BuilderFixtures(bool $isSeniorHigh = true): array
             'cluster_ID' => $cluster->cluster_ID,
             'code' => 'PRECALC',
             'title' => 'Pre-Calculus',
-            'type' => 'specialized',
+            'type' => 'elective',
             'status' => 'active',
         ]);
 
@@ -225,7 +308,7 @@ function createSf9BuilderFixtures(bool $isSeniorHigh = true): array
 
         $secondAssignment = TeacherSubjectAssignment::query()->create([
             'section_ID' => $section->section_ID,
-            'curr_subj_ID' => $specializedCurriculumSubject->curr_subj_ID,
+            'subject_ID' => $specializedCurriculumSubject->subject_ID,
             'staff_ID' => $teacher->staff_id,
             'SY_ID' => $academicYear->SY_ID,
         ]);
@@ -267,10 +350,10 @@ it('includes additional senior high terms in report averages columns and observa
     $card = Sf9ReportCardBuilder::buildCard(
         $fixtures['enrollment']->load(['student', 'cluster', 'preferredCourse']),
         $fixtures['section']->load(['academicYear', 'cluster', 'gradeLevel', 'adviser', 'curriculum']),
-        collect([$assignment->load('curriculumSubject.subject')]),
+        collect([$assignment->load('subject')]),
         $grades, collect(), \App\Models\GradingTerm::seniorHighPeriods(),
     );
-    $row = collect($card['subjects'])->firstWhere('slot', 'effective_communication');
+    $row = collect($card['subjects'])->firstWhere('slot', 'core_0');
     expect($row['terms']['term_4'])->toBe(100)->and($row['final'])->toBe(90)
         ->and(count($card['senior_high_terms']))->toBe(4)
         ->and(count($card['observed_periods']))->toBe(8)
@@ -294,7 +377,7 @@ it('rejects reducing senior high maximum when an excluded term has saved grades'
     $assignment = $fixtures['firstAssignment'];
     $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
     $grade = StudentSubjectGrade::query()->create([
         'student_subject_ID' => $studentSubject->student_subject_ID,
@@ -320,7 +403,7 @@ it('separates existing senior high grade references without changing saved grade
     $juniorTerm = \App\Models\GradingTerm::query()->juniorHigh()->where('key', 'term_1')->firstOrFail();
     $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $fixtures['enrollment']->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
     $grade = StudentSubjectGrade::query()->create([
         'student_subject_ID' => $studentSubject->student_subject_ID,

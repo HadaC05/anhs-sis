@@ -85,7 +85,7 @@ function createAdvisorySf9Fixtures(bool $isSeniorHigh = true): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -95,7 +95,7 @@ function createAdvisorySf9Fixtures(bool $isSeniorHigh = true): array
             'cluster_ID' => $cluster->cluster_ID,
             'code' => 'PRECALC',
             'title' => 'Pre-Calculus',
-            'type' => 'specialized',
+            'type' => 'elective',
             'status' => 'active',
         ]);
 
@@ -109,7 +109,7 @@ function createAdvisorySf9Fixtures(bool $isSeniorHigh = true): array
 
         TeacherSubjectAssignment::query()->create([
             'section_ID' => $section->section_ID,
-            'curr_subj_ID' => $specializedCurriculumSubject->curr_subj_ID,
+            'subject_ID' => $specializedCurriculumSubject->subject_ID,
             'staff_ID' => $teacher->staff_id,
             'SY_ID' => $academicYear->SY_ID,
         ]);
@@ -139,7 +139,7 @@ function createAdvisorySf9Fixtures(bool $isSeniorHigh = true): array
 
     $studentSubject = StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
     ]);
 
     StudentSubjectGrade::query()->create([
@@ -223,16 +223,14 @@ test('advisory teacher can print the senior high sf9 performance report layout',
     $response->assertSee('Learning Areas');
     $response->assertSee('Core Subjects');
     $response->assertSee('Elective Subjects');
-    $response->assertSee('Effective Communication');
-    $response->assertSee('Mabisang Komunikasyon');
-    $response->assertSee('General Mathematics');
+    $response->assertSee('Oral Communication');
     $response->assertSee('Pre-Calculus');
     $response->assertSee('Final Grade');
     $response->assertSee('General Average');
     $response->assertSee('Performance Descriptors');
     $response->assertSee('Advancing');
     $response->assertSee('Benchmarking');
-    $response->assertSee("Teacher's Comments/ Remarks", false);
+    $response->assertSee("Teacher's Comments / Remarks", false);
     $response->assertSee('Track (SHS only):');
     $response->assertSee('ACADEMIC');
     $response->assertSee('Term 1');
@@ -245,6 +243,8 @@ test('advisory teacher can print the senior high sf9 performance report layout',
     $response->assertDontSee('First Semester');
     $response->assertDontSee('Semester Final Grade');
     $response->assertDontSee('Applied and Specialized Subjects');
+    $response->assertDontSee('Mabisang Komunikasyon');
+    $response->assertDontSee('Academic Elective 1');
     $response->assertDontSee('Track / Strand');
     $response->assertDontSee("Report on Learner's Observed Values", false);
     $response->assertDontSee('>MAPEH</td>', false);
@@ -267,7 +267,7 @@ test('configured updated junior high SF9 is used for teacher and academic record
 test('updated junior high selection does not change senior high SF9', function () {
     ['teacher' => $teacher, 'section' => $section] = createAdvisorySf9Fixtures(isSeniorHigh: true);
     \App\Models\Sf9Configuration::create(['junior_high' => 'jhs_2026', 'senior_high' => 'shs_current']);
-    $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section))->assertOk()->assertSee('Life')->assertDontSee('GMRC / Values Education');
+    $this->actingAs($teacher)->get(route('teacher.advisory.sf9', $section))->assertOk()->assertSee('Oral Communication')->assertDontSee('GMRC / Values Education');
 });
 
 test('new SF9 replaces observed values with persisted term comments and preserves both when switching formats', function () {

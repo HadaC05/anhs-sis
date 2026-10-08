@@ -43,7 +43,7 @@
                         <tbody class="divide-y divide-white/20">
                             @forelse($grades as $grade)
                                 @php
-                                    $subject = $grade->assignment?->curriculumSubject?->subject?->title ?? '—';
+                                    $subject = $grade->assignment?->subject?->title ?? '—';
                                     $teacher = $grade->assignment?->staff;
                                     $teacherName = $teacher
                                         ? ($teacher->last_name . ', ' . $teacher->first_name)

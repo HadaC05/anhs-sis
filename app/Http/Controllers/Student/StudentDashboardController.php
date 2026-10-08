@@ -42,7 +42,7 @@ class StudentDashboardController extends Controller
 
         if ($student && $activeYear) {
             $currentEnrollment = Enrollment::query()
-                ->with(['section.gradeLevel', 'gradeLevel', 'cluster', 'preferredCourse', 'academicYear', 'enrollmentStatus', 'placementStatus'])
+                ->with(['section.gradeLevel', 'gradeLevel', 'cluster.track', 'track', 'electives', 'academicYear', 'enrollmentStatus', 'placementStatus'])
                 ->where('student_ID', $student->id)
                 ->where('SY_ID', $activeYear->SY_ID)
                 ->latest('created_at')
@@ -67,7 +67,7 @@ class StudentDashboardController extends Controller
             'guardians',
             'addresses',
             'enrollments' => function ($query) {
-                $query->with(['section.gradeLevel', 'gradeLevel', 'cluster', 'preferredCourse', 'academicYear', 'enrollmentStatus'])
+                $query->with(['section.gradeLevel', 'gradeLevel', 'cluster.track', 'track', 'electives', 'academicYear', 'enrollmentStatus'])
                     ->latest('created_at');
             },
         ]);
@@ -176,7 +176,7 @@ class StudentDashboardController extends Controller
 
         if ($student && $activeYear) {
             $currentEnrollment = Enrollment::query()
-                ->with(['section.gradeLevel', 'gradeLevel', 'cluster', 'preferredCourse', 'academicYear', 'enrollmentStatus'])
+                ->with(['section.gradeLevel', 'gradeLevel', 'cluster.track', 'track', 'electives', 'academicYear', 'enrollmentStatus'])
                 ->where('student_ID', $student->id)
                 ->where('SY_ID', $activeYear->SY_ID)
                 ->latest('created_at')
@@ -328,8 +328,9 @@ class StudentDashboardController extends Controller
                 'section.gradeLevel',
                 'section.curriculum',
                 'gradeLevel',
-                'cluster',
-                'preferredCourse',
+                'cluster.track',
+                'track',
+                'electives',
                 'enrollmentStatus',
             ])
             ->where('student_ID', $student->id)
@@ -394,8 +395,9 @@ class StudentDashboardController extends Controller
                 'section.gradeLevel',
                 'gradeLevel',
                 'gradingSemester',
-                'cluster',
-                'preferredCourse',
+                'cluster.track',
+                'track',
+                'electives',
                 'enrollmentStatus',
             ])
             ->where('student_ID', $student->id)
@@ -433,15 +435,17 @@ class StudentDashboardController extends Controller
             : $gradeEnrollments->first();
         $studentSubjects = $selectedEnrollment
             ? StudentSubject::query()
-                ->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester'])
+                ->with(['subject'])
                 ->where('enrollment_ID', $selectedEnrollment->enrollment_ID)
-                ->orderBy('curr_subj_ID')
+                ->orderBy('subject_ID')
                 ->get()
             : collect();
 
         if ($selectedEnrollment?->section && ($mapeh = \App\Models\MapehConfiguration::forSection($selectedEnrollment->section))) {
-            $studentSubjects = $studentSubjects->reject(fn ($row) => (int) $row->curr_subj_ID === (int) $mapeh->parent_curr_subj_ID
-                || in_array($row->curr_subj_ID, $mapeh->inactiveComponentIds()))->values();
+            $excludedSubjectIds = \App\Models\CurriculumSubject::query()
+                ->whereIn('curr_subj_ID', [$mapeh->parent_curr_subj_ID, ...$mapeh->inactiveComponentIds()])
+                ->pluck('subject_ID')->map(fn ($id) => (int) $id)->all();
+            $studentSubjects = $studentSubjects->reject(fn ($row) => in_array((int) $row->subject_ID, $excludedSubjectIds, true))->values();
         }
 
         return view('users.student.subjects', [
@@ -469,17 +473,17 @@ class StudentDashboardController extends Controller
         $semesterKey = $semester ?? $enrollment->semester;
 
         return TeacherSubjectAssignment::query()
-            ->with(['curriculumSubject.subject', 'section', 'academicYear', 'staff'])
+            ->with(['subject', 'section.curriculum.gradingSemester', 'academicYear', 'staff'])
             ->where('section_ID', $enrollment->section_ID)
             ->where('SY_ID', $enrollment->SY_ID)
+            ->whereIn('subject_ID', StudentSubject::query()
+                ->where('enrollment_ID', $enrollment->enrollment_ID)
+                ->select('subject_ID'))
             ->when($semesterKey, function ($query) use ($semesterKey): void {
-                $query->whereHas('curriculumSubject', function ($subjectQuery) use ($semesterKey): void {
-                    $subjectQuery->whereHas('gradingSemester', function ($semesterQuery) use ($semesterKey): void {
-                        $semesterQuery->whereIn('key', [\App\Models\GradingSemester::FULL_YEAR, $semesterKey]);
-                    });
-                });
+                $query->whereHas('section.curriculum.gradingSemester', fn ($semesterQuery) => $semesterQuery->whereIn('key', [\App\Models\GradingSemester::FULL_YEAR, $semesterKey])
+                );
             })
-            ->orderBy('curr_subj_ID')
+            ->orderBy('subject_ID')
             ->get();
     }
 }

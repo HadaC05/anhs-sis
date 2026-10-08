@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subject extends Model
@@ -21,6 +22,7 @@ class Subject extends Model
 
     protected $fillable = [
         'school_level',
+        'cluster_ID',
         'subject_type_ID',
         'code',
         'title',
@@ -31,6 +33,11 @@ class Subject extends Model
     public function subjectType(): BelongsTo
     {
         return $this->belongsTo(SubjectType::class, 'subject_type_ID', 'subject_type_ID');
+    }
+
+    public function cluster(): BelongsTo
+    {
+        return $this->belongsTo(Cluster::class, 'cluster_ID', 'cluster_ID');
     }
 
     /** Compatibility accessor for callers using the previous enum value. */
@@ -51,5 +58,17 @@ class Subject extends Model
     public function curriculumSubjects(): HasMany
     {
         return $this->hasMany(CurriculumSubject::class, 'subject_ID', 'subject_ID');
+    }
+
+    public function electiveEnrollments(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Enrollment::class,
+            'enrollment_electives',
+            'subject_ID',
+            'enrollment_ID',
+            'subject_ID',
+            'enrollment_ID',
+        )->withTimestamps();
     }
 }

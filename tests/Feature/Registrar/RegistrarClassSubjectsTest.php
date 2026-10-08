@@ -90,7 +90,7 @@ function createRegistrarClassSubjectFixtures(): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -175,7 +175,7 @@ test('registrar class status shows submitted grade status for assigned subjects'
 
     $studentSubject = StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
 
     StudentSubjectGrade::query()->create([
@@ -217,7 +217,7 @@ test('registrar can unlock a grading term for a class subject', function (bool $
 
     $studentSubject = StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
 
     StudentSubjectGrade::query()->create([
@@ -249,7 +249,6 @@ test('registrar can unlock a grading term for a class subject', function (bool $
     $this->actingAs($registrar)->get(route('registrar.classes.subjects', $section))
         ->assertOk()->assertSee('Draft')->assertSee('Registrar unlocked')->assertSee('1 draft');
 })->with([false, true]);
-
 
 test('registrar can view section subjects and term actions in the modal', function () {
     ['registrar' => $registrar, 'section' => $section, 'subject' => $subject, 'assignment' => $assignment] = createRegistrarClassSubjectFixtures();
@@ -292,7 +291,6 @@ test('teachers cannot access registrar subject modal or unlock terms', function 
         'grading_period' => 'shs_sem1_term_1',
     ])->assertForbidden();
 });
-
 
 test('preloaded subject modals use a bounded number of queries as sections grow', function () {
     ['registrar' => $registrar, 'section' => $section, 'assignment' => $assignment] = createRegistrarClassSubjectFixtures();
@@ -338,7 +336,6 @@ test('bulk term summaries preserve the existing term status rules', function () 
     }
 });
 
-
 test('section submission totals count complete subjects rather than individual grades', function () {
     ['registrar' => $registrar, 'teacher' => $teacher, 'section' => $section, 'assignment' => $assignment, 'academicYear' => $year, 'gradeLevel' => $level] = createRegistrarClassSubjectFixtures();
     GradingTermSetting::current()->setSeniorHighPeriod('first', 2);
@@ -354,7 +351,7 @@ test('section submission totals count complete subjects rather than individual g
             'learner_type' => 'regular', 'enrollment_status' => $index === 4 ? 'withdrawn' : 'enrolled',
         ]);
         $studentSubject = StudentSubject::query()->firstOrCreate([
-            'enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $assignment->curr_subj_ID,
+            'enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $assignment->subject_ID,
         ]);
         foreach (['shs_sem1_term_1', 'shs_sem1_term_3'] as $period) {
             StudentSubjectGrade::query()->create([
@@ -372,7 +369,7 @@ test('section submission totals count complete subjects rather than individual g
 
     StudentSubjectGrade::query()->where('assignment_ID', $assignment->assignment_ID)
         ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::APPROVED)]);
-    foreach (StudentSubject::query()->where('curr_subj_ID', $assignment->curr_subj_ID)->get() as $studentSubject) {
+    foreach (StudentSubject::query()->where('subject_ID', $assignment->subject_ID)->get() as $studentSubject) {
         StudentSubjectGrade::query()->create([
             'student_subject_ID' => $studentSubject->student_subject_ID,
             'assignment_ID' => $assignment->assignment_ID,
@@ -389,7 +386,6 @@ test('section submission totals count complete subjects rather than individual g
     $this->get(route('registrar.classes.subjects', $section))->assertOk()
         ->assertSee('data-submitted="0"', false)->assertSee('data-expected="1"', false);
 });
-
 
 test('class subject filters default to active year term and semester', function () {
     ['registrar' => $registrar, 'academicYear' => $year] = createRegistrarClassSubjectFixtures();
@@ -454,7 +450,6 @@ test('class subjects default to active school year but allow an explicit year', 
     $this->get(route('registrar.class-subjects.index', ['SY_ID' => $oldYear->SY_ID]))->assertOk()->assertSee($oldSection->name);
 });
 
-
 test('subject modal shows active term counts and all term actions despite the selected filter', function () {
     ['registrar' => $registrar, 'teacher' => $teacher, 'section' => $section, 'assignment' => $assignment, 'academicYear' => $year, 'gradeLevel' => $level] = createRegistrarClassSubjectFixtures();
     GradingTermSetting::current()->setSeniorHighPeriod('first', 2);
@@ -473,7 +468,7 @@ test('subject modal shows active term counts and all term actions despite the se
             'grade_ID' => $level->grade_ID, 'learner_type' => 'regular', 'enrollment_status' => 'enrolled',
         ]);
         $roster = StudentSubject::query()->firstOrCreate([
-            'enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $assignment->curr_subj_ID,
+            'enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $assignment->subject_ID,
         ]);
         StudentSubjectGrade::query()->create([
             'student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $assignment->assignment_ID,
@@ -503,7 +498,6 @@ test('subject grade records enforce registrar access and validate the selected t
     $this->get($url.'?grading_period=shs_sem1_term_1')->assertOk()->assertSee('No submitted grades for active students in this term.');
 });
 
-
 test('registrar unlock permits teacher editing only for the selected assignment and term while school input is closed', function (bool $seniorHigh) {
     ['registrar' => $registrar, 'teacher' => $teacher, 'section' => $section, 'assignment' => $assignment, 'academicYear' => $year] = createRegistrarClassSubjectFixtures();
     $gradeId = GradeLevel::idForValue($seniorHigh ? 'grade_11' : 'grade_7');
@@ -527,7 +521,7 @@ test('registrar unlock permits teacher editing only for the selected assignment 
     $otherCurriculumSubject->subject_ID = $otherSubject->subject_ID;
     $otherCurriculumSubject->save();
     $otherAssignment = $assignment->replicate();
-    $otherAssignment->curr_subj_ID = $otherCurriculumSubject->curr_subj_ID;
+    $otherAssignment->subject_ID = $otherCurriculumSubject->subject_ID;
     $otherAssignment->save();
     $otherSection = $section->replicate();
     $otherSection->name = 'Other section';
@@ -547,7 +541,7 @@ test('registrar unlock permits teacher editing only for the selected assignment 
         ]);
     }
     foreach ([[$assignment, 0, $term1], [$assignment, 0, $term2], [$otherAssignment, 0, $term1], [$otherSectionAssignment, 1, $term1]] as [$subjectAssignment, $studentIndex, $period]) {
-        $roster = StudentSubject::query()->firstOrCreate(['enrollment_ID' => $enrollments[$studentIndex]->enrollment_ID, 'curr_subj_ID' => $subjectAssignment->curr_subj_ID]);
+        $roster = StudentSubject::query()->firstOrCreate(['enrollment_ID' => $enrollments[$studentIndex]->enrollment_ID, 'subject_ID' => $subjectAssignment->subject_ID]);
         $grades[] = StudentSubjectGrade::query()->create([
             'student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $subjectAssignment->assignment_ID,
             'term_ID' => StudentSubjectGrade::termIdForPeriodKey($period), 'numeric_grade' => 80, 'status' => 'approved',
@@ -558,7 +552,9 @@ test('registrar unlock permits teacher editing only for the selected assignment 
     expect($grades[0]->fresh()->status)->toBe('draft')
         ->and($grades[0]->fresh()->reviewed_by)->toBeNull()
         ->and($grades[0]->fresh()->submitted_at)->toBeNull();
-    foreach (array_slice($grades, 1) as $grade) expect($grade->fresh()->status)->toBe('approved');
+    foreach (array_slice($grades, 1) as $grade) {
+        expect($grade->fresh()->status)->toBe('approved');
+    }
     expect(GradingTermSetting::current()->getAttributes())->toBe($settingsBefore);
     expect(AssignmentGradeTermUnlocker::unlockedPeriodKeysFor($otherAssignment->assignment_ID))->toBe([]);
     expect(AssignmentGradeTermUnlocker::unlockedPeriodKeysFor($otherSectionAssignment->assignment_ID))->toBe([]);
@@ -581,7 +577,9 @@ test('registrar unlock permits teacher editing only for the selected assignment 
         $enrollments[0]->enrollment_ID => [$term1 => ['grade' => 95]],
     ]]);
     expect((float) $grades[0]->fresh()->numeric_grade)->toBe(91.0);
-    foreach (array_slice($grades, 1) as $grade) expect($grade->fresh()->status)->toBe('approved');
+    foreach (array_slice($grades, 1) as $grade) {
+        expect($grade->fresh()->status)->toBe('approved');
+    }
     if ($seniorHigh) {
         GradingTermSetting::current()->setSeniorHighPeriod('first', 2);
         GradingTerm::query()->where('term_ID', StudentSubjectGrade::termIdForPeriodKey($term2))->update([

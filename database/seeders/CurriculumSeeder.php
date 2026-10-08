@@ -25,22 +25,35 @@ class CurriculumSeeder extends Seeder
     ];
 
     /**
-     * Senior high tracks offered by the school.
+     * Senior high clusters offered by the school.
      *
      * @var list<string>
      */
-    public const SENIOR_HIGH_TRACKS = [
+    public const SENIOR_HIGH_CLUSTERS = [
         'Arts, Social Sciences & Humanities',
         'Business and Entrepreneurship',
         'Science, Technology, Engineering and Mathematics',
+        'Sports, Health, and Wellness',
+        'ICT Support and Computer Programming Technologies',
+        'Aesthetic, Wellness, and Human Care',
+        'Agri-Fishery Business and Food Innovation',
+        'Artisanal and Creative Enterprise',
+        'Automotive and Small Engine Technologies',
+        'Construction and Building Technologies',
+        'Creative Arts and Design Technologies',
+        'Hospitality and Tourism',
+        'Industrial Technologies',
     ];
+
+    /** @deprecated Use SENIOR_HIGH_CLUSTERS. */
+    public const SENIOR_HIGH_TRACKS = self::SENIOR_HIGH_CLUSTERS;
 
     /**
      * Return the display name for a grade- and semester-specific SHS curriculum.
      */
-    public static function seniorHighCurriculumName(int $grade, string $semester, string $track): string
+    public static function seniorHighCurriculumName(int $grade, string $semester, string $cluster): string
     {
-        return "Grade {$grade} {$semester} Semester - {$track}";
+        return "Grade {$grade} {$semester} Semester - {$cluster}";
     }
 
     /**
@@ -52,10 +65,17 @@ class CurriculumSeeder extends Seeder
         $gradeIds = GradeLevel::query()->pluck('grade_ID', 'grade_label');
         $semesterIds = GradingSemester::query()->pluck('semester_ID', 'key');
         $clusterIds = Cluster::query()->pluck('cluster_ID', 'name');
-        $juniorHigh = Curricula::query()->updateOrCreate(
-            ['name' => 'Junior High School'],
+        $matatag = Curricula::query()->updateOrCreate(
+            ['name' => 'MATATAG'],
             [
-                'description' => 'Junior High School subject offerings.',
+                'description' => 'MATATAG curriculum for Grades 7 to 10.',
+                'data_status_ID' => $activeStatusId,
+            ],
+        );
+        $strengthenedSeniorHigh = Curricula::query()->updateOrCreate(
+            ['name' => 'Strengthened Senior High School'],
+            [
+                'description' => 'Strengthened Senior High School curriculum for Grades 11 and 12.',
                 'data_status_ID' => $activeStatusId,
             ],
         );
@@ -68,7 +88,7 @@ class CurriculumSeeder extends Seeder
                 [
                     'description' => "Junior High School Grade {$gradeNumber} subject offerings.",
                     'data_status_ID' => $activeStatusId,
-                    'curricula_ID' => $juniorHigh->curricula_ID,
+                    'curricula_ID' => $matatag->curricula_ID,
                     'grade_ID' => $gradeIds['Grade '.$gradeNumber] ?? null,
                     'semester_ID' => $semesterIds[GradingSemester::FULL_YEAR] ?? null,
                 ],
@@ -77,28 +97,25 @@ class CurriculumSeeder extends Seeder
 
         foreach ([11, 12] as $grade) {
             foreach (['First', 'Second'] as $semester) {
-                foreach (self::SENIOR_HIGH_TRACKS as $track) {
-                    $curricula = Curricula::query()->updateOrCreate(
-                        ['name' => $track],
-                        [
-                            'description' => "Senior High School curriculum for {$track}.",
-                            'data_status_ID' => $activeStatusId,
-                        ],
-                    );
-
+                foreach (self::SENIOR_HIGH_CLUSTERS as $cluster) {
                     Curriculum::query()->updateOrCreate(
-                        ['name' => self::seniorHighCurriculumName($grade, $semester, $track)],
+                        ['name' => self::seniorHighCurriculumName($grade, $semester, $cluster)],
                         [
-                            'description' => "Senior High School Grade {$grade} {$semester} Semester curriculum for {$track}.",
+                            'description' => "Senior High School Grade {$grade} {$semester} Semester curriculum for {$cluster}.",
                             'data_status_ID' => $activeStatusId,
-                            'curricula_ID' => $curricula->curricula_ID,
+                            'curricula_ID' => $strengthenedSeniorHigh->curricula_ID,
                             'grade_ID' => $gradeIds['Grade '.$grade] ?? null,
                             'semester_ID' => $semesterIds[strtolower($semester)] ?? null,
-                            'cluster_ID' => $clusterIds[$track] ?? null,
+                            'cluster_ID' => $clusterIds[$cluster] ?? null,
                         ],
                     );
                 }
             }
         }
+
+        Curricula::query()
+            ->whereNotIn('curricula_ID', [$matatag->curricula_ID, $strengthenedSeniorHigh->curricula_ID])
+            ->whereDoesntHave('curriculumGradeLevels')
+            ->delete();
     }
 }

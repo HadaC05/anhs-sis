@@ -15,7 +15,7 @@ use Database\Seeders\GradeLevelSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SectionSeeder;
 
-test('section seeder creates five lettered sections for each grade without strand names', function () {
+test('section seeder creates junior high sections and one section per senior high offering', function () {
     $this->seed([
         ClusterSeeder::class,
         AcademicYearSeeder::class,
@@ -30,12 +30,19 @@ test('section seeder creates five lettered sections for each grade without stran
 
     $sections = Section::query()
         ->where('SY_ID', $academicYearId)
-        ->with('gradeLevel', 'curriculum')
+        ->with('gradeLevel', 'curriculum', 'cluster')
         ->orderBy('name')
         ->get();
 
-    expect($sections)->toHaveCount(30)
-        ->and($sections->every(fn (Section $section): bool => $section->cluster_ID === null))->toBeTrue();
+    $seniorHighDefinitions = DefaultNonStudentUsersSeeder::seniorHighSectionDefinitions();
+    $juniorHighSections = $sections->filter(fn (Section $section): bool => in_array($section->grade_level, ['grade_7', 'grade_8', 'grade_9', 'grade_10'], true));
+    $seniorHighSections = $sections->filter(fn (Section $section): bool => in_array($section->grade_level, ['grade_11', 'grade_12'], true));
+
+    expect($sections)->toHaveCount(20 + count($seniorHighDefinitions))
+        ->and($juniorHighSections)->toHaveCount(20)
+        ->and($juniorHighSections->every(fn (Section $section): bool => $section->cluster_ID === null))->toBeTrue()
+        ->and($seniorHighSections)->toHaveCount(count($seniorHighDefinitions))
+        ->and($seniorHighSections->pluck('name')->unique())->toHaveCount(count($seniorHighDefinitions));
 
     foreach ([7, 8, 9, 10] as $grade) {
         $names = $sections
@@ -54,25 +61,16 @@ test('section seeder creates five lettered sections for each grade without stran
             ->and($sections->firstWhere('name', "G{$grade}-A")?->curriculum?->name)->toBe("Grade {$grade}");
     }
 
-    foreach ([11, 12] as $grade) {
-        $names = $sections
-            ->filter(fn (Section $section): bool => $section->grade_level === 'grade_'.$grade)
-            ->pluck('name')
-            ->values()
-            ->all();
+    foreach ($seniorHighDefinitions as $definition) {
+        $section = $sections->firstWhere('name', $definition['name']);
+        $grade = (int) str_replace('grade_', '', $definition['grade_level']);
 
-        expect($names)->toBe([
-            "G{$grade}-A",
-            "G{$grade}-B",
-            "G{$grade}-C",
-            "G{$grade}-D",
-            "G{$grade}-E",
-        ])
-            ->and($sections->firstWhere('name', "G{$grade}-A")?->curriculum?->name)
-            ->toBe(CurriculumSeeder::seniorHighCurriculumName(
+        expect($section)->not->toBeNull()
+            ->and($section->cluster?->name)->toBe($definition['cluster'])
+            ->and($section->curriculum?->name)->toBe(CurriculumSeeder::seniorHighCurriculumName(
                 $grade,
-                'First',
-                CurriculumSeeder::SENIOR_HIGH_TRACKS[0],
+                ucfirst($definition['semester']),
+                $definition['cluster'],
             ));
     }
 });
@@ -142,7 +140,8 @@ test('section seeder removes leftover lettered sections that have no enrollments
     expect(Section::query()->where('name', 'G7-F')->exists())->toBeFalse()
         ->and(Section::query()->where('name', 'G11-ASSH-A')->exists())->toBeFalse()
         ->and(Section::query()->where('name', 'G11-ASSH-B')->exists())->toBeTrue()
-        ->and(Section::query()->where('name', 'G11-A')->exists())->toBeTrue();
+        ->and(Section::query()->where('name', 'G11-A')->exists())->toBeFalse()
+        ->and(Section::query()->where('name', 'G11-ASSH-1ST')->exists())->toBeTrue();
 });
 
 test('section seeder assigns a unique adviser to each section', function () {
@@ -166,8 +165,11 @@ test('section seeder assigns a unique adviser to each section', function () {
 
     $adviserIds = $sections->pluck('staff_ID');
 
-    expect($sections)->toHaveCount(30)
-        ->and($adviserIds->filter()->unique())->toHaveCount(30);
+    $expectedSectionCount = 20 + count(DefaultNonStudentUsersSeeder::seniorHighSectionDefinitions());
+
+    expect($sections)->toHaveCount($expectedSectionCount)
+        ->and($adviserIds->filter())->toHaveCount($expectedSectionCount)
+        ->and($adviserIds->filter()->unique())->toHaveCount($expectedSectionCount);
 
     foreach (DefaultNonStudentUsersSeeder::sectionTeacherUsernames() as $sectionName => $username) {
         $teacherId = Staff::query()->where('username', $username)->value('staff_id');

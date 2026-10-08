@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\AcademicYear;
 use App\Models\CurriculumSubject;
+use App\Models\MapehConfiguration;
 use App\Models\Section;
 use App\Models\TeacherSubjectAssignment;
 use Illuminate\Database\Eloquent\Collection;
@@ -69,7 +70,7 @@ class TeacherSubjectAssignmentSeeder extends Seeder
                 TeacherSubjectAssignment::query()->updateOrCreate(
                     [
                         'section_ID' => $section->section_ID,
-                        'curr_subj_ID' => $subject->curr_subj_ID,
+                        'subject_ID' => $subject->subject_ID,
                     ],
                     [
                         'staff_ID' => $teacherId,
@@ -85,12 +86,21 @@ class TeacherSubjectAssignmentSeeder extends Seeder
      */
     private function curriculumSubjectsForSection(Section $section): Collection
     {
-        return CurriculumSubject::query()
+        $subjects = CurriculumSubject::query()
             ->with(['subject', 'gradingSemester'])
             // Grade level and cluster are defined by the curriculum-grade-level
             // offering, not by columns on curriculum_subjects.
             ->where('curriculum_grade_level_ID', $section->curriculum_grade_level_ID)
-            ->get()
+            ->get();
+
+        $configuration = MapehConfiguration::forSection($section);
+        if ($configuration) {
+            $subjects = $subjects->reject(fn (CurriculumSubject $subject): bool => (int) $subject->curr_subj_ID === (int) $configuration->parent_curr_subj_ID
+                || in_array($subject->curr_subj_ID, $configuration->inactiveComponentIds(), true)
+            );
+        }
+
+        return $subjects
             ->sortBy(fn (CurriculumSubject $subject): string => $this->subjectSortKey($subject))
             ->values();
     }

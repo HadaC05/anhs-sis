@@ -15,7 +15,7 @@ class Sf1Export
     {
         $section->loadMissing(['academicYear', 'gradeLevel', 'adviser', 'cluster']);
         $enrollments = Enrollment::query()
-            ->with(['student.addresses', 'student.guardians', 'cluster', 'preferredCourse'])
+            ->with(['student.addresses', 'student.guardians', 'cluster', 'track', 'electives'])
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())

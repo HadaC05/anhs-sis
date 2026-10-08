@@ -29,7 +29,7 @@ class EClassRecordGrades
             }
         }
         $subjects = StudentSubject::query()->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID'))
-            ->where('curr_subj_ID', $assignment->curr_subj_ID)->pluck('student_subject_ID', 'enrollment_ID');
+            ->where('subject_ID', $assignment->subject_ID)->pluck('student_subject_ID', 'enrollment_ID');
         $locked = StudentSubjectGrade::query()->where('assignment_ID', $assignment->assignment_ID)
             ->forPeriodKey($period)->get()->filter->isTeacherLocked()->pluck('student_subject_ID')->all();
         $matched = [];

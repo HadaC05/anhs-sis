@@ -74,7 +74,7 @@ function createTeacherDashboardFixtures(): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -122,7 +122,7 @@ test('teacher dashboard aggregates grade records across terms and highlights ret
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherDashboardFixtures();
     $roster = \App\Models\StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
     foreach (['rejected', 'draft', 'submitted', 'released'] as $index => $status) {
         StudentSubjectGrade::query()->create([
@@ -187,7 +187,7 @@ test('dashboard shows only five ungraded subjects while preserving full counts',
         $curriculumSubject->subject_ID = $subject->subject_ID;
         $curriculumSubject->save();
         $extraAssignment = $assignment->replicate();
-        $extraAssignment->curr_subj_ID = $curriculumSubject->curr_subj_ID;
+        $extraAssignment->subject_ID = $curriculumSubject->subject_ID;
         $extraAssignment->save();
     }
 

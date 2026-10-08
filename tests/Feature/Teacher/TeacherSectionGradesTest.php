@@ -80,7 +80,7 @@ function createTeacherSectionGradeFixtures(): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -384,7 +384,7 @@ test('teacher subject list displays the configured grade status from its status 
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
     $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
 
     StudentSubjectGrade::query()->create([
@@ -409,7 +409,7 @@ test('teacher subject status follows the displayed term after it changes', funct
     }
     $studentSubject = \App\Models\StudentSubject::query()->firstOrCreate([
         'enrollment_ID' => $enrollment->enrollment_ID,
-        'curr_subj_ID' => $assignment->curr_subj_ID,
+        'subject_ID' => $assignment->subject_ID,
     ]);
     $periodPrefix = $seniorHigh ? 'shs_sem1_' : '';
     $attributes = [
@@ -579,7 +579,7 @@ function createGradeDigestRegistrar(string $username = 'digest.registrar', strin
 function createPendingDigestGrades(TeacherSubjectAssignment $assignment, Enrollment $enrollment, int $terms = 1): void
 {
     $roster = \App\Models\StudentSubject::query()->firstOrCreate([
-        'enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $assignment->curr_subj_ID,
+        'enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $assignment->subject_ID,
     ]);
     for ($term = 1; $term <= $terms; $term++) {
         $termId = StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_'.$term);
@@ -720,7 +720,7 @@ test('full subject summary includes saved archived terms and averages every reco
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
     $assignment->section->update(['grade_ID' => GradeLevel::idForValue('grade_7')]);
     $periods = GradingTerm::configuredPeriods();
-    $roster = \App\Models\StudentSubject::firstOrCreate(['enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $assignment->curr_subj_ID]);
+    $roster = \App\Models\StudentSubject::firstOrCreate(['enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $assignment->subject_ID]);
     foreach (array_slice($periods, 0, 2) as $index => $period) {
         StudentSubjectGrade::create([
             'student_subject_ID' => $roster->student_subject_ID,

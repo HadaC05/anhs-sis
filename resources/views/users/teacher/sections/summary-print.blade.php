@@ -27,7 +27,7 @@
 
     @php
         $descriptorBands = \App\Support\Sf9PerformanceScale::forSection($section);
-        $subject = $assignment->curriculumSubject?->subject;
+        $subject = $assignment->subject;
         $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
         $gradeLabel = strtoupper(str_replace('grade_', 'Grade ', $section->grade_level));
     @endphp

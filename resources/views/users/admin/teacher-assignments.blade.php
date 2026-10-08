@@ -233,7 +233,7 @@
                                             <tr>
                                                 <td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td>
                                                 <td class="py-3 text-gray-600">{{ $section?->grade_level ? str_replace('grade_', 'Grade ', $section->grade_level) : '—' }}</td>
-                                                <td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td>
+                                                <td class="py-3 text-gray-700">{{ $teacher ? $teacher->last_name.', '.$teacher->first_name : 'Teacher not assigned' }}</td>
                                                 <td class="py-3 text-right">
                                                     <button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#296374] transition hover:bg-white" title="Edit" aria-label="Edit assignment">
                                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -249,7 +249,7 @@
                         @endif
                     </div>
                     {{-- Legacy compact table retained below for source-history continuity.
-                    <div class="border-t border-gray-100 bg-gray-50 px-5 py-3">@if ($subjectAssignments->isEmpty())<p class="py-3 text-sm text-gray-500">No assignments yet.</p>@else<div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-[10px] font-bold uppercase tracking-wider text-gray-400"><tr><th class="pb-2">Section</th><th class="pb-2">Grade Level</th><th class="pb-2">Teacher</th><th class="pb-2">Semester</th><th class="pb-2 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@foreach ($subjectAssignments as $assignment) @php $section = $assignment->section; $teacher = $assignment->staff; @endphp<tr><td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td><td class="py-3 text-gray-600">{{ optional($section?->gradeLevel)->grade_label ?? '—' }}</td><td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td><td class="py-3 text-gray-600">{{ optional($assignment->curriculumSubject)->semester ? ucfirst($assignment->curriculumSubject->semester) : '—' }}</td><td class="py-3 text-right"><button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="rounded-lg px-2 py-1 text-xs font-semibold text-[#296374] hover:bg-white">Edit</button><form action="{{ route($managementRoutePrefix.'teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">@csrf @method('DELETE')<button type="submit" class="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Remove</button></form></td></tr>@endforeach</tbody></table></div>@endif</div>
+                    <div class="border-t border-gray-100 bg-gray-50 px-5 py-3">@if ($subjectAssignments->isEmpty())<p class="py-3 text-sm text-gray-500">No assignments yet.</p>@else<div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-[10px] font-bold uppercase tracking-wider text-gray-400"><tr><th class="pb-2">Section</th><th class="pb-2">Grade Level</th><th class="pb-2">Teacher</th><th class="pb-2">Semester</th><th class="pb-2 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-200">@foreach ($subjectAssignments as $assignment) @php $section = $assignment->section; $teacher = $assignment->staff; $semester = $section?->curriculum?->gradingSemester?->key; @endphp<tr><td class="py-3 font-semibold text-gray-800">{{ $section?->name ?? '—' }}</td><td class="py-3 text-gray-600">{{ optional($section?->gradeLevel)->grade_label ?? '—' }}</td><td class="py-3 text-gray-700">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</td><td class="py-3 text-gray-600">{{ $semester && $semester !== 'full_year' ? ucfirst($semester) : '—' }}</td><td class="py-3 text-right"><button type="button" onclick="openReassignModal({{ (int) $assignment->assignment_ID }}, {{ (int) $assignment->staff_ID }})" class="rounded-lg px-2 py-1 text-xs font-semibold text-[#296374] hover:bg-white">Edit</button><form action="{{ route($managementRoutePrefix.'teacher-assignments.delete', $assignment) }}" method="POST" class="inline" onsubmit="return confirm('Remove this subject assignment?');">@csrf @method('DELETE')<button type="submit" class="rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Remove</button></form></td></tr>@endforeach</tbody></table></div>@endif</div>
                     --}}
                 </details>
             @empty
@@ -269,7 +269,7 @@
                     @forelse ($assignments as $assignment)
                         @php
                             $section = $assignment->section;
-                            $subject = $assignment->curriculumSubject?->subject;
+                            $subject = $assignment->subject;
                             $teacher = $assignment->staff;
                         @endphp
                         <tr class="bg-white transition even:bg-gray-50/70 hover:bg-[#296374]/[0.06]">
@@ -285,7 +285,7 @@
                                 <p class="font-semibold text-gray-900">{{ $teacher?->last_name }}, {{ $teacher?->first_name }}</p>
                                 <p class="mt-0.5 text-xs text-gray-500">{{ $teacher?->username ?? '—' }}</p>
                             </td>
-                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ optional($assignment->curriculumSubject)->semester ? ucfirst($assignment->curriculumSubject->semester) : '—' }}</td>
+                            <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ ($assignment->section?->curriculum?->gradingSemester?->key && $assignment->section->curriculum->gradingSemester->key !== 'full_year') ? ucfirst($assignment->section->curriculum->gradingSemester->key) : '—' }}</td>
                             <td class="border-r border-gray-100 px-5 py-4 text-gray-700">{{ $section?->academicYear?->school_year ?? '—' }}</td>
                             <td class="border-r border-gray-100 px-5 py-4">
                                 @if (($assignment->locked_grades_count ?? 0) > 0)

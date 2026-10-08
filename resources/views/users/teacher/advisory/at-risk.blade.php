@@ -35,7 +35,7 @@
                 @forelse($rows as $row)
                     <tr class="hover:bg-gray-50">
                         <td class="px-5 py-4"><p class="font-semibold text-gray-900">{{ $row['student']->name }}</p><p class="mt-1 text-xs text-gray-500">{{ $row['student']->lrn }}</p></td>
-                        <td class="px-5 py-4"><ul class="space-y-1">@foreach($row['grades'] as $grade)<li><span class="text-gray-700">{{ $grade->assignment->curriculumSubject->subject->title }}</span> <span class="font-bold text-red-700">{{ number_format((float) $grade->numeric_grade, 0) }}</span></li>@endforeach</ul></td>
+                        <td class="px-5 py-4"><ul class="space-y-1">@foreach($row['grades'] as $grade)<li><span class="text-gray-700">{{ $grade->assignment->subject?->title ?? 'Subject unavailable' }}</span> <span class="font-bold text-red-700">{{ number_format((float) $grade->numeric_grade, 0) }}</span></li>@endforeach</ul></td>
                         <td class="px-5 py-4">
                             <form method="POST" action="{{ route('teacher.advisory.at-risk.notify', [$section, $row['enrollment']]) }}">
                                 @csrf

@@ -14,17 +14,18 @@
     $gradeLevelLabel = $currentEnrollment?->grade_level
         ? strtoupper(str_replace('grade_', 'Grade ', $currentEnrollment->grade_level))
         : '-';
-    $preferredCoursesByCluster = ($clusters ?? collect())->mapWithKeys(fn ($cluster) => [
-        (string) $cluster->cluster_ID => $cluster->preferredCourses->map(fn ($course) => [
-            'id' => (string) $course->course_ID,
-            'name' => $course->name,
-        ])->values(),
-    ]);
+    $clustersByTrack = ($clusters ?? collect())->groupBy(fn ($cluster) => (string) $cluster->track_ID)->map(
+        fn ($items) => $items->map(fn ($cluster) => [
+            'id' => (string) $cluster->cluster_ID,
+            'name' => $cluster->name,
+        ])->values()
+    );
     $availableGradeLevels = collect($gradeLevels ?? [])->filter(function ($level) {
         return in_array(str_replace('grade_', '', $level['value']), ['7', '8', '9', '10', '11', '12'], true);
     });
     $defaults = $formDefaults ?? [];
     $value = fn (string $key, mixed $fallback = '') => old($key, $defaults[$key] ?? $fallback);
+    $selectedElectives = collect(old('elective_ids', $defaults['elective_ids'] ?? []))->map(fn ($id) => (string) $id)->values();
     $previousSchoolYear = $value('last_school_year_completed');
     $lastSchoolYearMaxStart = preg_match('/^(\d{4})-\d{4}$/', (string) $activeYear?->school_year, $matches)
         ? min((int) $matches[1], now()->year)
@@ -385,12 +386,16 @@
                 <p class="text-sm font-semibold text-gray-800">{{ $currentEnrollment->semester ? ucfirst($currentEnrollment->semester) . ' Semester' : 'Not applicable' }}</p>
             </div>
             <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-2">Track</label>
+                <p class="text-sm font-semibold text-gray-800">{{ $currentEnrollment->track?->name ?? $currentEnrollment->cluster?->track?->name ?? 'Not applicable' }}</p>
+            </div>
+            <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-2">Cluster</label>
                 <p class="text-sm font-semibold text-gray-800">{{ $currentEnrollment->cluster?->name ?? 'Not applicable' }}</p>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-500 mb-2">Preferred Course</label>
-                <p class="text-sm font-semibold text-gray-800">{{ $currentEnrollment->preferredCourse?->name ?? 'Not applicable' }}</p>
+                <label class="block text-xs font-semibold text-gray-500 mb-2">Electives</label>
+                <p class="text-sm font-semibold text-gray-800">{{ $currentEnrollment->electives->pluck('title')->join(', ') ?: 'Not applicable' }}</p>
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-2">Submitted On</label>
@@ -481,21 +486,45 @@
                 </div>
             </div>
 
-            <div id="cluster_container" class="mt-6 hidden">
-                <label class="block text-xs font-semibold text-gray-500 mb-2">Cluster</label>
-                <select name="cluster_ID" id="cluster_ID" class="w-full border border-gray-300 rounded-md px-4 py-3 focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none transition-all text-gray-700 bg-white shadow-sm">
-                    <option value="">Select Cluster</option>
-                    @foreach ($clusters as $cluster)
-                    <option value="{{ $cluster->cluster_ID }}" {{ (string) $value('cluster_ID') === (string) $cluster->cluster_ID ? 'selected' : '' }}>{{ $cluster->name }}</option>
+            <div id="track_container" class="mt-6 hidden">
+                <label class="block text-xs font-semibold text-gray-500 mb-2">Track</label>
+                <select name="track_ID" id="track_ID" class="w-full border border-gray-300 rounded-md px-4 py-3 focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none transition-all text-gray-700 bg-white shadow-sm">
+                    <option value="">Select Track</option>
+                    @foreach ($tracks ?? [] as $track)
+                    <option value="{{ $track->track_ID }}" data-academic="{{ $track->name === 'Academic Track' ? '1' : '0' }}" {{ (string) $value('track_ID') === (string) $track->track_ID ? 'selected' : '' }}>{{ $track->name }}</option>
                     @endforeach
                 </select>
             </div>
 
-            <div id="preferred_course_container" class="mt-6 hidden">
-                <label class="block text-xs font-semibold text-gray-500 mb-2">Preferred Course</label>
-                <select name="course_ID" id="course_ID" class="w-full border border-gray-300 rounded-md px-4 py-3 focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none transition-all text-gray-700 bg-white shadow-sm">
-                    <option value="">Select Preferred Course</option>
+            <div id="cluster_container" class="mt-6 hidden">
+                <label class="block text-xs font-semibold text-gray-500 mb-2">Cluster</label>
+                <select name="cluster_ID" id="cluster_ID" class="w-full border border-gray-300 rounded-md px-4 py-3 focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none transition-all text-gray-700 bg-white shadow-sm">
+                    <option value="">Select Cluster</option>
                 </select>
+            </div>
+
+            <div id="electives_container" class="mt-6 hidden">
+                <label class="block text-xs font-semibold text-gray-500 mb-2">Elective Selection</label>
+                <p id="elective_help" class="mb-3 text-xs text-gray-500">Choose electives from any cluster.</p>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    @for ($electiveIndex = 0; $electiveIndex < 2; $electiveIndex++)
+                    <div data-elective-slot="{{ $electiveIndex + 1 }}">
+                        <label for="elective_{{ $electiveIndex + 1 }}" class="block text-xs font-semibold text-gray-500 mb-2">Elective {{ $electiveIndex + 1 }}</label>
+                        <select name="elective_ids[]" id="elective_{{ $electiveIndex + 1 }}" class="elective-select w-full border border-gray-300 rounded-md px-4 py-3 focus:ring-2 focus:ring-[#296374]/20 focus:border-[#296374] outline-none transition-all text-gray-700 bg-white shadow-sm">
+                            <option value="">Select Elective {{ $electiveIndex + 1 }}</option>
+                            @foreach ($clusters ?? [] as $cluster)
+                                @if ($cluster->subjects->isNotEmpty())
+                                <optgroup label="{{ $cluster->name }}">
+                                    @foreach ($cluster->subjects as $subject)
+                                    <option value="{{ $subject->subject_ID }}" {{ $selectedElectives->get($electiveIndex) === (string) $subject->subject_ID ? 'selected' : '' }}>{{ $subject->title }}</option>
+                                    @endforeach
+                                </optgroup>
+                                @endif
+                            @endforeach
+                        </select>
+                    </div>
+                    @endfor
+                </div>
             </div>
 
             <div class="mb-0 mt-6">
@@ -888,12 +917,15 @@
 
     const gradeLevelSelect = document.getElementById('grade_level');
     const semesterContainer = document.getElementById('semester_container');
+    const trackContainer = document.getElementById('track_container');
     const clusterContainer = document.getElementById('cluster_container');
-    const preferredCourseContainer = document.getElementById('preferred_course_container');
+    const electivesContainer = document.getElementById('electives_container');
+    const trackSelect = document.getElementById('track_ID');
     const clusterSelect = document.getElementById('cluster_ID');
-    const preferredCourseSelect = document.getElementById('course_ID');
-    const selectedPreferredCourse = @json((string) $value('course_ID'));
-    const preferredCoursesByCluster = @json($preferredCoursesByCluster);
+    const electiveSelects = Array.from(document.querySelectorAll('.elective-select'));
+    const electiveHelp = document.getElementById('elective_help');
+    const selectedCluster = @json((string) $value('cluster_ID'));
+    const clustersByTrack = @json($clustersByTrack);
     const learnerDetails = document.getElementById('learner_details_container');
     const lastGradeCompletedSelect = document.getElementById('last_grade_level_completed');
     const lastSchoolYearCompleted = document.getElementById('last_school_year_completed');
@@ -1002,37 +1034,69 @@
         zipEntries: [],
     };
 
-    function updatePreferredCourses() {
-        if (!preferredCourseSelect || !clusterSelect) {
+    function updateClusters(resetSelection = false) {
+        if (!trackSelect || !clusterSelect) {
             return;
         }
 
-        const currentValue = preferredCourseSelect.value || selectedPreferredCourse;
-        const courses = preferredCoursesByCluster[clusterSelect.value] || [];
-        preferredCourseSelect.innerHTML = '<option value="">Select Preferred Course</option>';
+        const currentValue = resetSelection ? '' : (clusterSelect.value || selectedCluster);
+        const clusters = clustersByTrack[trackSelect.value] || [];
+        clusterSelect.innerHTML = '<option value="">Select Cluster</option>';
 
-        courses.forEach((course) => {
+        clusters.forEach((cluster) => {
             const option = document.createElement('option');
-            option.value = course.id;
-            option.textContent = course.name;
-            option.selected = course.id === currentValue;
-            preferredCourseSelect.appendChild(option);
+            option.value = cluster.id;
+            option.textContent = cluster.name;
+            option.selected = cluster.id === currentValue;
+            clusterSelect.appendChild(option);
         });
+    }
+
+    function preventDuplicateElectives() {
+        electiveSelects.forEach((select) => {
+            const otherValues = electiveSelects.filter((other) => other !== select).map((other) => other.value).filter(Boolean);
+            Array.from(select.options).forEach((option) => {
+                option.disabled = Boolean(option.value) && otherValues.includes(option.value);
+            });
+        });
+    }
+
+    function updateElectiveRequirement(isSenior) {
+        const isAcademic = trackSelect?.selectedOptions[0]?.dataset.academic === '1';
+        const requiredCount = isAcademic ? 2 : 1;
+
+        electiveSelects.forEach((select, index) => {
+            const required = isSenior && index < requiredCount;
+            select.required = required;
+            select.closest('[data-elective-slot]')?.classList.toggle('hidden', isSenior && index >= requiredCount);
+            if (!required && index >= requiredCount) {
+                select.value = '';
+            }
+        });
+
+        if (electiveHelp) {
+            electiveHelp.textContent = isAcademic
+                ? 'Choose two different electives. You may select electives from any cluster.'
+                : 'Choose one elective. You may select it from any cluster.';
+        }
+        preventDuplicateElectives();
     }
 
     function toggleSeniorFields() {
         const isSenior = ['11', '12'].includes(gradeLevelSelect?.value);
         semesterContainer.classList.toggle('hidden', !isSenior);
+        trackContainer.classList.toggle('hidden', !isSenior);
         clusterContainer.classList.toggle('hidden', !isSenior);
-        preferredCourseContainer.classList.toggle('hidden', !isSenior);
+        electivesContainer.classList.toggle('hidden', !isSenior);
         const semesterInputs = document.querySelectorAll('input[name="semester"]');
 
+        if (trackSelect) {
+            trackSelect.required = isSenior;
+        }
         if (clusterSelect) {
             clusterSelect.required = isSenior;
         }
-        if (preferredCourseSelect) {
-            preferredCourseSelect.required = isSenior;
-        }
+        updateElectiveRequirement(isSenior);
         semesterInputs.forEach((input) => {
             input.required = isSenior;
         });
@@ -1043,11 +1107,13 @@
             if (clusterSelect) {
                 clusterSelect.value = '';
             }
-            if (preferredCourseSelect) {
-                preferredCourseSelect.value = '';
+            if (trackSelect) {
+                trackSelect.value = '';
             }
+            electiveSelects.forEach((select) => select.value = '');
         } else {
-            updatePreferredCourses();
+            updateClusters();
+            preventDuplicateElectives();
         }
     }
 
@@ -1705,12 +1771,11 @@
         toggleSeniorFields();
         syncLastGradeOptions();
     });
-    clusterSelect?.addEventListener('change', () => {
-        if (preferredCourseSelect) {
-            preferredCourseSelect.value = '';
-        }
-        updatePreferredCourses();
+    trackSelect?.addEventListener('change', () => {
+        updateClusters(true);
+        updateElectiveRequirement(['11', '12'].includes(gradeLevelSelect?.value));
     });
+    electiveSelects.forEach((select) => select.addEventListener('change', preventDuplicateElectives));
     document.querySelectorAll('input[name="learner_type"]').forEach((input) => {
         input.addEventListener('change', toggleLearnerDetails);
     });

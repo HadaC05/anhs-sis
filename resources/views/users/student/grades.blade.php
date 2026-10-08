@@ -94,7 +94,7 @@
                 @foreach ($enrollment->subjectAssignments as $assignment)
                     @php
                         $grades = $assignment->grades->keyBy('grading_period');
-                        $subject = $assignment->curriculumSubject?->subject;
+                        $subject = $assignment->subject;
                         $periodValues = collect($periodKeys)
                             ->mapWithKeys(fn ($periodKey) => [$periodKey => $grades->get($periodKey)?->numeric_grade]);
                         $availableGrades = $periodValues->filter(fn ($grade) => $grade !== null && $grade !== '');
@@ -162,7 +162,7 @@
                         @foreach ($enrollment->subjectAssignments as $index => $assignment)
                             @php
                                 $grades = $assignment->grades->keyBy('grading_period');
-                                $subject = $assignment->curriculumSubject?->subject;
+                                $subject = $assignment->subject;
                                 $subjectCode = $subject?->code ?? '—';
                                 $subjectTitle = $subject?->title ?? 'N/A';
                                 $subjectType = $subject?->type ? ucwords(str_replace('_', ' ', $subject->type)) : '—';

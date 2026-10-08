@@ -9,6 +9,7 @@ use App\Http\Controllers\Guidance\GuidanceEnrollmentController;
 use App\Http\Controllers\Principal\PrincipalDashboardController;
 use App\Http\Controllers\Registrar\RegistrarDashboardController;
 use App\Http\Controllers\StaffAccountController;
+use App\Http\Controllers\Student\SecondSemesterEnrollmentController;
 use App\Http\Controllers\Student\StudentAccountController;
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
@@ -112,6 +113,12 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::get('/student/subjects', [StudentDashboardController::class, 'subjects'])
         ->middleware('student')
         ->name('student.subjects');
+    Route::get('/student/second-semester-enrollment', [SecondSemesterEnrollmentController::class, 'create'])
+        ->middleware('student')
+        ->name('student.second-semester-enrollment.create');
+    Route::post('/student/second-semester-enrollment', [SecondSemesterEnrollmentController::class, 'store'])
+        ->middleware('student')
+        ->name('student.second-semester-enrollment.store');
 
     Route::get('/teacher/dashboard', [TeacherDashboardController::class, 'index'])
         ->middleware('teacher')

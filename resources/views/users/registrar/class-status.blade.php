@@ -43,11 +43,11 @@
             <tbody class="divide-y divide-gray-100">
                 @forelse ($assignments as $assignment)
                     @php
-                        $subject = $assignment->curriculumSubject?->subject;
+                        $subject = $assignment->subject;
                         $teacher = $assignment->staff;
                         $teacherName = $teacher ? trim($teacher->last_name.', '.$teacher->first_name) : 'Unassigned';
                         $statusCounts = $assignment->gradeStatusCounts();
-                        $semester = $assignment->curriculumSubject?->semester;
+                        $semester = $assignment->section?->curriculum?->gradingSemester?->key;
                     @endphp
                     <tr>
                         <td class="px-5 py-4">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MapehSetup;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -27,6 +28,30 @@ class MapehConfiguration extends Model
         return $mode === 'paired'
             ? ['music_arts' => 'Music & Arts', 'pe_health' => 'Physical Education & Health']
             : ['music' => 'Music', 'arts' => 'Arts', 'pe' => 'Physical Education', 'health' => 'Health'];
+    }
+
+    public static function labelsForSubject(?Subject $subject, string $mode): array
+    {
+        if (MapehSetup::isCommunicationParent($subject)) {
+            return [
+                'effective_communication' => 'Effective Communication',
+                'mabisang_communication' => 'Mabisang Communication',
+            ];
+        }
+
+        return self::labels($mode);
+    }
+
+    public function componentLabels(): array
+    {
+        return self::labelsForSubject($this->parentSubject?->subject, $this->mode);
+    }
+
+    public function parentSlot(): string
+    {
+        return MapehSetup::isCommunicationParent($this->parentSubject?->subject)
+            ? 'effective_communication_group'
+            : 'mapeh';
     }
 
     public function inactiveComponentIds(): array

@@ -16,8 +16,8 @@
 
     if ($isSeniorHigh) {
         $infoRows[] = ['label' => 'Semester', 'value' => $enrollment?->semester ? ucfirst($enrollment->semester).' Semester' : 'N/A'];
+        $infoRows[] = ['label' => 'Track', 'value' => $enrollment?->track?->name ?? $enrollment?->cluster?->track?->name ?? 'N/A'];
         $infoRows[] = ['label' => 'Cluster', 'value' => $enrollment?->cluster?->name ?? 'N/A'];
-        $infoRows[] = ['label' => 'Preferred Course / Curriculum', 'value' => $enrollment?->preferredCourse?->name ?? $enrollment?->section?->curriculum?->name ?? 'N/A'];
     }
 @endphp
 

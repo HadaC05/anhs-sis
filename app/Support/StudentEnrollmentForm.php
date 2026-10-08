@@ -7,10 +7,11 @@ use App\Models\Cluster;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
 use App\Models\LearnerType;
-use App\Models\PreferredCourse;
 use App\Models\Religion;
 use App\Models\Student;
 use App\Models\StudentApplication;
+use App\Models\Subject;
+use App\Models\Track;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -40,10 +41,16 @@ class StudentEnrollmentForm
             'formDefaults' => [],
             'ignoreStudentId' => null,
             'fromSectionId' => null,
+            'tracks' => Track::query()->orderBy('name')->get(['track_ID', 'name']),
             'clusters' => Cluster::query()
-                ->with(['preferredCourses' => fn ($query) => $query->orderBy('name')])
+                ->with([
+                    'subjects' => fn ($query) => $query
+                        ->where('status', 'active')
+                        ->whereHas('subjectType', fn ($typeQuery) => $typeQuery->where('key', 'elective'))
+                        ->orderBy('title'),
+                ])
                 ->orderBy('name')
-                ->get(['cluster_ID', 'name']),
+                ->get(['cluster_ID', 'track_ID', 'name']),
             'gradeLevels' => GradeLevel::options(),
             'suffixOptions' => StudentApplication::suffixOptions(),
             'earliestBirthdate' => StudentApplication::EARLIEST_BIRTHDATE,
@@ -59,10 +66,23 @@ class StudentEnrollmentForm
         self::mergeLastSchoolYearCompleted($request);
 
         $request->merge(CapitalizesFormText::apply($request->all()));
+
+        $isSeniorHigh = in_array((string) $request->input('grade_level'), ['11', '12'], true);
+        $electiveIds = collect($request->input('elective_ids', []))
+            ->filter(fn ($id): bool => is_scalar($id) && filled($id))
+            ->values()
+            ->all();
+
         $request->merge([
             'father_is_deceased' => $request->boolean('father_is_deceased'),
             'mother_is_deceased' => $request->boolean('mother_is_deceased'),
             'guardian_is_deceased' => $request->boolean('guardian_is_deceased'),
+            // These controls remain in the HTML while hidden. Ignore their
+            // empty or stale values for the Grade 7-10 enrollment path.
+            'semester' => $isSeniorHigh ? $request->input('semester') : null,
+            'track_ID' => $isSeniorHigh ? $request->input('track_ID') : null,
+            'cluster_ID' => $isSeniorHigh ? $request->input('cluster_ID') : null,
+            'elective_ids' => $isSeniorHigh ? $electiveIds : [],
         ]);
 
         $normalizedLearnerType = LearnerType::normalizeSlug($request->input('learner_type'));
@@ -81,8 +101,10 @@ class StudentEnrollmentForm
             'grade_level' => ['required', 'in:7,8,9,10,11,12'],
             'LRN' => ['required', 'digits:12', Rule::unique('students', 'lrn')->ignore($ignoreStudentId)],
             'semester' => ['nullable', 'in:first,second'],
+            'track_ID' => ['nullable', 'integer', 'exists:tracks,track_ID'],
             'cluster_ID' => ['nullable', 'integer', 'exists:clusters,cluster_ID'],
-            'course_ID' => ['nullable', 'integer', 'exists:preferred_courses,course_ID'],
+            'elective_ids' => ['nullable', 'array'],
+            'elective_ids.*' => ['required', 'integer', 'distinct', 'exists:subjects,subject_ID'],
             'learner_type' => ['required', Rule::in(LearnerType::slugs())],
             'last_grade_level_completed' => ['nullable', 'in:6,7,8,9,10,11,12'],
             'last_school_year_completed' => ['nullable', 'regex:/^\d{4}-\d{4}$/'],
@@ -183,22 +205,47 @@ class StudentEnrollmentForm
                     $validator->errors()->add('semester', 'Semester is required for Grade 11 or 12.');
                 }
 
+                if (empty($data['track_ID'])) {
+                    $validator->errors()->add('track_ID', 'Track is required for Grade 11 or 12.');
+                }
+
                 if (empty($data['cluster_ID'])) {
                     $validator->errors()->add('cluster_ID', 'Cluster is required for Grade 11 or 12.');
                 }
 
-                if (empty($data['course_ID'])) {
-                    $validator->errors()->add('course_ID', 'Preferred course is required for Grade 11 or 12.');
-                }
-
-                if (! empty($data['course_ID']) && ! empty($data['cluster_ID'])) {
-                    $courseBelongsToCluster = PreferredCourse::query()
-                        ->where('course_ID', $data['course_ID'])
+                if (! empty($data['track_ID']) && ! empty($data['cluster_ID'])) {
+                    $clusterBelongsToTrack = Cluster::query()
                         ->where('cluster_ID', $data['cluster_ID'])
+                        ->where('track_ID', $data['track_ID'])
                         ->exists();
 
-                    if (! $courseBelongsToCluster) {
-                        $validator->errors()->add('course_ID', 'Preferred course must belong to the selected cluster.');
+                    if (! $clusterBelongsToTrack) {
+                        $validator->errors()->add('cluster_ID', 'Cluster must belong to the selected track.');
+                    }
+                }
+
+                $selectedTrack = ! empty($data['track_ID'])
+                    ? Track::query()->find($data['track_ID'])
+                    : null;
+                $requiredElectiveCount = $selectedTrack?->isAcademic() ? 2 : 1;
+                $electiveIds = collect($data['elective_ids'] ?? [])
+                    ->filter(fn ($id) => is_scalar($id) && filled($id))
+                    ->map(fn ($id) => (string) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+                if (count($electiveIds) !== $requiredElectiveCount) {
+                    $label = $requiredElectiveCount === 2 ? 'two different electives' : 'one elective';
+                    $validator->errors()->add('elective_ids', "Please choose {$label} for the selected track.");
+                } else {
+                    $validElectiveCount = Subject::query()
+                        ->whereIn('subject_ID', $electiveIds)
+                        ->where('status', 'active')
+                        ->whereHas('subjectType', fn ($query) => $query->where('key', 'elective'))
+                        ->count();
+
+                    if ($validElectiveCount !== $requiredElectiveCount) {
+                        $validator->errors()->add('elective_ids', 'Every selection must be an active elective.');
                     }
                 }
             }
@@ -256,8 +303,9 @@ class StudentEnrollmentForm
 
         if (! $isSeniorHigh) {
             $validated['semester'] = null;
+            $validated['track_ID'] = null;
             $validated['cluster_ID'] = null;
-            $validated['course_ID'] = null;
+            $validated['elective_ids'] = [];
         }
 
         return $validated;
@@ -276,6 +324,9 @@ class StudentEnrollmentForm
             'student.profile',
             'student.guardians',
             'student.addresses',
+            'cluster.track',
+            'track',
+            'electives',
         ]);
 
         $student = $enrollment->student;
@@ -302,8 +353,9 @@ class StudentEnrollmentForm
             'grade_level' => preg_replace('/\D+/', '', (string) $enrollment->grade_level) ?: '',
             'LRN' => $student?->lrn,
             'semester' => $enrollment->semester,
+            'track_ID' => $enrollment->track_ID ?? $enrollment->cluster?->track_ID,
             'cluster_ID' => $enrollment->cluster_ID,
-            'course_ID' => $enrollment->course_ID,
+            'elective_ids' => $enrollment->electives->pluck('subject_ID')->map(fn ($id) => (string) $id)->all(),
             'learner_type' => $enrollment->learner_type,
             'last_grade_level_completed' => $lastCompleted,
             'last_school_year_completed' => $enrollment->last_school_year_completed,

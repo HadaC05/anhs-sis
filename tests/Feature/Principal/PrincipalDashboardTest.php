@@ -235,13 +235,13 @@ test('principal can view subject proficiency levels by section', function () {
     ]);
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
     TeacherSubjectAssignment::query()->create([
         'section_ID' => $otherSection->section_ID,
-        'curr_subj_ID' => $otherCurriculumSubject->curr_subj_ID,
+        'subject_ID' => $otherCurriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);

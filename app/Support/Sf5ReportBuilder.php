@@ -31,12 +31,12 @@ class Sf5ReportBuilder
             throw ValidationException::withMessages(['sf5' => 'Complete the sex field for every learner before generating SF 5.']);
         }
 
-        $assignments = TeacherSubjectAssignment::query()->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester'])
+        $assignments = TeacherSubjectAssignment::query()->with(['subject', 'section.curriculum.gradingSemester'])
             ->where('section_ID', $section->section_ID)->where('SY_ID', $section->SY_ID)->get();
         $periodsBySemester = [];
         foreach ($assignments as $assignment) {
-            $key = GradingTerm::isSeniorHighSection($section) ? ($assignment->curriculumSubject?->semester ?? '') : 'jhs';
-            $periodsBySemester[$key] ??= $key === 'jhs' ? GradingTerm::configuredPeriods() : GradingTerm::seniorHighPeriods($assignment->curriculumSubject?->semester);
+            $key = GradingTerm::isSeniorHighSection($section) ? ($section->curriculum?->gradingSemester?->key ?? '') : 'jhs';
+            $periodsBySemester[$key] ??= $key === 'jhs' ? GradingTerm::configuredPeriods() : GradingTerm::seniorHighPeriods($key);
         }
         $grades = StudentSubjectGrade::query()->with(['studentSubject.enrollment.gradingSemester', 'term'])
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->pluck('enrollment_ID')))
@@ -47,22 +47,25 @@ class Sf5ReportBuilder
         return $enrollments->map(function (Enrollment $enrollment) use ($section, $assignments, $grades, $periodsBySemester): array {
             $student = $enrollment->student;
             $byAssignment = $grades->get($enrollment->enrollment_ID, collect())->groupBy('assignment_ID');
-            $subjectIds = $enrollment->studentSubjects->pluck('curr_subj_ID');
-            $learnerAssignments = $assignments->whereIn('curr_subj_ID', $subjectIds);
+            $subjectIds = $enrollment->studentSubjects->pluck('subject_ID');
+            $learnerAssignments = $assignments->whereIn('subject_ID', $subjectIds);
             $mapeh = \App\Models\MapehConfiguration::forSection($section);
             if ($mapeh) {
                 $learnerAssignments = MapehGrades::assignments($section, $learnerAssignments);
                 $byAssignment = MapehGrades::grades($learnerAssignments, $byAssignment->map(fn ($items) => $items->keyBy('grading_period')),
                     array_column(GradingTerm::configuredPeriods(), 'key'), true);
-                $subjectIds = $subjectIds->reject(fn ($id) => (int) $id === (int) $mapeh->parent_curr_subj_ID || in_array($id, $mapeh->inactiveComponentIds()));
+                $excludedSubjectIds = \App\Models\CurriculumSubject::query()
+                    ->whereIn('curr_subj_ID', [$mapeh->parent_curr_subj_ID, ...$mapeh->inactiveComponentIds()])
+                    ->pluck('subject_ID');
+                $subjectIds = $subjectIds->diff($excludedSubjectIds);
             }
             $finals = [];
-            $complete = $subjectIds->isNotEmpty() && $subjectIds->diff($learnerAssignments->pluck('curr_subj_ID'))->isEmpty();
+            $complete = $subjectIds->isNotEmpty() && $subjectIds->diff($learnerAssignments->pluck('subject_ID'))->isEmpty();
             foreach ($learnerAssignments as $assignment) {
                 if ($assignment->mapeh_component) {
                     continue;
                 }
-                $key = GradingTerm::isSeniorHighSection($section) ? ($assignment->curriculumSubject?->semester ?? '') : 'jhs';
+                $key = GradingTerm::isSeniorHighSection($section) ? ($section->curriculum?->gradingSemester?->key ?? '') : 'jhs';
                 $periods = $periodsBySemester[$key] ?? GradingTerm::configuredPeriods();
                 $byPeriod = $byAssignment->get($assignment->assignment_ID, collect())->filter(fn ($grade) => $grade->status === GradeStatus::RELEASED)->keyBy('grading_period');
                 $values = collect($periods)->map(fn ($period) => $byPeriod->get($period['key'])?->numeric_grade);
@@ -71,7 +74,7 @@ class Sf5ReportBuilder
 
                     continue;
                 }
-                $title = $assignment->curriculumSubject?->subject?->title ?? 'Subject';
+                $title = $assignment->subject?->title ?? 'Subject';
                 $finals[] = ['title' => $title, 'grade' => (int) round($values->map(fn ($value) => round((float) $value))->avg())];
             }
 

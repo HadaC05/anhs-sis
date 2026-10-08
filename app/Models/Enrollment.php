@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
@@ -30,6 +31,7 @@ class Enrollment extends Model
         'section_ID',
         'SY_ID',
         'curriculum_grade_level_ID',
+        'track_ID',
         'course_ID',
         'learner_type',
         'learner_type_ID',
@@ -90,6 +92,17 @@ class Enrollment extends Model
                 \App\Support\StudentSubjectRoster::sync($enrollment);
             }
         });
+
+        static::updated(function (Enrollment $enrollment): void {
+            if ($enrollment->wasChanged('section_ID') && $enrollment->section_ID && $enrollment->curriculum_grade_level_ID) {
+                $electiveSubjectIds = $enrollment->electives()
+                    ->pluck('subjects.subject_ID')
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->all();
+
+                \App\Support\StudentSubjectRoster::sync($enrollment, $electiveSubjectIds);
+            }
+        });
     }
 
     public function student(): BelongsTo
@@ -134,6 +147,11 @@ class Enrollment extends Model
         return $this->hasOneThrough(Cluster::class, Curriculum::class, 'curriculum_ID', 'cluster_ID', 'curriculum_grade_level_ID', 'cluster_ID');
     }
 
+    public function track(): BelongsTo
+    {
+        return $this->belongsTo(Track::class, 'track_ID', 'track_ID');
+    }
+
     public function gradingSemester(): HasOneThrough
     {
         return $this->hasOneThrough(GradingSemester::class, Curriculum::class, 'curriculum_ID', 'semester_ID', 'curriculum_grade_level_ID', 'semester_ID');
@@ -151,6 +169,18 @@ class Enrollment extends Model
     public function preferredCourse(): BelongsTo
     {
         return $this->belongsTo(PreferredCourse::class, 'course_ID', 'course_ID');
+    }
+
+    public function electives(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Subject::class,
+            'enrollment_electives',
+            'enrollment_ID',
+            'subject_ID',
+            'enrollment_ID',
+            'subject_ID',
+        )->withTimestamps();
     }
 
     public function enrollmentStatus(): BelongsTo

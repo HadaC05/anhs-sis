@@ -67,7 +67,7 @@ class PromotionEligibility
                     'closed_semester_id' => $closedSemesterId,
                     'periods' => $periods[$key],
                     'assignments' => $assignments->get($enrollment->section_ID, collect())->where('SY_ID', $enrollment->SY_ID)
-                        ->whereIn('curr_subj_ID', $enrollment->studentSubjects->pluck('curr_subj_ID')),
+                        ->whereIn('subject_ID', $enrollment->studentSubjects->pluck('subject_ID')),
                     'grades' => $grades->get($enrollment->enrollment_ID, collect()),
                     'observed_values' => $observedValues->get($enrollment->enrollment_ID, collect()),
                     'attendance' => $attendance->get($enrollment->enrollment_ID, collect()),
@@ -137,14 +137,14 @@ class PromotionEligibility
             return self::pending('The learner can be promoted after all Junior High terms are closed.');
         }
 
-        $studentSubjectIds = $batch !== null ? $enrollment->studentSubjects->pluck('curr_subj_ID') : StudentSubject::query()
+        $studentSubjectIds = $batch !== null ? $enrollment->studentSubjects->pluck('subject_ID') : StudentSubject::query()
             ->where('enrollment_ID', $enrollment->enrollment_ID)
-            ->pluck('curr_subj_ID');
+            ->pluck('subject_ID');
 
         $assignments = $batch['assignments'] ?? TeacherSubjectAssignment::query()
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
-            ->whereIn('curr_subj_ID', $studentSubjectIds)
+            ->whereIn('subject_ID', $studentSubjectIds)
             ->get();
         $periodKeys = $batch['periods']['keys'] ?? collect(GradingTerm::isSeniorHighSection($section)
             ? GradingTerm::seniorHighPeriods($enrollment->semester)

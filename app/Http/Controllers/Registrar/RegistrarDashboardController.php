@@ -139,11 +139,13 @@ class RegistrarDashboardController extends Controller
                     'academicYear',
                     'section',
                     'cluster',
-                    'preferredCourse',
+                    'cluster.track',
+                    'track',
+                    'electives',
                     'gradeLevel',
                     'learnerType',
                     'placementStatus',
-                    'grades.assignment.curriculumSubject.subject',
+                    'grades.assignment.subject',
                     'grades.assignment.staff',
                     'enrollmentStatus',
                 ])->latest('created_at');
@@ -180,12 +182,12 @@ class RegistrarDashboardController extends Controller
     {
         abort_if((int) $enrollment->student_ID !== (int) $student->id, 404);
 
-        $enrollment->load(['student', 'section.academicYear', 'section.cluster', 'section.gradeLevel', 'section.adviser', 'section.curriculum', 'academicYear', 'cluster', 'gradeLevel', 'preferredCourse']);
+        $enrollment->load(['student', 'section.academicYear', 'section.cluster', 'section.gradeLevel', 'section.adviser', 'section.curriculum', 'academicYear', 'cluster.track', 'track', 'gradeLevel', 'electives', 'studentSubjects']);
         $section = $enrollment->section;
         abort_if(! $section, 404);
 
         $assignments = TeacherSubjectAssignment::query()
-            ->with(['curriculumSubject.subject'])
+            ->with(['subject.subjectType'])
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $enrollment->SY_ID)
             ->get();
@@ -291,7 +293,7 @@ class RegistrarDashboardController extends Controller
             ->withoutMapehParents()
             ->with([
                 'section.gradeLevel',
-                'curriculumSubject.subject',
+                'subject',
                 'staff',
                 'grades' => function ($query) use ($statuses, $status, $termIds): void {
                     $query->whereStatus($status ?: $statuses)->when($termIds !== null, fn ($grades) => $grades->whereIn('term_ID', $termIds))->with('gradeStatus');
@@ -300,10 +302,8 @@ class RegistrarDashboardController extends Controller
             ->whereHas('grades', function ($query) use ($statuses, $status, $termIds): void {
                 $query->whereStatus($status ?: $statuses)->when($termIds !== null, fn ($grades) => $grades->whereIn('term_ID', $termIds));
             })
-            ->when($semester, fn ($query) => $query->whereHas('curriculumSubject.curriculumGradeLevel.gradingSemester', fn ($query) => $query->where('key', $semester)))
-            ->when($subjectId, function ($query) use ($subjectId): void {
-                $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $subjectId));
-            })
+            ->when($semester, fn ($query) => $query->whereHas('section.curriculum.gradingSemester', fn ($query) => $query->whereIn('key', ['full_year', $semester])))
+            ->when($subjectId, fn ($query) => $query->where('subject_ID', $subjectId))
             ->when($gradeId, function ($query) use ($gradeId): void {
                 $query->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('grade_ID', $gradeId));
             })
@@ -312,7 +312,7 @@ class RegistrarDashboardController extends Controller
                 $query->where(function ($assignmentQuery) use ($search): void {
                     $assignmentQuery
                         ->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('curriculumSubject.subject', function ($subjectQuery) use ($search): void {
+                        ->orWhereHas('subject', function ($subjectQuery) use ($search): void {
                             $subjectQuery->where('code', 'like', "%{$search}%")
                                 ->orWhere('title', 'like', "%{$search}%");
                         })
@@ -334,7 +334,7 @@ class RegistrarDashboardController extends Controller
 
         $assignment->load([
             'section.gradeLevel',
-            'curriculumSubject.subject',
+            'subject',
             'staff',
             'academicYear',
             'grades' => function ($query) use ($status): void {
@@ -531,14 +531,15 @@ class RegistrarDashboardController extends Controller
                 'academicYear',
                 'cluster',
                 'adviser',
+                'curriculum.gradingSemester',
                 'teacherSubjectAssignments' => fn ($query) => $query
-                    ->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester', 'staff'])
+                    ->with(['subject', 'staff'])
                     ->orderBy('assignment_ID'),
             ])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($sectionQuery) use ($search): void {
                     $sectionQuery->where('name', 'like', "%{$search}%")
-                        ->orWhereHas('teacherSubjectAssignments.curriculumSubject.subject', function ($subjectQuery) use ($search): void {
+                        ->orWhereHas('teacherSubjectAssignments.subject', function ($subjectQuery) use ($search): void {
                             $subjectQuery->where('code', 'like', "%{$search}%")
                                 ->orWhere('title', 'like', "%{$search}%");
                         })
@@ -602,8 +603,9 @@ class RegistrarDashboardController extends Controller
             'gradeLevel',
             'academicYear',
             'adviser',
+            'curriculum.gradingSemester',
             'teacherSubjectAssignments' => function ($query): void {
-                $query->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester', 'staff'])
+                $query->with(['subject', 'staff'])
                     ->withGradeStatusCounts()
                     ->orderBy('assignment_ID');
             },
@@ -616,8 +618,9 @@ class RegistrarDashboardController extends Controller
     {
         $section->load([
             'gradeLevel',
+            'curriculum.gradingSemester',
             'teacherSubjectAssignments' => fn ($query) => $query
-                ->with(['curriculumSubject.subject', 'curriculumSubject.gradingSemester', 'staff'])
+                ->with(['subject', 'staff'])
                 ->orderBy('assignment_ID'),
         ]);
 
@@ -631,8 +634,8 @@ class RegistrarDashboardController extends Controller
 
     public function classSubjectGradeRecords(Request $request, TeacherSubjectAssignment $assignment): View
     {
-        $assignment->load(['section.gradeLevel', 'curriculumSubject.gradingSemester']);
-        $periods = GradingTerm::periodsForSection($assignment->section, $assignment->curriculumSubject?->semester);
+        $assignment->load(['section.gradeLevel', 'section.curriculum.gradingSemester']);
+        $periods = GradingTerm::periodsForSection($assignment->section, $this->semesterForSection($assignment->section));
         $validated = $request->validate([
             'grading_period' => ['required', Rule::in(array_column($periods, 'key'))],
         ]);
@@ -641,7 +644,7 @@ class RegistrarDashboardController extends Controller
             ->forPeriodKey($period['key'])
             ->whereStatus(GradeStatus::teacherLockedSlugs())
             ->whereHas('studentSubject', function ($query) use ($assignment): void {
-                $query->where('curr_subj_ID', $assignment->curr_subj_ID)
+                $query->where('subject_ID', $assignment->subject_ID)
                     ->whereHas('enrollment', function ($enrollments) use ($assignment): void {
                         $enrollments->where('section_ID', $assignment->section_ID)
                             ->where('SY_ID', $assignment->SY_ID)
@@ -676,8 +679,8 @@ class RegistrarDashboardController extends Controller
             $subjects = $section->teacherSubjectAssignments->filter(function ($assignment) use ($section, $periods): bool {
                 return ! GradingTerm::isSeniorHighSection($section)
                     || ! $periods['semester']
-                    || ! $assignment->curriculumSubject?->semester
-                    || $assignment->curriculumSubject->semester === $periods['semester'];
+                    || ! $this->semesterForSection($section)
+                    || $this->semesterForSection($section) === $periods['semester'];
             })->values();
             $section->setRelation('teacherSubjectAssignments', $subjects);
             foreach ($subjects as $assignment) {
@@ -725,14 +728,15 @@ class RegistrarDashboardController extends Controller
             'section.academicYear',
             'section.cluster',
             'section.adviser',
-            'curriculumSubject.subject',
+            'section.curriculum.gradingSemester',
+            'subject',
             'staff',
             'academicYear',
         ]);
 
         $periods = GradingTerm::openPeriodsForSection(
             $assignment->section,
-            $assignment->curriculumSubject?->semester,
+            $this->semesterForSection($assignment->section),
         );
         $termSummaries = collect($periods)
             ->map(fn (array $period): array => AssignmentGradeTermUnlocker::termSummary($assignment, $period))
@@ -747,10 +751,10 @@ class RegistrarDashboardController extends Controller
 
     public function unlockClassSubjectTerm(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse|JsonResponse
     {
-        $assignment->load(['section.gradeLevel', 'curriculumSubject']);
+        $assignment->load(['section.gradeLevel', 'section.curriculum.gradingSemester']);
         $periods = GradingTerm::openPeriodsForSection(
             $assignment->section,
-            $assignment->curriculumSubject?->semester,
+            $this->semesterForSection($assignment->section),
         );
         $periodKeys = array_column($periods, 'key');
 
@@ -782,5 +786,12 @@ class RegistrarDashboardController extends Controller
     private function periodsForSection(?Section $section): array
     {
         return GradingTerm::periodsForSection($section);
+    }
+
+    private function semesterForSection(?Section $section): ?string
+    {
+        $key = $section?->curriculum?->gradingSemester?->key;
+
+        return $key === 'full_year' ? null : $key;
     }
 }

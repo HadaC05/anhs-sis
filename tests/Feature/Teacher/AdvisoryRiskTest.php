@@ -82,7 +82,7 @@ function createAdvisoryRiskFixtures(bool $isSeniorHigh = true): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -92,7 +92,7 @@ function createAdvisoryRiskFixtures(bool $isSeniorHigh = true): array
             'cluster_ID' => $cluster->cluster_ID,
             'code' => 'PRECALC',
             'title' => 'Pre-Calculus',
-            'type' => 'specialized',
+            'type' => 'elective',
             'status' => 'active',
         ]);
 
@@ -106,7 +106,7 @@ function createAdvisoryRiskFixtures(bool $isSeniorHigh = true): array
 
         TeacherSubjectAssignment::query()->create([
             'section_ID' => $section->section_ID,
-            'curr_subj_ID' => $specializedCurriculumSubject->curr_subj_ID,
+            'subject_ID' => $specializedCurriculumSubject->subject_ID,
             'staff_ID' => $teacher->staff_id,
             'SY_ID' => $academicYear->SY_ID,
         ]);
@@ -135,7 +135,7 @@ function createAdvisoryRiskFixtures(bool $isSeniorHigh = true): array
     ]);
 
     StudentSubjectGrade::query()->create([
-        'student_subject_ID' => $enrollment->studentSubjects()->where('curr_subj_ID', $curriculumSubject->curr_subj_ID)->firstOrFail()->getKey(),
+        'student_subject_ID' => $enrollment->studentSubjects()->where('subject_ID', $curriculumSubject->subject_ID)->firstOrFail()->getKey(),
         'assignment_ID' => $assignment->assignment_ID,
         'term_ID' => StudentSubjectGrade::termIdForPeriodKey($isSeniorHigh ? 'shs_sem1_term_1' : 'term_1'),
         'numeric_grade' => 91,

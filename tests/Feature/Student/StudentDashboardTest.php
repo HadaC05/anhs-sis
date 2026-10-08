@@ -167,6 +167,7 @@ test('senior high student dashboard shows cluster and preferred course', functio
     $response->assertSee('Cluster');
     $response->assertSee('Preferred Course');
     $response->assertSee('Semester');
+    $response->assertDontSee('>Electives<', false);
     $response->assertSee($fixtures['cluster']->name);
     $response->assertSee($fixtures['preferredCourse']->name);
     expect($fixtures['enrollment']->isSeniorHigh())->toBeTrue();

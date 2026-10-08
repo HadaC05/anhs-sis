@@ -177,9 +177,9 @@ $sectionList = $sections instanceof \Illuminate\Pagination\LengthAwarePaginator 
             <div class="mt-3 space-y-2">
                 @forelse ($assignments as $assignment)
                 @php
-                $subject = $assignment->curriculumSubject?->subject;
+                $subject = $assignment->subject;
                 $subjectLabel = $subject ? ($subject->code . ' - ' . $subject->title) : 'Subject';
-                $semester = $assignment->curriculumSubject?->semester;
+                $semester = $assignment->section?->curriculum?->gradingSemester?->key;
                 $isSeniorHigh = in_array((int) $section->grade_ID, $seniorHighGradeIds, true);
                 $periodLabel = $isSeniorHigh
                     ? ($semester ? ucfirst($semester) . ' Semester · ' : '') . $seniorHighTermLabel

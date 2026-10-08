@@ -69,7 +69,7 @@
                         if (! $assignment->mapeh_component) $finalRatings->push($final);
                     @endphp
                     <tr>
-                        <td>{{ $assignment->curriculumSubject?->subject?->title ?? 'N/A' }}</td>
+                        <td>{{ $assignment->subject?->title ?? 'N/A' }}</td>
                         @foreach ($values as $value)<td>{{ $format($value) }}</td>@endforeach
                         <td>{{ $format($final) }}</td>
                         <td>{{ $final === null ? 'Pending' : ($final >= 75 ? 'PASSED' : 'FAILED') }}</td>

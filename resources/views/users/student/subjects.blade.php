@@ -65,7 +65,7 @@
                     <tbody>
                         @foreach ($studentSubjects as $index => $studentSubject)
                             @php
-                                $subject = $studentSubject->curriculumSubject?->subject;
+                                $subject = $studentSubject->subject;
                                 $subjectCode = $subject?->code ?? '—';
                                 $subjectTitle = $subject?->title ?? 'N/A';
                                 $subjectType = $subject?->type ? ucwords(str_replace('_', ' ', $subject->type)) : '—';

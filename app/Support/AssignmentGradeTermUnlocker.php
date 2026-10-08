@@ -28,13 +28,13 @@ class AssignmentGradeTermUnlocker
     public static function editablePeriodKeysFor(int $assignmentId): array
     {
         $assignment = TeacherSubjectAssignment::query()
-            ->with(['section.gradeLevel', 'curriculumSubject'])
+            ->with(['section.gradeLevel', 'section.curriculum.gradingSemester'])
             ->find($assignmentId);
 
         $keys = array_filter([
             GradingTerm::currentEditablePeriodKeyForSection(
                 $assignment?->section,
-                $assignment?->curriculumSubject?->semester,
+                self::semesterForAssignment($assignment),
             ),
             ...self::unlockedPeriodKeysFor($assignmentId),
         ]);
@@ -84,7 +84,7 @@ class AssignmentGradeTermUnlocker
      * Build summaries in bulk. Period settings are resolved once per school level
      * and semester, and grade records are counted in SQL rather than hydrated.
      *
-     * @param iterable<TeacherSubjectAssignment> $assignments
+     * @param  iterable<TeacherSubjectAssignment>  $assignments
      * @return array<int, list<array<string, mixed>>>
      */
     public static function termSummariesForAssignments(iterable $assignments, bool $includeFuturePeriods = false): array
@@ -113,7 +113,7 @@ class AssignmentGradeTermUnlocker
 
         foreach ($assignments as $assignment) {
             $section = $assignment->section;
-            $semester = $assignment->curriculumSubject?->semester;
+            $semester = self::semesterForAssignment($assignment);
             $contextKey = GradingTerm::isSeniorHighSection($section) ? 'senior:'.($semester ?? 'all') : 'junior';
             if (! isset($contexts[$contextKey])) {
                 $contexts[$contextKey] = [
@@ -167,7 +167,7 @@ class AssignmentGradeTermUnlocker
             ->get();
 
         $section = $assignment->section;
-        $semester = $assignment->curriculumSubject?->semester;
+        $semester = self::semesterForAssignment($assignment);
         $isSchoolLocked = in_array($period['key'], GradingTerm::lockedPeriodKeysForSection($section, $semester), true);
         $isRegistrarUnlocked = AssignmentGradeTermUnlock::query()
             ->where('assignment_ID', $assignment->assignment_ID)
@@ -190,5 +190,12 @@ class AssignmentGradeTermUnlocker
             'is_current_term' => $isCurrentTerm,
             'can_unlock' => $canUnlock || ($lockedCount > 0),
         ];
+    }
+
+    private static function semesterForAssignment(?TeacherSubjectAssignment $assignment): ?string
+    {
+        $key = $assignment?->section?->curriculum?->gradingSemester?->key;
+
+        return $key === 'full_year' ? null : $key;
     }
 }

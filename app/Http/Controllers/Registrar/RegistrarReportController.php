@@ -44,7 +44,7 @@ class RegistrarReportController extends Controller
             $query = TeacherSubjectAssignment::query()->withoutMapehParents()
                 ->where('SY_ID', $selectedYear?->SY_ID ?? 0)
                 ->when($gradeId, fn ($q) => $q->whereHas('section', fn ($s) => $s->where('grade_ID', $gradeId)))
-                ->with(['section.gradeLevel', 'curriculumSubject.subject', 'staff'])
+                ->with(['section.gradeLevel', 'subject', 'staff'])
                 ->withCount(['grades' => fn ($q) => $q->when($termId, fn ($g) => $g->where('term_ID', $termId))]);
             foreach (GradeStatus::slugs() as $status) {
                 $query->withCount(["grades as {$status}_count" => fn ($q) => $q->whereStatus($status)
@@ -53,7 +53,7 @@ class RegistrarReportController extends Controller
             $rows = $query->orderBy('section_ID')->orderBy('assignment_ID')->get()->map(fn ($assignment) => [
                 $assignment->section?->getRelation('gradeLevel')?->grade_label ?? 'Unspecified',
                 $assignment->section?->name ?? 'Unassigned',
-                $assignment->curriculumSubject?->subject?->title ?? 'Unspecified',
+                $assignment->subject?->title ?? 'Unspecified',
                 trim(($assignment->staff?->first_name ?? '').' '.($assignment->staff?->last_name ?? '')) ?: 'Unassigned',
                 ...array_map(fn ($status) => (int) $assignment->{"{$status}_count"}, GradeStatus::slugs()),
                 (int) $assignment->grades_count,

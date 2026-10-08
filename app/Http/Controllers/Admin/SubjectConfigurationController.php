@@ -9,6 +9,7 @@ use App\Models\Cluster;
 use App\Models\PreferredCourse;
 use App\Models\Subject;
 use App\Models\SubjectType;
+use App\Models\Track;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,16 +28,12 @@ class SubjectConfigurationController extends Controller
         $status = $request->string('status')->toString();
         $type = $request->string('type')->toString();
         $schoolLevel = $request->string('school_level')->toString();
-        $preferredCoursesPerPage = (int) $request->integer('preferred_courses_per_page', 10);
-        if (! in_array($preferredCoursesPerPage, [5, 10, 15, 25, 50], true)) {
-            $preferredCoursesPerPage = 10;
-        }
-
-        $preferredSearch = trim($request->string('preferred_courses_search')->toString());
-        $preferredClusterId = $request->integer('preferred_courses_cluster_ID');
-
+        $clusterId = $request->integer('cluster_ID');
+        $trackSearch = trim($request->string('track_search')->toString());
+        $clusterSearch = trim($request->string('cluster_search')->toString());
+        $clusterTrackId = $request->integer('cluster_track_ID');
         $subjects = Subject::query()
-            ->with('subjectType')
+            ->with(['subjectType', 'cluster'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('code', 'like', "%{$search}%")
@@ -52,45 +49,42 @@ class SubjectConfigurationController extends Controller
             ->when(in_array($schoolLevel, ['Junior High School', 'Senior High School'], true), function ($query) use ($schoolLevel): void {
                 $query->where('school_level', $schoolLevel);
             })
+            ->when($clusterId > 0, function ($query) use ($clusterId): void {
+                $query->where('cluster_ID', $clusterId);
+            })
             ->orderBy('code')
             ->paginate($perPage)
             ->withQueryString();
 
-        $preferredCourses = PreferredCourse::query()
-            ->with('cluster')
-            ->when($preferredSearch !== '', function ($query) use ($preferredSearch): void {
-                $query->where(function ($inner) use ($preferredSearch): void {
-                    $inner->where('name', 'like', "%{$preferredSearch}%")
-                        ->orWhere('description', 'like', "%{$preferredSearch}%");
-                });
-            })
-            ->when($preferredClusterId > 0, function ($query) use ($preferredClusterId): void {
-                $query->where('cluster_ID', $preferredClusterId);
-            })
+        $tracks = Track::query()
+            ->withCount('clusters')
+            ->when($trackSearch !== '', fn ($query) => $query->where('name', 'like', "%{$trackSearch}%"))
             ->orderBy('name')
-            ->paginate($preferredCoursesPerPage, ['*'], 'preferred_courses_page')
-            ->withQueryString();
+            ->get();
 
-        $preferredClusters = Cluster::query()
-            ->whereIn('name', [
-                'Arts, Social Sciences, And Humanities',
-                'Business And Entrepreneurship',
-                'Science, Technology, Engineering, and Mathematics',
-            ])
+        $clusters = Cluster::query()
+            ->with('track')
+            ->withCount('subjects')
+            ->when($clusterSearch !== '', fn ($query) => $query->where('name', 'like', "%{$clusterSearch}%"))
+            ->when($clusterTrackId > 0, fn ($query) => $query->where('track_ID', $clusterTrackId))
             ->orderBy('name')
-            ->get(['cluster_ID', 'name']);
+            ->get();
+
+        $allTracks = Track::query()->orderBy('name')->get(['track_ID', 'name']);
+        $allClusters = Cluster::query()->orderBy('name')->get(['cluster_ID', 'name']);
 
         return view('users.admin.subject-config', [
             'subjects' => $subjects,
-            'preferredCourses' => $preferredCourses,
+            'tracks' => $tracks,
+            'clusters' => $clusters,
+            'allTracks' => $allTracks,
             'subjectTypes' => SubjectType::query()->orderBy('sort_order')->get(['subject_type_ID', 'key', 'label']),
-            'preferredClusters' => $preferredClusters,
+            'subjectClusters' => $allClusters,
             'perPage' => $perPage,
-            'preferredCoursesPerPage' => $preferredCoursesPerPage,
+            'trackCount' => Track::query()->count(),
+            'clusterCount' => Cluster::query()->count(),
             'totalSubjects' => Subject::query()->count(),
             'activeSubjectCount' => Subject::query()->where('status', 'active')->count(),
-            'archivedSubjectCount' => Subject::query()->where('status', 'archived')->count(),
-            'preferredCourseCount' => PreferredCourse::query()->count(),
         ]);
     }
 
@@ -116,6 +110,52 @@ class SubjectConfigurationController extends Controller
         return back()->with('success', $nextStatus === 'archived'
             ? 'Subject archived successfully.'
             : 'Subject restored successfully.');
+    }
+
+    public function storeTrack(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('tracks', 'name')],
+        ]);
+
+        Track::query()->create($validated);
+
+        return back()->with('success', 'Track created successfully.');
+    }
+
+    public function updateTrack(Request $request, Track $track): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('tracks', 'name')->ignore($track->track_ID, 'track_ID')],
+        ]);
+
+        $track->update($validated);
+
+        return back()->with('success', 'Track updated successfully.');
+    }
+
+    public function storeCluster(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'track_ID' => ['required', 'integer', Rule::exists('tracks', 'track_ID')],
+            'name' => ['required', 'string', 'max:255', Rule::unique('clusters', 'name')],
+        ]);
+
+        Cluster::query()->create($validated);
+
+        return back()->with('success', 'Cluster created successfully.');
+    }
+
+    public function updateCluster(Request $request, Cluster $cluster): RedirectResponse
+    {
+        $validated = $request->validate([
+            'track_ID' => ['required', 'integer', Rule::exists('tracks', 'track_ID')],
+            'name' => ['required', 'string', 'max:255', Rule::unique('clusters', 'name')->ignore($cluster->cluster_ID, 'cluster_ID')],
+        ]);
+
+        $cluster->update($validated);
+
+        return back()->with('success', 'Cluster updated successfully.');
     }
 
     public function storePreferredCourse(Request $request): RedirectResponse

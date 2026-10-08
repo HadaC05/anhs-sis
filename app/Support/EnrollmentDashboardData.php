@@ -120,7 +120,7 @@ class EnrollmentDashboardData
             'genderDistribution' => $genderDistribution,
             'clusterDistribution' => $clusterDistribution,
             'recentEnrollments' => (clone $baseQuery)
-                ->with(['student.application', 'section.gradeLevel', 'gradeLevel', 'cluster', 'preferredCourse', 'enrollmentStatus', 'learnerType', 'placementStatus'])
+                ->with(['student.application', 'section.gradeLevel', 'gradeLevel', 'cluster', 'track', 'electives', 'enrollmentStatus', 'learnerType', 'placementStatus'])
                 ->latest('created_at')
                 ->limit(5)
                 ->get(),

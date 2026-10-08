@@ -122,7 +122,7 @@ function createAssignedSubject(
 
     return TeacherSubjectAssignment::query()->create([
         'section_ID' => $context['section']->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $context['teacher']->staff_id,
         'SY_ID' => $context['academicYear']->SY_ID,
     ]);
@@ -176,6 +176,7 @@ test('senior high student subjects page uses semester and term filters from look
     $response->assertSee('GENMATH');
     $response->assertSee('General Mathematics');
     $response->assertSee('Reyes, Maria');
+    $response->assertDontSee('>Electives<', false);
     $response->assertDontSee('name="quarter_ID"', false);
     $response->assertDontSee('>Quarter</label>', false);
 });
@@ -277,7 +278,7 @@ test('student subjects page filters assignments by selected school year', functi
     ]);
     TeacherSubjectAssignment::query()->create([
         'section_ID' => $yearTwoSection->section_ID,
-        'curr_subj_ID' => $yearTwoCurriculumSubject->curr_subj_ID,
+        'subject_ID' => $yearTwoCurriculumSubject->subject_ID,
         'staff_ID' => $firstYear['teacher']->staff_id,
         'SY_ID' => $yearTwo->SY_ID,
     ]);

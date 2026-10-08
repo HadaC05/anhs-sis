@@ -46,7 +46,7 @@ class RegistrarDashboardData
                 ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
                 ->distinct()->count('student_ID'),
             'reviewQueue' => $pending
-                ->with(['section.gradeLevel', 'curriculumSubject.subject', 'staff'])
+                ->with(['section.gradeLevel', 'subject', 'staff'])
                 ->withCount(['grades as pending_grades_count' => fn ($query) => $query->whereStatus(GradeStatus::SUBMITTED)])
                 ->withMin(['grades as oldest_submission' => fn ($query) => $query->whereStatus(GradeStatus::SUBMITTED)], 'submitted_at')
                 ->orderBy('oldest_submission')->orderBy('assignment_ID')->limit(6)->get(),

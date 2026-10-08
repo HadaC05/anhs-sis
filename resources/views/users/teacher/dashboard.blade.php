@@ -91,10 +91,10 @@
                     @forelse ($displayedAssignments as $assignment)
                         <tr>
                             <td class="px-5 py-4 text-slate-600">{{ $assignment->section?->name ?? 'Section unavailable' }}</td>
-                            <th scope="row" class="min-w-48 px-5 py-4 font-bold text-slate-900">{{ $assignment->curriculumSubject?->subject?->title ?? 'Subject unavailable' }}</th>
-                            <td class="px-5 py-4 text-slate-600">{{ $assignment->curriculumSubject?->subject?->code ?: '—' }}</td>
+                            <th scope="row" class="min-w-48 px-5 py-4 font-bold text-slate-900">{{ $assignment->subject?->title ?? 'Subject unavailable' }}</th>
+                            <td class="px-5 py-4 text-slate-600">{{ $assignment->subject?->code ?: '—' }}</td>
                             @if ($showSemester)
-                                <td class="px-5 py-4 text-slate-600">{{ \App\Models\GradingTerm::isSeniorHighSection($assignment->section) && $assignment->curriculumSubject?->semester ? ucfirst($assignment->curriculumSubject->semester) : '—' }}</td>
+                                <td class="px-5 py-4 text-slate-600">{{ \App\Models\GradingTerm::isSeniorHighSection($assignment->section) && $assignment->section?->curriculum?->gradingSemester?->key ? ucfirst($assignment->section->curriculum->gradingSemester->key) : '—' }}</td>
                             @endif
                             <td class="px-5 py-4">
                                 <div class="flex flex-wrap gap-2">
@@ -106,7 +106,7 @@
                                 </div>
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <a href="{{ route('teacher.sections.show', $assignment) }}" aria-label="Open grades for {{ $assignment->curriculumSubject?->subject?->title }} in {{ $assignment->section?->name }}" class="inline-flex whitespace-nowrap rounded-lg border border-[#296374]/30 px-4 py-2.5 text-sm font-bold text-[#296374] transition hover:bg-[#296374]/5">{{ $assignment->rejected_grades_count > 0 ? 'Review grades' : 'Open grades' }} &rarr;</a>
+                                <a href="{{ route('teacher.sections.show', $assignment) }}" aria-label="Open grades for {{ $assignment->subject?->title }} in {{ $assignment->section?->name }}" class="inline-flex whitespace-nowrap rounded-lg border border-[#296374]/30 px-4 py-2.5 text-sm font-bold text-[#296374] transition hover:bg-[#296374]/5">{{ $assignment->rejected_grades_count > 0 ? 'Review grades' : 'Open grades' }} &rarr;</a>
                             </td>
                         </tr>
                     @empty

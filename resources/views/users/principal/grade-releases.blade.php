@@ -53,7 +53,7 @@
                             $approvedCount = $grades->where('status', 'approved')->count();
                             $releasedCount = $grades->where('status', 'released')->count();
                             $canRelease = $approvedCount > 0;
-                            $subject = $assignment->curriculumSubject?->subject;
+                            $subject = $assignment->subject;
                             $subjectLabel = $subject ? ($subject->code.' - '.$subject->title) : 'N/A';
                         @endphp
                         <tr class="transition-colors">

@@ -134,6 +134,14 @@ Route::delete('/curriculum-configuration/subjects/{curriculumSubject}', [Curricu
     ->name('curriculum-config.subjects.delete');
 Route::get('/subject-configuration', [SubjectConfigurationController::class, 'index'])
     ->name('subject-config.index');
+Route::post('/subject-configuration/tracks', [SubjectConfigurationController::class, 'storeTrack'])
+    ->name('subject-config.tracks.store');
+Route::put('/subject-configuration/tracks/{track}', [SubjectConfigurationController::class, 'updateTrack'])
+    ->name('subject-config.tracks.update');
+Route::post('/subject-configuration/clusters', [SubjectConfigurationController::class, 'storeCluster'])
+    ->name('subject-config.clusters.store');
+Route::put('/subject-configuration/clusters/{cluster}', [SubjectConfigurationController::class, 'updateCluster'])
+    ->name('subject-config.clusters.update');
 Route::post('/subject-configuration', [SubjectConfigurationController::class, 'store'])
     ->name('subject-config.store');
 Route::put('/subject-configuration/{subject}', [SubjectConfigurationController::class, 'update'])

@@ -13,6 +13,7 @@ use App\Models\TeacherSubjectAssignment;
 use Database\Seeders\AcademicYearSeeder;
 use Database\Seeders\ClusterSeeder;
 use Database\Seeders\CurriculumSeeder;
+use Database\Seeders\CurriculumSubjectSeeder;
 use Database\Seeders\DefaultNonStudentUsersSeeder;
 use Database\Seeders\GradeLevelSeeder;
 use Database\Seeders\RoleSeeder;
@@ -93,7 +94,7 @@ test('teacher subject assignment seeder assigns subjects to each section adviser
         'cluster_ID' => $cluster->cluster_ID,
         'code' => 'PRACTRESEARCH2',
         'title' => 'Practical Research 2',
-        'type' => 'applied',
+        'type' => 'elective',
         'status' => 'active',
     ]);
 
@@ -115,9 +116,9 @@ test('teacher subject assignment seeder assigns subjects to each section adviser
 
     $this->seed(TeacherSubjectAssignmentSeeder::class);
 
-    expect(TeacherSubjectAssignment::query()->where('section_ID', $grade11Section->section_ID)->where('curr_subj_ID', $grade11Subject->curr_subj_ID)->value('staff_ID'))
+    expect(TeacherSubjectAssignment::query()->where('section_ID', $grade11Section->section_ID)->where('subject_ID', $grade11Subject->subject_ID)->value('staff_ID'))
         ->toBe($grade11Teacher->staff_id)
-        ->and(TeacherSubjectAssignment::query()->where('section_ID', $grade12Section->section_ID)->where('curr_subj_ID', $grade12Subject->curr_subj_ID)->value('staff_ID'))
+        ->and(TeacherSubjectAssignment::query()->where('section_ID', $grade12Section->section_ID)->where('subject_ID', $grade12Subject->subject_ID)->value('staff_ID'))
         ->toBe($grade12Teacher->staff_id);
 });
 
@@ -210,14 +211,14 @@ test('teacher subject assignment seeder shares specialists across sections and k
     $this->seed(TeacherSubjectAssignmentSeeder::class);
 
     $mathTeacherIds = TeacherSubjectAssignment::query()
-        ->where('curr_subj_ID', $mathSubject->curr_subj_ID)
+        ->where('subject_ID', $mathSubject->subject_ID)
         ->whereIn('section_ID', [$sectionA->section_ID, $sectionB->section_ID])
         ->pluck('staff_ID')
         ->unique()
         ->values();
 
     $scienceTeacherIds = TeacherSubjectAssignment::query()
-        ->where('curr_subj_ID', $scienceSubject->curr_subj_ID)
+        ->where('subject_ID', $scienceSubject->subject_ID)
         ->whereIn('section_ID', [$sectionA->section_ID, $sectionB->section_ID])
         ->pluck('staff_ID')
         ->unique()
@@ -231,7 +232,7 @@ test('teacher subject assignment seeder shares specialists across sections and k
         ->and($sectionB->fresh()->staff_ID)->toBe($scienceTeacher->staff_id);
 });
 
-test('default seeders do not create curriculum subject or teacher assignments', function () {
+test('default seeders create configured curriculum subjects and matching teacher assignments', function () {
     $this->seed([
         RoleSeeder::class,
         DefaultNonStudentUsersSeeder::class,
@@ -239,6 +240,7 @@ test('default seeders do not create curriculum subject or teacher assignments', 
         GradeLevelSeeder::class,
         SubjectSeeder::class,
         CurriculumSeeder::class,
+        CurriculumSubjectSeeder::class,
         AcademicYearSeeder::class,
         SectionSeeder::class,
         TeacherSubjectAssignmentSeeder::class,
@@ -246,8 +248,14 @@ test('default seeders do not create curriculum subject or teacher assignments', 
 
     $academicYearId = AcademicYear::query()->where('status', true)->value('SY_ID');
     $sections = Section::query()->where('SY_ID', $academicYearId)->get();
+    $expectedAssignmentCount = $sections->sum(
+        fn (Section $section): int => CurriculumSubject::query()
+            ->where('curriculum_grade_level_ID', $section->curriculum_grade_level_ID)
+            ->count(),
+    );
 
-    expect($sections->pluck('staff_ID')->filter()->unique())->toHaveCount(30)
-        ->and(CurriculumSubject::query()->count())->toBe(0)
-        ->and(TeacherSubjectAssignment::query()->count())->toBe(0);
+    expect($sections->pluck('staff_ID')->filter()->unique())->toHaveCount($sections->count())
+        ->and(CurriculumSubject::query()->count())->toBeGreaterThan(0)
+        ->and(TeacherSubjectAssignment::query()->count())->toBe($expectedAssignmentCount)
+        ->and(TeacherSubjectAssignment::query()->whereNull('staff_ID')->exists())->toBeFalse();
 });

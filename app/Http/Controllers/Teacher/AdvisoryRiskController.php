@@ -34,7 +34,7 @@ class AdvisoryRiskController extends Controller
         }
 
         return StudentSubjectGrade::query()
-            ->with(['studentSubject.enrollment.student.application', 'assignment.curriculumSubject.subject'])
+            ->with(['studentSubject.enrollment.student.application', 'assignment.subject'])
             ->forPeriodKey($term)
             ->whereHas('assignment', fn ($query) => $query->withoutMapehParents()->where('section_ID', $section->section_ID)->where('SY_ID', $section->SY_ID))
             ->whereHas('studentSubject.enrollment', fn ($query) => $query
@@ -70,7 +70,7 @@ class AdvisoryRiskController extends Controller
             $periods->firstWhere('key', $term)['label'],
             $section->academicYear->school_year,
             $term,
-            $grades->unique('assignment.curriculumSubject.subject_ID')->count(),
+            $grades->unique('assignment.subject_ID')->count(),
         );
         $student = DB::transaction(function () use ($enrollment, $term, $reminder) {
             $student = $enrollment->student()->lockForUpdate()->firstOrFail();

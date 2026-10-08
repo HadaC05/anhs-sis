@@ -23,7 +23,7 @@
         body {
             margin: 0;
             color: #111;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: "Arial Narrow", Arial, Helvetica, sans-serif;
             font-size: 10px;
             background: #e5e7eb;
         }
@@ -66,10 +66,40 @@
             margin-bottom: 4mm;
         }
 
+        .header.cover-header {
+            position: relative;
+            min-height: 26mm;
+            padding: 0 33mm;
+        }
+
+        .header-logo {
+            position: absolute;
+            top: 2mm;
+            object-fit: contain;
+        }
+
+        .header-logo.seal {
+            left: 0;
+            width: 20mm;
+            height: 20mm;
+        }
+
+        .header-logo.wordmark {
+            right: 0;
+            width: 32mm;
+            height: 16mm;
+        }
+
         .header .form-id {
             text-align: left;
             font-size: 9px;
             font-weight: 700;
+        }
+
+        .cover-header .form-id {
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
         .header .deped {
@@ -87,6 +117,8 @@
 
         .section-title {
             margin: 3mm 0 1.5mm;
+            padding: 2px 4px;
+            background: #e5e5e5;
             font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
@@ -106,6 +138,7 @@
         }
 
         th {
+            background: #e5e5e5;
             font-size: 9px;
             font-weight: 700;
             text-align: center;
@@ -146,7 +179,7 @@
         .grades th,
         .grades td {
             font-size: 8.5px;
-            height: 5.5mm;
+            height: 4mm;
         }
 
         .learning-area {
@@ -186,7 +219,7 @@
         .remedial th,
         .remedial td {
             font-size: 8px;
-            height: 5mm;
+            height: 4mm;
         }
 
         .certification {
@@ -230,14 +263,17 @@
     </div>
 
     @foreach($cards as $card)
+        @php($backPages = array_chunk(array_slice($card['scholastic_records'], 2), 3))
         <section class="sheet">
-            <div class="header">
-                <div class="form-id">SF10-JHS</div>
+            <div class="header cover-header">
+                <div class="form-id">{{ ($card['is_senior_high'] ?? false) ? 'SF10-SHS' : 'SF10-JHS' }}</div>
+                <img src="{{ asset('images/sf10-deped-seal.png') }}" alt="DepEd seal" class="header-logo seal">
+                <img src="{{ asset('images/sf10-deped-wordmark.png') }}" alt="DepEd wordmark" class="header-logo wordmark">
                 <div class="deped">
                     <div>Republic of the Philippines</div>
                     <div>Department of Education</div>
                 </div>
-                <div class="title">Learner Permanent Academic Record for Junior High School (SF10-JHS)</div>
+                <div class="title">Learner Permanent Academic Record for {{ ($card['is_senior_high'] ?? false) ? 'Senior High School (SF10-SHS)' : 'Junior High School (SF10-JHS)' }}</div>
                 <div class="small">(Formerly Form 137)</div>
             </div>
 
@@ -247,25 +283,23 @@
                     <td>Last Name: <span class="line">{{ $card['last_name'] }}</span></td>
                     <td>First Name: <span class="line">{{ $card['first_name'] }}</span></td>
                     <td>Name Ext. (Jr, I, II): <span class="line">{{ $card['suffix'] }}</span></td>
+                    <td>Middle Name: <span class="line">{{ $card['middle_name'] }}</span></td>
                 </tr>
                 <tr>
-                    <td colspan="3">Middle Name: <span class="line">{{ $card['middle_name'] }}</span></td>
-                </tr>
-                <tr>
-                    <td>Learner Reference Number (LRN): <span class="line">{{ $card['lrn'] }}</span></td>
+                    <td colspan="2">Learner Reference Number (LRN): <span class="line">{{ $card['lrn'] }}</span></td>
                     <td>Birthdate (mm/dd/yyyy): <span class="line">{{ $card['birthdate'] }}</span></td>
                     <td>Sex: <span class="line">{{ $card['sex'] }}</span></td>
                 </tr>
             </table>
 
-            <div class="section-title">Eligibility for JHS Enrollment</div>
+            <div class="section-title">Eligibility for {{ ($card['is_senior_high'] ?? false) ? 'SHS' : 'JHS' }} Enrollment</div>
             <table class="info-table">
                 <tr>
-                    <td>Elementary School Completer General Average: <span class="line">{{ $card['eligibility']['elementary_average'] }}</span></td>
+                    <td>{{ ($card['is_senior_high'] ?? false) ? 'Junior High School Completer General Average' : 'Elementary School Completer General Average' }}: <span class="line">{{ $card['eligibility']['elementary_average'] }}</span></td>
                     <td colspan="2">Citation (if Any): <span class="line">{{ $card['eligibility']['citation'] }}</span></td>
                 </tr>
                 <tr>
-                    <td>Name of Elementary School: <span class="line">{{ $card['eligibility']['elementary_school'] }}</span></td>
+                    <td>{{ ($card['is_senior_high'] ?? false) ? 'Name of Previous School' : 'Name of Elementary School' }}: <span class="line">{{ $card['eligibility']['elementary_school'] }}</span></td>
                     <td>School ID: <span class="line">{{ $card['eligibility']['elementary_school_id'] }}</span></td>
                     <td>Address of School: <span class="line">{{ $card['eligibility']['elementary_school_address'] }}</span></td>
                 </tr>
@@ -312,19 +346,21 @@
             <div class="footer-note">Revised 2025 based on DepEd Order No. 10, s. 2024</div>
         </section>
 
+        @foreach($backPages as $pageIndex => $pageRecords)
         <section class="sheet">
             <div class="header">
-                <div class="form-id">SF10-JHS Page 2 of 2</div>
+                <div class="form-id">{{ ($card['is_senior_high'] ?? false) ? 'SF10-SHS' : 'SF10-JHS' }} Page {{ $pageIndex + 2 }} of {{ count($backPages) + 1 }}</div>
             </div>
 
-            @foreach(array_slice($card['scholastic_records'], 2, 4) as $record)
+            @foreach($pageRecords as $record)
                 <div class="scholastic-block">
                     @include('users.teacher.advisory.partials.sf10-scholastic-record', ['record' => $record])
                 </div>
             @endforeach
 
+            @if($loop->last)
             <div class="certification">
-                <div class="section-title">For Transfer Out / JHS Completer Only</div>
+                <div class="section-title">For Transfer Out / {{ ($card['is_senior_high'] ?? false) ? 'SHS' : 'JHS' }} Completer Only</div>
                 <div class="section-title">Certification</div>
                 <p>
                     I CERTIFY that this is a true record of <span class="line">{{ $card['full_name'] }}</span> with LRN <span class="line">{{ $card['lrn'] }}</span>
@@ -343,7 +379,9 @@
             </div>
 
             <div class="footer-note">(May add Certification box if needed) Revised 2025 based on DepEd Order No. 10, s. 2024</div>
+            @endif
         </section>
+        @endforeach
     @endforeach
 </body>
 </html>

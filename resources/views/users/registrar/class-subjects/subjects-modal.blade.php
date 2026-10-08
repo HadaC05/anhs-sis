@@ -12,7 +12,7 @@
         <tbody class="divide-y divide-gray-100">
             @forelse ($section->teacherSubjectAssignments as $assignment)
             @php
-                $subject = $assignment->curriculumSubject?->subject;
+                $subject = $assignment->subject;
                 $teacher = $assignment->staff;
                 $activeTerm = $assignment->active_term_summary;
                 $studentsCount = (int) ($assignment->subject_students_count ?? 0);

@@ -76,6 +76,7 @@ class PromotionRegistrar
             ['student_ID' => $enrollment->student_ID, 'SY_ID' => $targetYear->SY_ID],
             [
                 'curriculum_grade_level_ID' => $targetOffering->curriculum_ID,
+                'track_ID' => $isSeniorHigh ? $targetOffering->cluster?->track_ID : null,
                 'learner_type' => $enrollment->learner_type ?: LearnerType::REGULAR,
                 'enrollment_status' => EnrollmentStatus::PENDING,
                 'promotion_status' => PromotionStatus::PENDING,

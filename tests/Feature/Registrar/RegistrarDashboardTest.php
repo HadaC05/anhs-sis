@@ -47,7 +47,7 @@ function createRegistrarDashboardRecords(AcademicYear $year, int $index): Teache
         'staff_ID' => $teacher->staff_id, 'capacity' => 40,
     ]);
     $assignment = TeacherSubjectAssignment::query()->create([
-        'section_ID' => $section->section_ID, 'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'section_ID' => $section->section_ID, 'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id, 'SY_ID' => $year->SY_ID,
     ]);
     foreach (GradeStatus::slugs() as $offset => $status) {
@@ -61,7 +61,7 @@ function createRegistrarDashboardRecords(AcademicYear $year, int $index): Teache
             'learner_type' => 'regular', 'enrollment_status' => 'enrolled',
         ]);
         $roster = StudentSubject::query()->firstOrCreate([
-            'enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+            'enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $curriculumSubject->subject_ID,
         ]);
         StudentSubjectGrade::query()->create([
             'student_subject_ID' => $roster->student_subject_ID, 'assignment_ID' => $assignment->assignment_ID,

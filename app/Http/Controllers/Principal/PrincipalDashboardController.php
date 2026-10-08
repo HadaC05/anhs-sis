@@ -143,10 +143,10 @@ class PrincipalDashboardController extends Controller
                     'section.cluster',
                     'section.gradeLevel',
                     'section.academicYear',
-                    'curriculumSubject.subject',
+                    'subject',
                     'staff',
                 ])
-                ->whereHas('curriculumSubject', fn ($query) => $query->where('subject_ID', $selectedSubject->subject_ID))
+                ->where('subject_ID', $selectedSubject->subject_ID)
                 ->when($selectedAcademicYearId, fn ($query) => $query->where('SY_ID', $selectedAcademicYearId))
                 ->when($selectedGradeLevel, function ($query) use ($selectedGradeLevel): void {
                     $query->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('grade_ID', $selectedGradeLevel));
@@ -431,7 +431,7 @@ class PrincipalDashboardController extends Controller
 
         $assignment->load([
             'section.gradeLevel',
-            'curriculumSubject.subject',
+            'subject',
             'staff',
             'academicYear',
             'grades' => function ($query) use ($status): void {
@@ -576,8 +576,8 @@ class PrincipalDashboardController extends Controller
             ->with([
                 'section.gradeLevel',
                 'section.academicYear',
-                'curriculumSubject.subject',
-                'curriculumSubject.curriculumGradeLevel.gradingSemester',
+                'subject',
+                'section.curriculum.gradingSemester',
                 'staff',
                 'grades' => function ($query) use ($filters): void {
                     $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
@@ -589,16 +589,16 @@ class PrincipalDashboardController extends Controller
                 $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
                     ->when($filters['term_ids'] !== null, fn ($gradeQuery) => $gradeQuery->whereIn('term_ID', $filters['term_ids']));
             })
-            ->when($filters['subject_id'], fn ($query) => $query->whereHas('curriculumSubject', fn ($subjectQuery) => $subjectQuery->where('subject_ID', $filters['subject_id'])))
+            ->when($filters['subject_id'], fn ($query) => $query->where('subject_ID', $filters['subject_id']))
             ->when($filters['academic_year_id'], fn ($query) => $query->where('SY_ID', $filters['academic_year_id']))
             ->when($filters['grade_level'], fn ($query) => $query->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('grade_ID', $filters['grade_level'])))
-            ->when($filters['semester'], fn ($query) => $query->whereHas('curriculumSubject.curriculumGradeLevel.gradingSemester', fn ($semesterQuery) => $semesterQuery->where('key', $filters['semester'])))
+            ->when($filters['semester'], fn ($query) => $query->whereHas('section.curriculum.gradingSemester', fn ($semesterQuery) => $semesterQuery->whereIn('key', ['full_year', $filters['semester']])))
             ->when($filters['search'] !== '', function ($query) use ($filters): void {
                 $search = $filters['search'];
 
                 $query->where(function ($searchQuery) use ($search): void {
                     $searchQuery->whereHas('section', fn ($sectionQuery) => $sectionQuery->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('curriculumSubject.subject', fn ($subjectQuery) => $subjectQuery->where('code', 'like', "%{$search}%")->orWhere('title', 'like', "%{$search}%"))
+                        ->orWhereHas('subject', fn ($subjectQuery) => $subjectQuery->where('code', 'like', "%{$search}%")->orWhere('title', 'like', "%{$search}%"))
                         ->orWhereHas('staff', fn ($staffQuery) => $staffQuery->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
                 });
             })

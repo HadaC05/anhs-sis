@@ -81,7 +81,7 @@ function createAdvisorySf5Fixtures(bool $isSeniorHigh = true): array
 
     $assignment = TeacherSubjectAssignment::query()->create([
         'section_ID' => $section->section_ID,
-        'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id,
         'SY_ID' => $academicYear->SY_ID,
     ]);
@@ -91,7 +91,7 @@ function createAdvisorySf5Fixtures(bool $isSeniorHigh = true): array
             'cluster_ID' => $cluster->cluster_ID,
             'code' => 'PRECALC',
             'title' => 'Pre-Calculus',
-            'type' => 'specialized',
+            'type' => 'elective',
             'status' => 'active',
         ]);
 
@@ -105,7 +105,7 @@ function createAdvisorySf5Fixtures(bool $isSeniorHigh = true): array
 
         TeacherSubjectAssignment::query()->create([
             'section_ID' => $section->section_ID,
-            'curr_subj_ID' => $specializedCurriculumSubject->curr_subj_ID,
+            'subject_ID' => $specializedCurriculumSubject->subject_ID,
             'staff_ID' => $teacher->staff_id,
             'SY_ID' => $academicYear->SY_ID,
         ]);
@@ -195,16 +195,16 @@ test('SF5 retains learners with three failed learning areas and omits unreleased
         $curriculumSubject->subject_ID = $subject->subject_ID;
         $curriculumSubject->save();
         $assignment = $original->replicate();
-        $assignment->curr_subj_ID = $curriculumSubject->curr_subj_ID;
+        $assignment->subject_ID = $curriculumSubject->subject_ID;
         $assignment->save();
         \App\Models\StudentSubject::query()->firstOrCreate([
-            'enrollment_ID' => $enrollment->enrollment_ID, 'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+            'enrollment_ID' => $enrollment->enrollment_ID, 'subject_ID' => $curriculumSubject->subject_ID,
         ]);
     }
     foreach (TeacherSubjectAssignment::query()->get() as $assignment) {
         foreach (\App\Models\GradingTerm::configuredPeriods() as $period) {
             StudentSubjectGrade::query()->create([
-                'student_subject_ID' => $enrollment->studentSubjects()->where('curr_subj_ID', $assignment->curr_subj_ID)->firstOrFail()->student_subject_ID,
+                'student_subject_ID' => $enrollment->studentSubjects()->where('subject_ID', $assignment->subject_ID)->firstOrFail()->student_subject_ID,
                 'assignment_ID' => $assignment->assignment_ID,
                 'term_ID' => StudentSubjectGrade::termIdForPeriodKey($period['key']),
                 'numeric_grade' => 70, 'status' => \App\Models\GradeStatus::RELEASED,

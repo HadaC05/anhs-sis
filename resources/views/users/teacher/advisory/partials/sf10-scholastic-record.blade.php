@@ -1,7 +1,8 @@
 @php
-    $periodCount = count($periods);
-    $periodGroupLabel = \App\Models\GradingTerm::periodGroupLabel($periods);
-    $periodRatingLabel = \App\Models\GradingTerm::periodRatingLabel($periods);
+    $recordPeriods = $record['periods'] ?? $periods;
+    $periodCount = count($recordPeriods);
+    $periodGroupLabel = \App\Models\GradingTerm::periodGroupLabel($recordPeriods);
+    $periodRatingLabel = \App\Models\GradingTerm::periodRatingLabel($recordPeriods);
     $periodColumnWidth = $periodCount > 0 ? round(28 / $periodCount, 2) : 7;
 @endphp
 <table class="scholastic-meta">
@@ -34,8 +35,8 @@
             <th rowspan="2" class="remarks-col">Remarks</th>
         </tr>
         <tr>
-            @foreach($periods as $period)
-                <th class="period-col">{{ \App\Models\GradingTerm::periodColumnLabel($period['label']) }}</th>
+            @foreach($recordPeriods as $period)
+                <th class="period-col" style="width: {{ $periodColumnWidth }}%">{{ \App\Models\GradingTerm::periodColumnLabel($period['label']) }}</th>
             @endforeach
         </tr>
     </thead>
@@ -43,7 +44,7 @@
         @foreach($record['subjects'] as $row)
             <tr class="{{ $row['child'] ? 'child-row' : '' }}">
                 <td class="{{ $row['child'] ? 'child-label' : 'bold' }}">{{ $row['label'] }}</td>
-                @foreach($periods as $period)
+                @foreach($recordPeriods as $period)
                     <td class="center">{{ $row['quarters'][$period['key']] ?? '' }}</td>
                 @endforeach
                 <td class="center bold">{{ $row['final'] ?? '' }}</td>

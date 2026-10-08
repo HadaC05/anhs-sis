@@ -202,7 +202,7 @@ function guidancePromotionFixtures(): array
         'first_name' => 'Test', 'last_name' => 'Teacher', 'status' => 'active',
     ]);
     $assignment = TeacherSubjectAssignment::query()->create([
-        'section_ID' => $section->section_ID, 'curr_subj_ID' => $curriculumSubject->curr_subj_ID,
+        'section_ID' => $section->section_ID, 'subject_ID' => $curriculumSubject->subject_ID,
         'staff_ID' => $teacher->staff_id, 'SY_ID' => $year->SY_ID,
     ]);
     $enrollment = Enrollment::query()->create([

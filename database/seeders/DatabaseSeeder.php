@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RoleSeeder::class);
         $this->call(DefaultNonStudentUsersSeeder::class);
+        $this->call(TrackSeeder::class);
         $this->call(ClusterSeeder::class);
         $this->call(PreferredCourseSeeder::class);
         $this->call(GradeLevelSeeder::class);
@@ -25,6 +26,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CurriculumSubjectSeeder::class);
         $this->call(MonthSeeder::class);
         $this->call(AcademicYearSeeder::class);
+        $this->call(CombinedSubjectConfigurationSeeder::class);
         $this->call(SectionSeeder::class);
         $this->call(TeacherSubjectAssignmentSeeder::class);
         $this->call(MovementReasonSeeder::class);

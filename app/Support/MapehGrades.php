@@ -19,11 +19,15 @@ class MapehGrades
         if (! $config) {
             return $assignments;
         }
-        $components = $config->components->keyBy('curr_subj_ID');
-        $result = $assignments->reject(fn ($row) => (int) $row->curr_subj_ID === (int) $config->parent_curr_subj_ID || in_array($row->curr_subj_ID, $config->inactiveComponentIds()))
+        $parentSubjectId = (int) $config->parentSubject->subject_ID;
+        $inactiveSubjectIds = \App\Models\CurriculumSubject::query()
+            ->whereIn('curr_subj_ID', $config->inactiveComponentIds())
+            ->pluck('subject_ID')->map(fn ($id) => (int) $id)->all();
+        $components = $config->components->keyBy(fn ($component) => (int) $component->curriculumSubject->subject_ID);
+        $result = $assignments->reject(fn ($row) => (int) $row->subject_ID === $parentSubjectId || in_array($row->subject_ID, $inactiveSubjectIds, true))
             ->map(function ($row) use ($components) {
                 $copy = clone $row;
-                if ($component = $components->get($row->curr_subj_ID)) {
+                if ($component = $components->get((int) $row->subject_ID)) {
                     $copy->mapeh_component = true;
                     $copy->mapeh_slot = $component->key;
                 }
@@ -31,20 +35,20 @@ class MapehGrades
                 return $copy;
             })->values();
         foreach ($components as $component) {
-            if (! $result->contains('curr_subj_ID', $component->curr_subj_ID)) {
+            if (! $result->contains('subject_ID', $component->curriculumSubject->subject_ID)) {
                 $placeholder = new TeacherSubjectAssignment;
-                $placeholder->forceFill(['assignment_ID' => -$component->curr_subj_ID, 'curr_subj_ID' => $component->curr_subj_ID, 'mapeh_component' => true, 'mapeh_slot' => $component->key]);
-                $placeholder->setRelation('curriculumSubject', $component->curriculumSubject)->setRelation('staff', null);
+                $placeholder->forceFill(['assignment_ID' => -$component->curr_subj_ID, 'subject_ID' => $component->curriculumSubject->subject_ID, 'mapeh_component' => true, 'mapeh_slot' => $component->key]);
+                $placeholder->setRelation('subject', $component->curriculumSubject->subject)->setRelation('staff', null);
                 $result->push($placeholder);
             }
         }
         $parent = new TeacherSubjectAssignment;
         $parent->forceFill([
-            'assignment_ID' => -$config->parent_curr_subj_ID, 'curr_subj_ID' => $config->parent_curr_subj_ID,
-            'computed_mapeh' => true, 'mapeh_slot' => 'mapeh',
-            'legacy_assignment_id' => $assignments->firstWhere('curr_subj_ID', $config->parent_curr_subj_ID)?->assignment_ID,
+            'assignment_ID' => -$config->parent_curr_subj_ID, 'subject_ID' => $parentSubjectId,
+            'computed_mapeh' => true, 'mapeh_slot' => $config->parentSlot(),
+            'legacy_assignment_id' => $assignments->firstWhere('subject_ID', $parentSubjectId)?->assignment_ID,
         ]);
-        $parent->setRelation('curriculumSubject', $config->parentSubject)->setRelation('staff', null);
+        $parent->setRelation('subject', $config->parentSubject->subject)->setRelation('staff', null);
         $result->push($parent);
 
         return $result;
@@ -88,13 +92,22 @@ class MapehGrades
     {
         $config = MapehConfiguration::forSection($assignment->section);
 
-        return $config && (int) $config->parent_curr_subj_ID === (int) $assignment->curr_subj_ID;
+        return $config && (int) $config->parentSubject->subject_ID === (int) $assignment->subject_ID;
     }
 
     public static function inputBlocked(TeacherSubjectAssignment $assignment): bool
     {
         $config = MapehConfiguration::forSection($assignment->section);
 
-        return $config && ((int) $config->parent_curr_subj_ID === (int) $assignment->curr_subj_ID || in_array($assignment->curr_subj_ID, $config->inactiveComponentIds()));
+        if (! $config) {
+            return false;
+        }
+
+        $inactiveSubjectIds = \App\Models\CurriculumSubject::query()
+            ->whereIn('curr_subj_ID', $config->inactiveComponentIds())
+            ->pluck('subject_ID')->map(fn ($id) => (int) $id)->all();
+
+        return (int) $config->parentSubject->subject_ID === (int) $assignment->subject_ID
+            || in_array((int) $assignment->subject_ID, $inactiveSubjectIds, true);
     }
 }

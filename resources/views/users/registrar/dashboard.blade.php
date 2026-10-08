@@ -68,12 +68,12 @@
                         @forelse ($reviewQueue as $assignment)
                         <tr>
                             <th scope="row" class="px-5 py-4 font-normal">
-                                <p class="font-semibold text-gray-800">{{ $assignment->curriculumSubject?->subject?->title ?? 'Subject unavailable' }}</p>
+                                <p class="font-semibold text-gray-800">{{ $assignment->subject?->title ?? 'Subject unavailable' }}</p>
                                 <p class="mt-1 text-xs text-gray-500">{{ $assignment->section?->getRelation('gradeLevel')?->grade_label }} &middot; {{ $assignment->section?->name ?? 'Section unavailable' }}</p>
                                 <p class="mt-1 text-xs text-gray-500">{{ $assignment->staff ? trim($assignment->staff->first_name.' '.$assignment->staff->last_name) : 'Unassigned teacher' }}</p>
                             </th>
                             <td class="px-5 py-4"><span class="inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-bold tabular-nums text-violet-800">{{ number_format($assignment->pending_grades_count) }}</span></td>
-                            <td class="px-5 py-4"><a href="{{ route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => 'submitted']) }}" class="inline-flex rounded-lg bg-[#296374] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1e4d5c]" aria-label="Review grades for {{ $assignment->curriculumSubject?->subject?->title }} in {{ $assignment->section?->name }}">Review</a></td>
+                            <td class="px-5 py-4"><a href="{{ route('registrar.grade-approvals.show', ['assignment' => $assignment, 'status' => 'submitted']) }}" class="inline-flex rounded-lg bg-[#296374] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1e4d5c]" aria-label="Review grades for {{ $assignment->subject?->title }} in {{ $assignment->section?->name }}">Review</a></td>
                         </tr>
                         @empty
                         <tr><td colspan="3" class="px-6 py-12 text-center">

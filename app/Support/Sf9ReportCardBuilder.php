@@ -151,6 +151,7 @@ class Sf9ReportCardBuilder
         ?string $principalName = null,
     ): array {
         $isSeniorHigh = self::isSeniorHigh($section, $enrollment);
+        $assignments = self::assignmentsForEnrollment($enrollment, $assignments);
         $student = $enrollment->student;
         $adviser = $section->adviser;
         $periodKeys = array_column($periods, 'key');
@@ -204,16 +205,15 @@ class Sf9ReportCardBuilder
                 : Sf9AttendanceSummary::empty(),
         ];
 
+        $assignments = MapehGrades::assignments($section, $assignments);
+        $gradesByAssignment = MapehGrades::grades($assignments, $gradesByAssignment, $periodKeys);
+
         if ($isSeniorHigh) {
             return array_merge($base, self::seniorHighSubjects(
                 $assignments,
                 $gradesByAssignment,
-                ($base['shs_track'] ?? '') === 'TECHPRO',
             ));
         }
-
-        $assignments = MapehGrades::assignments($section, $assignments);
-        $gradesByAssignment = MapehGrades::grades($assignments, $gradesByAssignment, $periodKeys);
 
         return array_merge($base, self::juniorHighSubjects($assignments, $gradesByAssignment, $periodKeys));
     }
@@ -229,10 +229,10 @@ class Sf9ReportCardBuilder
 
     public static function trackStrand(Enrollment $enrollment, Section $section): string
     {
+        $track = $enrollment->track?->name ?? $enrollment->cluster?->track?->name ?? $section->cluster?->track?->name;
         $cluster = $enrollment->cluster?->name ?? $section->cluster?->name;
-        $course = $enrollment->preferredCourse?->name;
 
-        return collect([$cluster, $course])->filter()->implode(' / ');
+        return collect([$track, $cluster])->filter()->implode(' / ');
     }
 
     public static function seniorHighTrackGroup(Enrollment $enrollment, Section $section): string
@@ -240,7 +240,7 @@ class Sf9ReportCardBuilder
         $haystack = Str::of(collect([
             $enrollment->cluster?->name,
             $section->cluster?->name,
-            $enrollment->preferredCourse?->name,
+            $enrollment->track?->name,
             $section->curriculum?->name,
         ])->filter()->implode(' '))->lower()->value();
 
@@ -281,7 +281,7 @@ class Sf9ReportCardBuilder
         $subjectGrades = [];
 
         foreach ($assignments as $assignment) {
-            $subject = $assignment->curriculumSubject?->subject;
+            $subject = $assignment->subject;
             $slot = $assignment->mapeh_slot ?: self::juniorHighSubjectSlot((string) ($subject?->title ?? $subject?->code ?? ''));
             $assignmentGrades = $gradesByAssignment->get($assignment->assignment_ID, collect());
             $quarterGrades = [];
@@ -362,16 +362,15 @@ class Sf9ReportCardBuilder
      * @param  Collection<int, Collection<string, mixed>>  $gradesByAssignment
      * @return array<string, mixed>
      */
-    private static function seniorHighSubjects(Collection $assignments, Collection $gradesByAssignment, bool $isTechPro): array
+    private static function seniorHighSubjects(Collection $assignments, Collection $gradesByAssignment): array
     {
         $emptyTerms = array_fill_keys(array_column(GradingTerm::seniorHighTerms(), 'key'), null);
-        $slotted = [];
+        $core = [];
         $electives = [];
 
         foreach ($assignments as $assignment) {
-            $curriculumSubject = $assignment->curriculumSubject;
-            $subject = $curriculumSubject?->subject;
-            $semester = $curriculumSubject?->semester === 'second' ? 'second' : 'first';
+            $subject = $assignment->subject;
+            $semester = $assignment->section?->curriculum?->gradingSemester?->key === 'second' ? 'second' : 'first';
             $assignmentGrades = $gradesByAssignment->get($assignment->assignment_ID, collect());
             $terms = [];
             $values = [];
@@ -391,84 +390,61 @@ class Sf9ReportCardBuilder
                 'terms' => $terms,
                 'final' => $final,
                 'remarks' => self::remarksForGrade($final),
+                'child' => (bool) $assignment->mapeh_component,
+                'combined' => (bool) $assignment->computed_mapeh,
             ];
-            $slot = self::seniorHighSubjectSlot($label);
-
-            if ($slot === null) {
+            if ($subject?->type === 'elective') {
                 $electives[] = $row;
+            } else {
+                $core[] = $row;
+            }
+        }
 
+        $rows = collect();
+        foreach ([
+            ['key' => 'core', 'label' => 'Core Subjects', 'subjects' => $core],
+            ['key' => 'elective', 'label' => 'Elective Subjects', 'subjects' => $electives],
+        ] as $group) {
+            if ($group['subjects'] === []) {
                 continue;
             }
 
-            $slotted[$slot] = isset($slotted[$slot])
-                ? self::mergeSeniorHighGradeRows($slotted[$slot], $row)
-                : $row;
+            $rows->push([
+                'slot' => $group['key'].'_header',
+                'label' => $group['label'],
+                'category' => true,
+                'child' => false,
+                'terms' => $emptyTerms,
+                'final' => null,
+                'remarks' => '',
+            ]);
+
+            $groupSubjects = collect($group['subjects'])
+                ->sortBy(fn (array $row): int => $row['combined'] ? 0 : ($row['child'] ? 1 : 2))
+                ->values();
+
+            foreach ($groupSubjects as $index => $subjectRow) {
+                $rows->push([
+                    'slot' => $group['key'].'_'.$index,
+                    'label' => $subjectRow['label'],
+                    'category' => false,
+                    'child' => $subjectRow['child'],
+                    'terms' => $subjectRow['terms'],
+                    'final' => $subjectRow['final'],
+                    'remarks' => $subjectRow['remarks'],
+                ]);
+            }
         }
 
-        $rows = collect(self::seniorHighOfficialRows($isTechPro))
-            ->map(function (array $definition) use ($slotted, $emptyTerms, &$electives): array {
-                if ($definition['category'] ?? false) {
-                    return [
-                        'slot' => $definition['slot'],
-                        'label' => $definition['label'],
-                        'category' => true,
-                        'child' => false,
-                        'terms' => $emptyTerms,
-                        'final' => null,
-                        'remarks' => '',
-                    ];
-                }
-
-                $slot = $definition['slot'];
-                $child = (bool) ($definition['child'] ?? false);
-
-                if (str_starts_with($slot, 'elective_')) {
-                    $grade = array_shift($electives) ?? ($slotted[$slot] ?? null);
-
-                    return [
-                        'slot' => $slot,
-                        'label' => $grade['label'] ?? $definition['label'],
-                        'category' => false,
-                        'child' => false,
-                        'terms' => $grade['terms'] ?? $emptyTerms,
-                        'final' => $grade['final'] ?? null,
-                        'remarks' => $grade['remarks'] ?? '',
-                    ];
-                }
-
-                $grade = $slotted[$slot] ?? null;
-
-                if ($slot === 'effective_communication_group' && $grade === null) {
-                    $grade = self::averagedSeniorHighRow(
-                        $definition['label'],
-                        array_filter([
-                            $slotted['effective_communication'] ?? null,
-                            $slotted['mabisang_komunikasyon'] ?? null,
-                        ]),
-                    );
-                }
-
-                return [
-                    'slot' => $slot,
-                    'label' => $definition['label'],
-                    'category' => false,
-                    'child' => $child,
-                    'terms' => $grade['terms'] ?? $emptyTerms,
-                    'final' => $grade['final'] ?? null,
-                    'remarks' => $grade['remarks'] ?? '',
-                ];
-            })
-            ->values();
-
-        foreach ($electives as $index => $elective) {
+        if ($rows->isEmpty()) {
             $rows->push([
-                'slot' => 'elective_extra_'.$index,
-                'label' => $elective['label'],
+                'slot' => 'subjects_empty',
+                'label' => 'No enlisted subjects',
                 'category' => false,
                 'child' => false,
-                'terms' => $elective['terms'],
-                'final' => $elective['final'],
-                'remarks' => $elective['remarks'],
+                'terms' => $emptyTerms,
+                'final' => null,
+                'remarks' => '',
             ]);
         }
 
@@ -486,6 +462,22 @@ class Sf9ReportCardBuilder
             'first_semester' => self::emptySemester(),
             'second_semester' => self::emptySemester(),
         ];
+    }
+
+    /** Keep report rows scoped to the immutable subject roster of this learner. */
+    private static function assignmentsForEnrollment(Enrollment $enrollment, Collection $assignments): Collection
+    {
+        if (! $enrollment->exists) {
+            return $assignments;
+        }
+
+        $subjectIds = $enrollment->relationLoaded('studentSubjects')
+            ? $enrollment->studentSubjects->pluck('subject_ID')
+            : $enrollment->studentSubjects()->pluck('subject_ID');
+
+        return $assignments
+            ->whereIn('subject_ID', $subjectIds->map(fn (mixed $id): int => (int) $id)->all())
+            ->values();
     }
 
     /**
@@ -659,9 +651,9 @@ class Sf9ReportCardBuilder
     {
         $rows = [
             ['slot' => 'core_header', 'label' => 'Core Subjects', 'category' => true],
-            ['slot' => 'effective_communication_group', 'label' => 'Effective Communication/Mabisang Komunikasyon'],
+            ['slot' => 'effective_communication_group', 'label' => 'Effective Communication & Mabisang Communication'],
             ['slot' => 'effective_communication', 'label' => 'Effective Communication', 'child' => true],
-            ['slot' => 'mabisang_komunikasyon', 'label' => 'Mabisang Komunikasyon', 'child' => true],
+            ['slot' => 'mabisang_communication', 'label' => 'Mabisang Communication', 'child' => true],
             ['slot' => 'general_mathematics', 'label' => 'General Mathematics'],
             ['slot' => 'general_science', 'label' => 'General Science'],
             ['slot' => 'life_and_career', 'label' => 'Life and Career Skills'],
@@ -693,8 +685,9 @@ class Sf9ReportCardBuilder
             str_contains($normalized, 'oral communication'),
             str_contains($normalized, 'english for academic') => 'effective_communication',
             str_contains($normalized, 'mabisang komunikasyon'),
+            str_contains($normalized, 'mabisang communication'),
             str_contains($normalized, 'komunikasyon at pananaliksik'),
-            str_contains($normalized, 'pagsulat sa filipino') => 'mabisang_komunikasyon',
+            str_contains($normalized, 'pagsulat sa filipino') => 'mabisang_communication',
             str_contains($normalized, 'general mathematics'),
             str_contains($normalized, 'statistics and probability') => 'general_mathematics',
             str_contains($normalized, 'general science'),
