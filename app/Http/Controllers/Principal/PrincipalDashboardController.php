@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Principal;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\NotifyReleasedGrades;
 use App\Models\AcademicYear;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
@@ -518,19 +519,12 @@ class PrincipalDashboardController extends Controller
             'assignment_ids.*' => ['integer', 'exists:teacher_subject_assignments,assignment_ID'],
         ]);
 
-        $assignments = TeacherSubjectAssignment::query()
+        $gradeCountsByAssignment = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
-            ->whereHas('grades', function ($query): void {
-                $query->whereStatus(GradeStatus::APPROVED);
-            })
-            ->get();
-
-        $studentsByAssignment = $assignments->mapWithKeys(fn (TeacherSubjectAssignment $assignment): array => [
-            $assignment->assignment_ID => $this->studentsWithApprovedGrades($assignment),
-        ]);
-        $gradeCountsByAssignment = $assignments->mapWithKeys(fn (TeacherSubjectAssignment $assignment): array => [
-            $assignment->assignment_ID => $assignment->grades()->whereStatus(GradeStatus::APPROVED)->count(),
-        ]);
+            ->whereStatus(GradeStatus::APPROVED)
+            ->selectRaw('assignment_ID, COUNT(*) as grade_count')
+            ->groupBy('assignment_ID')
+            ->pluck('grade_count', 'assignment_ID');
 
         $released = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
@@ -540,10 +534,9 @@ class PrincipalDashboardController extends Controller
         $request->attributes->set('audit_description', "Released {$released} approved grade record(s) to students in bulk.");
 
         if ($released > 0) {
-            $assignments->each(function (TeacherSubjectAssignment $assignment) use ($studentsByAssignment, $gradeCountsByAssignment): void {
-                TeacherGradeNotifier::released($assignment, $gradeCountsByAssignment->get($assignment->assignment_ID, 1));
-                StudentGradeNotifier::released($assignment, $studentsByAssignment->get($assignment->assignment_ID, collect()));
-            });
+            foreach ($gradeCountsByAssignment as $assignmentId => $gradeCount) {
+                NotifyReleasedGrades::dispatch((int) $assignmentId, (int) $gradeCount);
+            }
         }
 
         return back()->with('status', "{$released} grade record(s) released to students.");
@@ -602,7 +595,12 @@ class PrincipalDashboardController extends Controller
                         ->orWhereHas('staff', fn ($staffQuery) => $staffQuery->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
                 });
             })
-            ->orderBy('section_ID')
+            ->withMax(['grades as latest_grade_at' => function ($query) use ($filters): void {
+                $query->whereStatus($filters['status'] === 'all' ? [GradeStatus::APPROVED, GradeStatus::RELEASED] : $filters['status'])
+                    ->when($filters['term_ids'] !== null, fn ($gradeQuery) => $gradeQuery->whereIn('term_ID', $filters['term_ids']));
+            }], 'updated_at')
+            ->orderByDesc('latest_grade_at')
+            ->orderByDesc('assignment_ID')
             ->get();
     }
 

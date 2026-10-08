@@ -322,7 +322,12 @@ class RegistrarDashboardController extends Controller
                         });
                 });
             })
-            ->orderBy('section_ID')
+            ->withMax(['grades as latest_grade_at' => function ($query) use ($statuses, $status, $termIds): void {
+                $query->whereStatus($status ?: $statuses)
+                    ->when($termIds !== null, fn ($grades) => $grades->whereIn('term_ID', $termIds));
+            }], 'updated_at')
+            ->orderByDesc('latest_grade_at')
+            ->orderByDesc('assignment_ID')
             ->get();
     }
 

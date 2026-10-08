@@ -42,7 +42,7 @@
                         <th scope="col" class="px-5 py-4">Subject</th>
                         <th scope="col" class="px-5 py-4">Teacher</th>
                         <th scope="col" class="px-5 py-4 text-center">Records</th>
-                        <th scope="col" class="px-5 py-4">Status</th>
+                        <th scope="col" class="min-w-44 px-5 py-4">Status</th>
                         <th scope="col" class="px-5 py-4 text-right">Action</th>
                     </tr>
                 </thead>
@@ -75,10 +75,10 @@
                             <td class="px-5 py-4">
                                 <div class="flex flex-col items-start gap-2">
                                     @if($approvedCount)
-                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>{{ $approvedCount }} awaiting release</span>
+                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>{{ $approvedCount }} awaiting release</span>
                                     @endif
                                     @if($releasedCount)
-                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{{ $releasedCount }} released</span>
+                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{{ $releasedCount }} released</span>
                                     @endif
                                 </div>
                             </td>

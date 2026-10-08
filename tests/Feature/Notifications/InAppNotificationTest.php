@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\NotifyReleasedGrades;
 use App\Models\AcademicYear;
 use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
@@ -24,6 +25,7 @@ use App\Notifications\PlacementStatusUpdated;
 use App\Notifications\StudentGradesReleased;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 
 test('students are notified when their enrollment status is updated', function () {
     Notification::fake();
@@ -517,6 +519,33 @@ test('bulk grade release updates multiple selected assignments and leaves other 
     $this->post(route('principal.grade-releases.bulk-release'), ['assignment_ids' => []])
         ->assertSessionHasErrors('assignment_ids');
 });
+
+test('bulk release queues notifications after changing grade statuses', function () {
+    Queue::fake();
+    ['principal' => $principal, 'assignment' => $assignment] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+
+    $this->actingAs($principal)->post(route('principal.grade-releases.bulk-release'), [
+        'assignment_ids' => [$assignment->getKey()],
+    ])->assertRedirect();
+
+    expect($assignment->grades()->firstOrFail()->status)->toBe(GradeStatus::RELEASED);
+    Queue::assertPushed(NotifyReleasedGrades::class, fn (NotifyReleasedGrades $job) => $job->assignmentId === $assignment->getKey() && $job->releasedCount === 1
+    );
+});
+
+test('grade approval and release lists put the most recently updated grades first', function (string $portal, string $page) {
+    $older = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $newer = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+
+    $older['assignment']->grades()->update(['updated_at' => now()->subDay()]);
+    $newer['assignment']->grades()->update(['updated_at' => now()]);
+
+    $this->actingAs($older[$portal])->get(route($portal.'.'.$page, ['academic_year_id' => '', 'term_id' => '']))
+        ->assertOk()
+        ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [
+            $newer['assignment']->getKey(), $older['assignment']->getKey(),
+        ]);
+})->with([['registrar', 'grade-approvals'], ['principal', 'grade-releases']]);
 
 test('teachers are notified when approved grades are bulk released', function () {
     Notification::fake();

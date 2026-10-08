@@ -46,7 +46,7 @@
         <table class="min-w-[950px] w-full text-left">
             <thead><tr class="border-b border-[#296374] bg-[#296374] text-xs font-bold uppercase tracking-wider text-white">
                 <th class="px-4 py-4"><input id="selectAllGrades" type="checkbox" aria-label="Select all submitted rows" class="h-4 w-4 rounded"></th>
-                <th class="px-6 py-4">Section</th><th class="px-6 py-4">Grade Level</th><th class="px-6 py-4">Subject</th><th class="px-6 py-4">Teacher</th><th class="px-6 py-4">Grades</th><th class="px-6 py-4">Status</th><th class="px-6 py-4 text-right">Action</th>
+                <th class="px-6 py-4">Section</th><th class="px-6 py-4">Grade Level</th><th class="px-6 py-4">Subject</th><th class="px-6 py-4">Teacher</th><th class="whitespace-nowrap px-6 py-4">Grades</th><th class="min-w-32 px-6 py-4">Status</th><th class="px-6 py-4 text-right">Action</th>
             </tr></thead>
             <tbody class="divide-y divide-gray-200">
                 @forelse($assignments as $assignment)
@@ -76,8 +76,8 @@
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $subjectLabel }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $teacherName }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $grades->count() }}</td>
-                        <td class="px-6 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold {{ $statusClasses }}">{{ ucfirst($rowStatus) }}</span></td>
-                        <td class="px-6 py-4 text-right"><a href="{{ $reviewUrl }}" class="inline-flex items-center rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">{{ $rowStatus === 'submitted' ? 'Review' : 'View' }}</a></td>
+                        <td class="px-6 py-4"><span class="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold {{ $statusClasses }}">{{ ucfirst($rowStatus) }}</span></td>
+                        <td class="px-6 py-4 text-right"><a href="{{ $reviewUrl }}" class="inline-flex items-center whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md" style="background-color: #296374;">{{ $rowStatus === 'submitted' ? 'Review' : 'View' }}</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">No grade submissions match your filters.</td></tr>
