@@ -522,8 +522,10 @@ class PrincipalDashboardController extends Controller
         $gradeCountsByAssignment = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
             ->whereStatus(GradeStatus::APPROVED)
-            ->selectRaw('assignment_ID, COUNT(*) as grade_count')
+            ->select('assignment_ID')
+            ->selectRaw('COUNT(*) as grade_count')
             ->groupBy('assignment_ID')
+            ->get()
             ->pluck('grade_count', 'assignment_ID');
 
         $released = StudentSubjectGrade::query()
