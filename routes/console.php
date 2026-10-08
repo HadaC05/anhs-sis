@@ -26,14 +26,20 @@ Artisan::command('database:reset-once', function () {
 
     $this->warn('Resetting all database tables and seeding default data.');
 
-    $result = $this->call('migrate:fresh', [
-        '--seed' => true,
-        '--force' => true,
-        '--no-interaction' => true,
-    ]);
+    // Production blocks db:wipe and migrate:fresh by default. Allow only this
+    // validated, one-time command to wipe the database, then restore the guard.
+    DB::prohibitDestructiveCommands(false);
 
-    if ($result !== 0) {
-        return $result;
+    try {
+        foreach (['db:wipe', 'migrate', 'db:seed'] as $command) {
+            $result = $this->call($command, ['--force' => true]);
+
+            if ($result !== 0) {
+                return $result;
+            }
+        }
+    } finally {
+        DB::prohibitDestructiveCommands(app()->isProduction());
     }
 
     DB::table('database_reset_runs')->insert([
