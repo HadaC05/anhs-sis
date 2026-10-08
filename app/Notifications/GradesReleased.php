@@ -11,10 +11,15 @@ class GradesReleased extends Notification
 {
     use Queueable;
 
-    public function __construct(
-        public TeacherSubjectAssignment $assignment,
-        public int $gradeCount = 1,
-    ) {}
+    public int $subjectCount = 1;
+
+    /** @var list<int> */
+    public array $assignmentIds;
+
+    public function __construct(public TeacherSubjectAssignment $assignment)
+    {
+        $this->assignmentIds = [(int) $assignment->getKey()];
+    }
 
     /**
      * @return list<string>
@@ -25,17 +30,18 @@ class GradesReleased extends Notification
     }
 
     /**
-     * @return array{notification_type_ID: int, title: string, message: string, url: string, grade_count: int}
+     * @return array{notification_type_ID: int, title: string, message: string, url: string, subject_count: int, assignment_ids: list<int>}
      */
     public function toArray(object $notifiable): array
     {
-        $count = max(1, $this->gradeCount);
-        $grade = $count === 1 ? 'grade has' : 'grades have';
+        $count = max(1, $this->subjectCount);
+        $subject = $count === 1 ? 'subject has' : 'subjects have';
 
         return NotificationType::payload(NotificationType::GRADES_RELEASED, [
-            'message' => "{$count} {$grade} been released to students.",
+            'message' => "{$count} {$subject} been released to students.",
             'url' => route('teacher.sections.index', absolute: false),
-            'grade_count' => $count,
+            'subject_count' => $count,
+            'assignment_ids' => $this->assignmentIds,
         ]);
     }
 }

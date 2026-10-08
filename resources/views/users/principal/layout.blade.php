@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     @include('users.partials.sidebar-behavior')
     @include('users.principal.partials.responsive')
+    @livewireStyles
     <style>
         .sidebar-link {
             display: flex;
@@ -75,7 +76,8 @@
                 <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-auto max-h-12 min-w-0 max-w-[calc(100%-3.25rem)] object-contain">
             </div>
 
-            <nav class="flex shrink-0 items-center">
+            <nav class="flex shrink-0 items-center gap-2" aria-label="Account and notifications">
+                <livewire:notification-dropdown :auto-refresh="true" />
                 @include('users.partials.staff-profile-menu')
             </nav>
         </div>
@@ -254,6 +256,7 @@
     @stack('modals')
     @stack('toasts')
     <x-idle-session-timeout />
+    @livewireScripts
 </body>
 
 </html>

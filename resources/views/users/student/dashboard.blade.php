@@ -5,23 +5,8 @@
 @section('content')
 @push('modals')
 @if ($profileCompletionRequired ?? false)
-    <style>
-        @media (min-width: 768px) {
-            body.sidebar-collapsed .profile-completion-backdrop {
-                left: 5.5rem;
-            }
-        }
-
-        @media (max-width: 767px) {
-            .app-sidebar {
-                z-index: 201;
-                pointer-events: none;
-            }
-        }
-    </style>
-    <div class="profile-completion-backdrop fixed inset-y-0 right-0 top-20 left-0 z-[200] bg-slate-900/60 md:left-72" aria-hidden="true"></div>
-    <div class="fixed inset-0 z-[202] flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="profile-completion-title">
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <div class="fixed inset-0 z-[200] flex overflow-y-auto bg-slate-900/60 p-4" role="dialog" aria-modal="true" aria-labelledby="profile-completion-title" data-test="profile-completion-modal">
+        <div class="m-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /></svg>
             </div>

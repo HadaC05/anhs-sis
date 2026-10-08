@@ -29,15 +29,15 @@
     <div class="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
         <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h2 class="text-base font-bold text-slate-800">Grade Records <span class="ml-2 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ $assignments->count() }}</span></h2>
+                <h2 class="text-base font-bold text-slate-800">Subjects <span class="ml-2 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ $assignments->total() }}</span></h2>
             </div>
-            <button type="submit" id="release-selected-grades" disabled class="hidden inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50" style="background-color: #296374;">Release Grades</button>
+            <button type="submit" id="release-selected-grades" disabled class="hidden inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50" style="background-color: #296374;">Release Subjects</button>
         </div>
         <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Grade records">
             <table class="grade-release-table min-w-[850px] w-full text-left">
                 <thead style="background-color: #296374;" class="text-xs font-semibold uppercase tracking-wide text-white">
                     <tr>
-                        <th scope="col" class="w-14 px-5 py-4"><input type="checkbox" id="grade-release-check-all" class="rounded border-gray-300" aria-label="Select all releasable grade records"></th>
+                        <th scope="col" class="w-14 px-5 py-4"><input type="checkbox" id="grade-release-check-all" class="rounded border-gray-300" aria-label="Select all releasable subjects"></th>
                         <th scope="col" class="px-5 py-4">Section</th>
                         <th scope="col" class="px-5 py-4">Subject</th>
                         <th scope="col" class="px-5 py-4">Teacher</th>
@@ -75,10 +75,10 @@
                             <td class="px-5 py-4">
                                 <div class="flex flex-col items-start gap-2">
                                     @if($approvedCount)
-                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>{{ $approvedCount }} awaiting release</span>
+                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>Awaiting release</span>
                                     @endif
                                     @if($releasedCount)
-                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{{ $releasedCount }} released</span>
+                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Released</span>
                                     @endif
                                 </div>
                             </td>
@@ -92,6 +92,11 @@
                 </tbody>
             </table>
         </div>
+        @if ($assignments->hasPages())
+            <div class="border-t border-slate-200 px-5 py-4">
+                {{ $assignments->links() }}
+            </div>
+        @endif
     </div>
 </form>
 
@@ -108,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectAll.disabled = checkboxes.length === 0;
         releaseButton.disabled = selectedCount === 0;
         releaseButton.classList.toggle('hidden', selectedCount === 0);
-        releaseButton.textContent = `Release Grades (${selectedCount} selected)`;
+        releaseButton.textContent = `Release Subjects (${selectedCount} selected)`;
     };
 
     selectAll.addEventListener('change', () => {

@@ -29,10 +29,10 @@ test('promotion report includes every saved outcome without changing statuses', 
     $before = Enrollment::query()->pluck('promotion_status_ID', 'enrollment_ID')->all();
     $this->actingAs($this->counselor)->get(route('guidance.reports.promotion'))->assertOk()
         ->assertSee('Promotion Reports')->assertSee('Outcomes by school year')
-        ->assertViewHas('total', 5)
-        ->assertViewHas('rows', fn ($rows) => $rows->count() === 5 && $rows->every(fn ($row) => $row->total === 1));
+        ->assertViewHas('total', 6)
+        ->assertViewHas('rows', fn ($rows) => $rows->count() === 6 && $rows->every(fn ($row) => $row->total === 1));
     expect(Enrollment::query()->pluck('promotion_status_ID', 'enrollment_ID')->all())->toBe($before);
-    $this->get(route('guidance.reports.promotion', ['academic_year_id' => '']))->assertOk()->assertViewHas('total', 6)
+    $this->get(route('guidance.reports.promotion', ['academic_year_id' => '']))->assertOk()->assertViewHas('total', 7)
         ->assertViewHas('matrices', fn ($matrices) => $matrices['School year']->count() === 2);
 });
 

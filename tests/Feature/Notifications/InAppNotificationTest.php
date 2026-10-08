@@ -23,6 +23,7 @@ use App\Notifications\GradesApproved;
 use App\Notifications\GradesReleased;
 use App\Notifications\PlacementStatusUpdated;
 use App\Notifications\StudentGradesReleased;
+use App\Notifications\SubjectsAwaitingRelease;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -182,6 +183,42 @@ test('teachers are notified when submitted grades are approved', function () {
     });
 });
 
+test('principals receive one current subject total for grades awaiting release', function () {
+    $first = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
+    $second = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
+    $principal = $first['principal'];
+
+    $this->actingAs($first['registrar'])
+        ->post(route('registrar.grade-approvals.approve', $first['assignment']))
+        ->assertRedirect(route('registrar.grade-approvals'));
+    $this->post(route('registrar.grade-approvals.approve', $second['assignment']))
+        ->assertRedirect(route('registrar.grade-approvals'));
+
+    $notification = $principal->notifications()
+        ->where('type', SubjectsAwaitingRelease::class)
+        ->firstOrFail();
+
+    expect($principal->notifications()->where('type', SubjectsAwaitingRelease::class)->count())->toBe(1)
+        ->and($notification->data['subject_count'])->toBe(2)
+        ->and($notification->data['assignment_ids'])->toEqualCanonicalizing([
+            $first['assignment']->getKey(),
+            $second['assignment']->getKey(),
+        ])
+        ->and($notification->data['message'])->toBe('2 subject grades are awaiting release to students.');
+
+    $this->actingAs($principal)->get(route('principal.dashboard'))
+        ->assertOk()
+        ->assertSee('data-test="notification-bell"', false)
+        ->assertSee('2 subject grades are awaiting release to students.');
+
+    $this->post(route('principal.grade-releases.release', $first['assignment']))->assertRedirect();
+    expect($notification->fresh()->data['subject_count'])->toBe(1)
+        ->and($notification->fresh()->data['message'])->toBe('1 subject grade is awaiting release to students.');
+
+    $this->post(route('principal.grade-releases.release', $second['assignment']))->assertRedirect();
+    expect($principal->unreadNotifications()->where('type', SubjectsAwaitingRelease::class)->count())->toBe(0);
+});
+
 test('registrars can bulk approve selected submissions within the filtered term', function () {
     Notification::fake();
     $first = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
@@ -201,7 +238,8 @@ test('registrars can bulk approve selected submissions within the filtered term'
         $first['assignment']->getKey(), $second['assignment']->getKey(), $released['assignment']->getKey(),
     ]];
     $this->post(route('registrar.grade-approvals.approve-selected'), $payload)
-        ->assertRedirect(route('registrar.grade-approvals', $filters))->assertSessionHas('status');
+        ->assertRedirect(route('registrar.grade-approvals', $filters))
+        ->assertSessionHas('status', '2 subjects approved and sent to the principal for release.');
 
     foreach ([$first, $second] as $fixture) {
         $approved = $fixture['assignment']->grades()->where('term_ID', $grade->term_ID)->firstOrFail();
@@ -215,6 +253,7 @@ test('registrars can bulk approve selected submissions within the filtered term'
         ->and($released['assignment']->grades()->first()->status)->toBe(GradeStatus::RELEASED);
     Notification::assertNotSentTo($unselected['teacher'], GradesApproved::class);
     Notification::assertNotSentTo($released['teacher'], GradesApproved::class);
+    Notification::assertSentTo($first['principal'], SubjectsAwaitingRelease::class, fn (SubjectsAwaitingRelease $notification): bool => count($notification->assignmentIds) === 2);
 
     $this->post(route('registrar.grade-approvals.approve-selected'), $payload)->assertSessionHas('error');
     Notification::assertSentToTimes($first['teacher'], GradesApproved::class, 1);
@@ -248,29 +287,34 @@ test('teachers are notified when approved grades are released', function () {
     });
 });
 
-test('unseen teacher grade approvals and releases are bundled with grade counts', function () {
+test('unseen teacher grade approvals and releases are bundled with subject counts', function () {
     ['teacher' => $teacher, 'assignment' => $assignment] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    ['assignment' => $otherAssignment] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
 
-    $teacher->notify(new GradesApproved($assignment, 3));
-    $teacher->notify(new GradesApproved($assignment, 4));
-    $teacher->notify(new GradesReleased($assignment, 2));
-    $teacher->notify(new GradesReleased($assignment, 5));
+    $teacher->notify(new GradesApproved($assignment));
+    $teacher->notify(new GradesApproved($assignment));
+    $teacher->notify(new GradesApproved($otherAssignment));
+    $teacher->notify(new GradesReleased($assignment));
+    $teacher->notify(new GradesReleased($assignment));
+    $teacher->notify(new GradesReleased($otherAssignment));
 
     $approved = $teacher->notifications()->where('type', GradesApproved::class)->firstOrFail();
     $released = $teacher->notifications()->where('type', GradesReleased::class)->firstOrFail();
 
     expect($teacher->notifications()->count())->toBe(2)
         ->and($teacher->unreadNotifications()->whereNull('seen_at')->count())->toBe(2)
-        ->and($approved->data['grade_count'])->toBe(7)
-        ->and($approved->data['message'])->toBe('7 grades were approved and sent to the principal for release.')
-        ->and($released->data['grade_count'])->toBe(7)
-        ->and($released->data['message'])->toBe('7 grades have been released to students.');
+        ->and($approved->data['subject_count'])->toBe(2)
+        ->and($approved->data['assignment_ids'])->toHaveCount(2)
+        ->and($approved->data['message'])->toBe('2 subjects were approved and sent to the principal for release.')
+        ->and($released->data['subject_count'])->toBe(2)
+        ->and($released->data['assignment_ids'])->toHaveCount(2)
+        ->and($released->data['message'])->toBe('2 subjects have been released to students.');
 
     $approved->update(['seen_at' => now()]);
-    $teacher->notify(new GradesApproved($assignment, 2));
+    $teacher->notify(new GradesApproved($assignment));
 
     expect($teacher->notifications()->where('type', GradesApproved::class)->count())->toBe(2)
-        ->and($teacher->notifications()->where('type', GradesApproved::class)->whereNull('seen_at')->firstOrFail()->data['grade_count'])->toBe(2);
+        ->and($teacher->notifications()->where('type', GradesApproved::class)->whereNull('seen_at')->firstOrFail()->data['subject_count'])->toBe(1);
 });
 
 test('students are notified when their approved grades are released', function () {
@@ -338,15 +382,15 @@ test('student grade notices wait for every subject and are sent once per period'
     expect($student->notifications()->count())->toBe(2);
 });
 
-test('grade releases default to all statuses and support status filters', function () {
+test('grade releases default to awaiting release and support status filters', function () {
     ['principal' => $principal, 'assignment' => $pending] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
     ['assignment' => $released] = createInAppNotificationGradeAssignment(GradeStatus::RELEASED);
     ['assignment' => $submitted] = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
 
     $this->actingAs($principal)->get(route('principal.grade-releases', ['academic_year_id' => '']))
         ->assertOk()
-        ->assertViewHas('filters', fn ($filters) => $filters['status'] === 'all')
-        ->assertViewHas('assignments', fn ($rows) => $rows->count() === 2 && ! $rows->contains($submitted))
+        ->assertViewHas('filters', fn ($filters) => $filters['status'] === 'approved')
+        ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [$pending->assignment_ID])
         ->assertSeeInOrder(['name="search"', 'name="grade_level"', 'name="subject_id"', 'name="academic_year_id"', 'name="status"'], false);
 
     $this->get(route('principal.grade-releases', ['status' => 'approved', 'academic_year_id' => '']))
@@ -365,7 +409,7 @@ test('grade releases default to all statuses and support status filters', functi
         ->assertSessionHasErrors('status');
 });
 
-test('registrar grade approvals include released records and filter all supported statuses', function () {
+test('registrar grade approvals default to submitted and filter all supported statuses', function () {
     ['registrar' => $registrar, 'assignment' => $released] = createInAppNotificationGradeAssignment(GradeStatus::RELEASED);
     ['assignment' => $approved] = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
     ['assignment' => $submitted] = createInAppNotificationGradeAssignment(GradeStatus::SUBMITTED);
@@ -374,6 +418,10 @@ test('registrar grade approvals include released records and filter all supporte
 
     $this->actingAs($registrar)->get(route('registrar.grade-approvals', $filters))->assertOk()
         ->assertSee('value="released"', false)
+        ->assertViewHas('filters', fn ($values) => $values['status'] === 'submitted')
+        ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [$submitted->assignment_ID]);
+
+    $this->get(route('registrar.grade-approvals', $filters + ['status' => '']))->assertOk()
         ->assertViewHas('assignments', fn ($rows) => $rows->count() === 3 && ! $rows->contains($draft));
 
     foreach (['submitted' => $submitted, 'approved' => $approved, 'released' => $released] as $status => $assignment) {
@@ -436,7 +484,10 @@ test('grade pages default to the current term and filter grade records by term',
     $record = $fixtures['assignment']->grades()->firstOrFail()->replicate();
     $record->term_ID = $current->term_ID;
     $record->save();
-    $query = ['grade_level' => $portal === 'principal' ? $grade->grade_ID : $grade->value];
+    $query = [
+        'grade_level' => $portal === 'principal' ? $grade->grade_ID : $grade->value,
+        'status' => 'approved',
+    ];
 
     $this->actingAs($fixtures[$portal])->get(route($portal.'.'.$page, $query))
         ->assertOk()
@@ -509,7 +560,7 @@ test('bulk grade release updates multiple selected assignments and leaves other 
     $this->actingAs($principal)->from(route('principal.grade-releases'))
         ->post(route('principal.grade-releases.bulk-release'), [
             'assignment_ids' => [$first->assignment_ID, $second->assignment_ID, $submitted->assignment_ID],
-        ])->assertRedirect()->assertSessionHas('status', '2 grade record(s) released to students.');
+        ])->assertRedirect()->assertSessionHas('status', '2 subjects released to students.');
 
     expect($first->grades()->first()->status)->toBe(GradeStatus::RELEASED)
         ->and($second->grades()->first()->status)->toBe(GradeStatus::RELEASED)
@@ -540,11 +591,48 @@ test('grade approval and release lists put the most recently updated grades firs
     $older['assignment']->grades()->update(['updated_at' => now()->subDay()]);
     $newer['assignment']->grades()->update(['updated_at' => now()]);
 
-    $this->actingAs($older[$portal])->get(route($portal.'.'.$page, ['academic_year_id' => '', 'term_id' => '']))
+    $this->actingAs($older[$portal])->get(route($portal.'.'.$page, [
+        'academic_year_id' => '', 'term_id' => '', 'status' => 'approved',
+    ]))
         ->assertOk()
         ->assertViewHas('assignments', fn ($rows) => $rows->modelKeys() === [
             $newer['assignment']->getKey(), $older['assignment']->getKey(),
         ]);
+})->with([['registrar', 'grade-approvals'], ['principal', 'grade-releases']]);
+
+test('grade approval and release tables paginate and preserve their filters', function (string $portal, string $page) {
+    $fixture = createInAppNotificationGradeAssignment(GradeStatus::APPROVED);
+    $baseAssignment = $fixture['assignment'];
+    $baseSection = $baseAssignment->section;
+    $baseGrade = $baseAssignment->grades()->firstOrFail();
+
+    foreach (range(1, 15) as $index) {
+        $section = $baseSection->replicate();
+        $section->name = 'Paginated section '.$index;
+        $section->save();
+
+        $assignment = $baseAssignment->replicate();
+        $assignment->section_ID = $section->section_ID;
+        $assignment->save();
+
+        $grade = $baseGrade->replicate();
+        $grade->assignment_ID = $assignment->assignment_ID;
+        $grade->save();
+    }
+
+    $query = ['academic_year_id' => '', 'term_id' => '', 'status' => 'approved'];
+    $response = $this->actingAs($fixture[$portal])->get(route($portal.'.'.$page, $query))->assertOk();
+    $assignments = $response->viewData('assignments');
+
+    expect($assignments)->toBeInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class)
+        ->and($assignments->total())->toBe(16)
+        ->and($assignments->count())->toBe(15)
+        ->and($assignments->lastPage())->toBe(2)
+        ->and($assignments->url(2))->toContain('status=approved');
+
+    $this->get(route($portal.'.'.$page, $query + ['page' => 2]))
+        ->assertOk()
+        ->assertViewHas('assignments', fn ($rows) => $rows->total() === 16 && $rows->count() === 1 && $rows->currentPage() === 2);
 })->with([['registrar', 'grade-approvals'], ['principal', 'grade-releases']]);
 
 test('teachers are notified when approved grades are bulk released', function () {

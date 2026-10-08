@@ -82,4 +82,4 @@
     .jhs-updated .jhs-panels { height: auto; }
 }
 
-.jhs-updated .jhs-comment-text { font-size: 5.5pt; line-height: 1.1; font-weight: normal; overflow-wrap: anywhere; white-space: normal; }
+.jhs-updated .jhs-comment-text { font-size: 6.2pt; line-height: 1.1; font-weight: normal; text-align: center; overflow-wrap: anywhere; white-space: normal; }

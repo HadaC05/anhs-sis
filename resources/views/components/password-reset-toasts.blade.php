@@ -1,4 +1,4 @@
-@props(['includeErrors' => true, 'testPrefix' => 'password-reset'])
+@props(['includeErrors' => true, 'testPrefix' => 'password-reset', 'positionClass' => 'top-4'])
 
 @php
     $notifications = [];
@@ -20,7 +20,7 @@
 @endphp
 
 @if ($notifications)
-    <div class="fixed right-4 top-4 z-[120] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-sm flex-col gap-3 overflow-y-auto" data-password-reset-toasts>
+    <div class="fixed right-4 {{ $positionClass }} z-[120] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-sm flex-col gap-3 overflow-y-auto" data-password-reset-toasts>
         @foreach ($notifications as $notification)
             <div class="flex items-start gap-3 rounded-xl border bg-white p-4 text-sm shadow-xl {{ $colors[$notification['type']] ?? $colors['error'] }}"
                 role="{{ $notification['type'] === 'success' ? 'status' : 'alert' }}"

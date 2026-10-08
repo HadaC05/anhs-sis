@@ -27,7 +27,7 @@ class NotifyReleasedGrades implements ShouldQueue
             return;
         }
 
-        TeacherGradeNotifier::released($assignment, $this->releasedCount);
+        TeacherGradeNotifier::released($assignment);
 
         $students = StudentSubjectGrade::query()
             ->where('assignment_ID', $this->assignmentId)

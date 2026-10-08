@@ -5,6 +5,7 @@ use App\Models\Cluster;
 use App\Models\Curriculum;
 use App\Models\CurriculumSubject;
 use App\Models\GradeLevel;
+use App\Models\MapehConfiguration;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
@@ -12,6 +13,7 @@ use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use Database\Seeders\AcademicYearSeeder;
 use Database\Seeders\ClusterSeeder;
+use Database\Seeders\CombinedSubjectConfigurationSeeder;
 use Database\Seeders\CurriculumSeeder;
 use Database\Seeders\CurriculumSubjectSeeder;
 use Database\Seeders\DefaultNonStudentUsersSeeder;
@@ -258,4 +260,51 @@ test('default seeders create configured curriculum subjects and matching teacher
         ->and(CurriculumSubject::query()->count())->toBeGreaterThan(0)
         ->and(TeacherSubjectAssignment::query()->count())->toBe($expectedAssignmentCount)
         ->and(TeacherSubjectAssignment::query()->whereNull('staff_ID')->exists())->toBeFalse();
+});
+
+test('default paired MAPEH components have assigned teachers', function () {
+    $this->seed([
+        RoleSeeder::class,
+        DefaultNonStudentUsersSeeder::class,
+        ClusterSeeder::class,
+        GradeLevelSeeder::class,
+        SubjectSeeder::class,
+        CurriculumSeeder::class,
+        CurriculumSubjectSeeder::class,
+        AcademicYearSeeder::class,
+        CombinedSubjectConfigurationSeeder::class,
+        SectionSeeder::class,
+        TeacherSubjectAssignmentSeeder::class,
+    ]);
+
+    $academicYearId = AcademicYear::query()->where('status', true)->value('SY_ID');
+    $sections = Section::query()
+        ->where('SY_ID', $academicYearId)
+        ->whereHas('gradeLevel', fn ($query) => $query->whereIn('grade_label', [
+            'Grade 7',
+            'Grade 8',
+            'Grade 9',
+            'Grade 10',
+        ]))
+        ->get();
+
+    foreach ($sections as $section) {
+        $configuration = MapehConfiguration::forSection($section);
+        $componentSubjectIds = $configuration->components
+            ->pluck('curriculumSubject.subject_ID');
+
+        $assignments = TeacherSubjectAssignment::query()
+            ->where('section_ID', $section->section_ID)
+            ->whereIn('subject_ID', $componentSubjectIds)
+            ->get();
+
+        expect($configuration->mode)->toBe('paired')
+            ->and($configuration->components)->toHaveCount(2)
+            ->and($assignments)->toHaveCount(2)
+            ->and($assignments->pluck('staff_ID')->filter())->toHaveCount(2)
+            ->and(TeacherSubjectAssignment::query()
+                ->where('section_ID', $section->section_ID)
+                ->where('subject_ID', $configuration->parentSubject->subject_ID)
+                ->exists())->toBeFalse();
+    }
 });

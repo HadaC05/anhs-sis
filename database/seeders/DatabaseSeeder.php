@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
         $this->call(AcademicYearSeeder::class);
         $this->call(CombinedSubjectConfigurationSeeder::class);
         $this->call(SectionSeeder::class);
+        $this->call(RoomSeeder::class);
         $this->call(TeacherSubjectAssignmentSeeder::class);
         $this->call(MovementReasonSeeder::class);
         $this->call(DocumentReturnReasonSeeder::class);

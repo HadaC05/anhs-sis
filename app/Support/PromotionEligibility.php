@@ -8,6 +8,7 @@ use App\Models\GradeStatus;
 use App\Models\GradingPeriodStatus;
 use App\Models\GradingTerm;
 use App\Models\PromotionStatus;
+use App\Models\RemediationCase;
 use App\Models\Sf9Configuration;
 use App\Models\StudentObservedValue;
 use App\Models\StudentSubject;
@@ -25,10 +26,10 @@ class PromotionEligibility
         if ($enrollments->isEmpty()) {
             return [];
         }
-        $enrollments->loadMissing(['academicYear', 'curriculumGradeLevel', 'section.gradeLevel', 'section.curriculum', 'gradingSemester.status', 'studentSubjects', 'sf9Comments']);
+        $enrollments->loadMissing(['academicYear', 'curriculumGradeLevel', 'section.gradeLevel', 'section.curriculum', 'gradingSemester.status', 'studentSubjects', 'sf9Comments', 'remediationCase.subjects']);
         $laterEnrollments = Enrollment::query()->with(['academicYear', 'curriculumGradeLevel'])
             ->whereIn('student_ID', $enrollments->pluck('student_ID'))->get()->groupBy('student_ID');
-        $assignments = TeacherSubjectAssignment::query()->whereIn('section_ID', $enrollments->pluck('section_ID')->filter())
+        $assignments = TeacherSubjectAssignment::query()->with('subject')->whereIn('section_ID', $enrollments->pluck('section_ID')->filter())
             ->get()->groupBy('section_ID');
         $grades = StudentSubjectGrade::query()->with('studentSubject')
             ->whereHas('studentSubject', fn ($query) => $query->whereIn('enrollment_ID', $enrollments->modelKeys()))
@@ -50,7 +51,11 @@ class PromotionEligibility
         $changes = [];
         foreach ($enrollments as $enrollment) {
             $gradeId = $enrollment->section?->grade_ID ?: $enrollment->curriculumGradeLevel?->grade_ID;
-            $promoted = $enrollment->promotion_status === PromotionStatus::PROMOTED
+            $terminalStatus = in_array($enrollment->promotion_status, [
+                PromotionStatus::PROMOTED,
+                PromotionStatus::COMPLETED_JUNIOR_HIGH,
+            ], true) ? $enrollment->promotion_status : null;
+            $promoted = $terminalStatus === PromotionStatus::PROMOTED
                 || ($gradeId && $enrollment->academicYear?->start_date && $laterEnrollments->get($enrollment->student_ID, collect())->contains(
                     fn ($later) => $later->academicYear?->start_date > $enrollment->academicYear->start_date
                         && $later->curriculumGradeLevel?->grade_ID > $gradeId
@@ -60,8 +65,10 @@ class PromotionEligibility
                 $keys = collect($key === 'jhs' ? GradingTerm::configuredPeriods() : GradingTerm::seniorHighPeriods($enrollment->semester))->pluck('key');
                 $periods[$key] = ['keys' => $keys, 'ids' => $keys->map(fn ($key) => StudentSubjectGrade::termIdForPeriodKey($key))];
             }
-            $evaluation = $promoted
-                ? ['status' => PromotionStatus::PROMOTED, 'reason' => 'Already promoted.', 'subject_averages' => []]
+            $evaluation = $terminalStatus === PromotionStatus::COMPLETED_JUNIOR_HIGH
+                ? ['status' => PromotionStatus::COMPLETED_JUNIOR_HIGH, 'reason' => 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []]
+                : ($promoted
+                ? ['status' => PromotionStatus::PROMOTED, 'reason' => 'Already promoted.', 'subject_averages' => [], 'failed_subjects' => []]
                 : self::evaluate($enrollment, [
                     'closed' => $closed,
                     'closed_semester_id' => $closedSemesterId,
@@ -71,7 +78,7 @@ class PromotionEligibility
                     'grades' => $grades->get($enrollment->enrollment_ID, collect()),
                     'observed_values' => $observedValues->get($enrollment->enrollment_ID, collect()),
                     'attendance' => $attendance->get($enrollment->enrollment_ID, collect()),
-                ]);
+                ]));
             $evaluations[$enrollment->enrollment_ID] = $evaluation;
             $statusId = (int) $statusIds[$evaluation['status']];
             if ((int) $enrollment->promotion_status_ID !== $statusId) {
@@ -107,7 +114,11 @@ class PromotionEligibility
         }
 
         if ($enrollment->promotion_status === PromotionStatus::PROMOTED) {
-            return ['status' => PromotionStatus::PROMOTED, 'reason' => 'Already promoted.', 'subject_averages' => []];
+            return ['status' => PromotionStatus::PROMOTED, 'reason' => 'Already promoted.', 'subject_averages' => [], 'failed_subjects' => []];
+        }
+
+        if ($enrollment->promotion_status === PromotionStatus::COMPLETED_JUNIOR_HIGH) {
+            return ['status' => PromotionStatus::COMPLETED_JUNIOR_HIGH, 'reason' => 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []];
         }
 
         $evaluation = self::evaluate($enrollment);
@@ -120,10 +131,23 @@ class PromotionEligibility
         return $evaluation;
     }
 
-    /** @return array{status: string, reason: string, subject_averages: array<int, float>} */
+    /** @return array{status: string, reason: string, subject_averages: array<int, float>, failed_subjects: array<int, array{subject_id: int, label: string, final_grade: float}>} */
     public static function evaluate(Enrollment $enrollment, ?array $batch = null): array
     {
-        $enrollment->loadMissing(['section.gradeLevel', 'gradingSemester.status']);
+        if ($enrollment->promotion_status === PromotionStatus::COMPLETED_JUNIOR_HIGH) {
+            return ['status' => PromotionStatus::COMPLETED_JUNIOR_HIGH, 'reason' => 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []];
+        }
+
+        $enrollment->loadMissing(['section.gradeLevel', 'gradingSemester.status', 'remediationCase.subjects']);
+        if ($enrollment->remediationCase?->status === RemediationCase::APPROVED_PASSED) {
+            return [
+                'status' => PromotionStatus::ELIGIBLE,
+                'reason' => 'Approved remediation requirements were passed.',
+                'subject_averages' => $enrollment->remediationCase->subjects
+                    ->pluck('recomputed_final_grade', 'subject_ID')->map(fn ($grade): float => (float) $grade)->all(),
+                'failed_subjects' => [],
+            ];
+        }
         $section = $enrollment->section;
         if (! $section) {
             return self::pending('The learner has no section for this school year.');
@@ -141,7 +165,7 @@ class PromotionEligibility
             ->where('enrollment_ID', $enrollment->enrollment_ID)
             ->pluck('subject_ID');
 
-        $assignments = $batch['assignments'] ?? TeacherSubjectAssignment::query()
+        $assignments = $batch['assignments'] ?? TeacherSubjectAssignment::query()->with('subject')
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
             ->whereIn('subject_ID', $studentSubjectIds)
@@ -197,9 +221,17 @@ class PromotionEligibility
             return self::pending('Complete attendance records are required before promotion.');
         }
 
-        $failingGrades = $grades->flatten()
-            ->filter(fn (StudentSubjectGrade $grade): bool => (float) $grade->numeric_grade < self::PASSING_GRADE)
-            ->count();
+        $failedSubjects = $assignments
+            ->filter(fn ($assignment): bool => ($averages[$assignment->assignment_ID] ?? self::PASSING_GRADE) < self::PASSING_GRADE)
+            ->map(fn ($assignment): array => [
+                'subject_id' => (int) $assignment->subject_ID,
+                'label' => (string) ($assignment->subject?->title ?? $assignment->subject?->code ?? 'Learning Area'),
+                'final_grade' => (float) $averages[$assignment->assignment_ID],
+            ])
+            ->unique('subject_id')
+            ->values()
+            ->all();
+        $failingGrades = count($failedSubjects);
         $status = match (true) {
             $failingGrades === 0 => PromotionStatus::ELIGIBLE,
             $failingGrades <= 2 => PromotionStatus::CONDITIONALLY_PROMOTED,
@@ -214,13 +246,14 @@ class PromotionEligibility
                 default => '',
             },
             'subject_averages' => $averages,
+            'failed_subjects' => $failedSubjects,
         ];
     }
 
-    /** @return array{status: string, reason: string, subject_averages: array<int, float>} */
+    /** @return array{status: string, reason: string, subject_averages: array<int, float>, failed_subjects: array<int, array{subject_id: int, label: string, final_grade: float}>} */
     private static function pending(string $reason): array
     {
-        return ['status' => PromotionStatus::PENDING, 'reason' => $reason, 'subject_averages' => []];
+        return ['status' => PromotionStatus::PENDING, 'reason' => $reason, 'subject_averages' => [], 'failed_subjects' => []];
     }
 
     private static function hasCompleteObservedValues(Enrollment $enrollment, $periodKeys, ?array $batch): bool

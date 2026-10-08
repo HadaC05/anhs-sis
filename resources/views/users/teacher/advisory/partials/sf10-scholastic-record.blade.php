@@ -62,7 +62,7 @@
 <table class="remedial">
     <tr>
         <td colspan="{{ 4 + max($periodCount, 1) }}" class="small">
-            Remedial Classes Conducted from <span class="line short"></span> (mm/dd/yyyy) to <span class="line short"></span> (mm/dd/yyyy)
+            Remedial Classes Conducted from <span class="line short">{{ $record['remediation']['start_date'] ?? '' }}</span> (mm/dd/yyyy) to <span class="line short">{{ $record['remediation']['end_date'] ?? '' }}</span> (mm/dd/yyyy)
         </td>
     </tr>
     <tr>
@@ -72,11 +72,21 @@
         <th colspan="{{ max($periodCount, 1) }}">Recomputed Final Grade</th>
         <th>Remarks</th>
     </tr>
-    <tr>
-        <td>&nbsp;</td>
-        <td></td>
-        <td></td>
-        <td colspan="{{ max($periodCount, 1) }}"></td>
-        <td></td>
-    </tr>
+    @forelse(($record['remediation']['subjects'] ?? []) as $remedialSubject)
+        <tr>
+            <td>{{ $remedialSubject['label'] }}</td>
+            <td class="center">{{ $remedialSubject['final_rating'] }}</td>
+            <td class="center">{{ $remedialSubject['remedial_class_mark'] }}</td>
+            <td colspan="{{ max($periodCount, 1) }}" class="center">{{ $remedialSubject['recomputed_final_grade'] }}</td>
+            <td class="center">{{ $remedialSubject['remarks'] }}</td>
+        </tr>
+    @empty
+        <tr>
+            <td>&nbsp;</td>
+            <td></td>
+            <td></td>
+            <td colspan="{{ max($periodCount, 1) }}"></td>
+            <td></td>
+        </tr>
+    @endforelse
 </table>

@@ -39,6 +39,7 @@ class EClassRecordGrades
             ->forPeriodKey($period)->get()->filter->isTeacherLocked()->pluck('student_subject_ID')->all();
         $matched = [];
         $issues = [];
+        $unmatchedNames = 0;
         foreach ($records as $record) {
             $ids = array_keys($index[EClassRecord::normalize($record['name'])] ?? []);
             if ($ids === [] && preg_match('/^(.+),\s*(.+?)\s+[\pL]\.?$/u', $record['name'], $parts)) {
@@ -46,6 +47,9 @@ class EClassRecordGrades
                 $ids = array_keys($withoutMiddleName[$key] ?? []);
             }
             if (count($ids) !== 1) {
+                if ($ids === []) {
+                    $unmatchedNames++;
+                }
                 $issues[] = 'Row '.$record['row'].' — '.$record['name'].': '.(count($ids) ? 'name matches more than one learner.' : 'no matching learner in this class.');
 
                 continue;
@@ -76,6 +80,7 @@ class EClassRecordGrades
             'grades' => $grades,
             'issues' => $issues,
             'unchanged' => $enrollments->count() - count($grades),
+            'no_matching_students' => $records !== [] && $unmatchedNames === count($records),
         ];
     }
 }

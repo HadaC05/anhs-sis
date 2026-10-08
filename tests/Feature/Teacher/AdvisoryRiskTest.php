@@ -205,7 +205,7 @@ test('promotion filters and advisory navigation render', function () {
         ->assertSee('At-risk Students')->assertSee('Back to Advisory')
         ->assertSee('data-test="promotion-status"', false)
         ->assertSee('id="recordActionConfirmation"', false)
-        ->assertSee('data-confirm-title="Promote selected learners?"', false)
+        ->assertSee('data-confirm-title="Process selected learners?"', false)
         ->assertDontSee("return confirm('Promote this learner", false);
 });
 

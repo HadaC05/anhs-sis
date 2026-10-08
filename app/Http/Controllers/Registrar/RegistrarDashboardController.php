@@ -23,6 +23,7 @@ use App\Models\TeacherSubjectAssignment;
 use App\Support\AssignmentGradeTermUnlocker;
 use App\Support\GradeRecordPeriodFilters;
 use App\Support\LearnerPermanentRecordBuilder;
+use App\Support\PrincipalGradeReleaseNotifier;
 use App\Support\RegistrarDashboardData;
 use App\Support\SectionGradeSubmissionProgress;
 use App\Support\Sf9AttendanceSummary;
@@ -252,7 +253,9 @@ class RegistrarDashboardController extends Controller
     public function gradeApprovals(Request $request): \Illuminate\View\View
     {
         $search = trim($request->string('search')->toString());
-        $status = $request->string('status')->toString();
+        $status = $request->has('status')
+            ? $request->string('status')->toString()
+            : GradeStatus::SUBMITTED;
         $subjectId = $request->integer('subject_id') ?: null;
         $gradeLevel = $request->string('grade_level')->toString();
         $gradeId = GradeLevel::idForValue($gradeLevel);
@@ -328,7 +331,8 @@ class RegistrarDashboardController extends Controller
             }], 'updated_at')
             ->orderByDesc('latest_grade_at')
             ->orderByDesc('assignment_ID')
-            ->get();
+            ->paginate(15)
+            ->withQueryString();
     }
 
     public function showGradeApproval(Request $request, TeacherSubjectAssignment $assignment): View
@@ -440,10 +444,7 @@ class RegistrarDashboardController extends Controller
                         'reviewed_at' => now(),
                     ]);
                 if ($count > 0) {
-                    $approvedAssignments->push([
-                        'assignment' => $assignment,
-                        'count' => $count,
-                    ]);
+                    $approvedAssignments->push($assignment);
                     $total += $count;
                 }
             }
@@ -452,15 +453,19 @@ class RegistrarDashboardController extends Controller
         });
 
         foreach ($approvedAssignments as $approvedAssignment) {
-            TeacherGradeNotifier::approved($approvedAssignment['assignment'], $approvedAssignment['count']);
+            TeacherGradeNotifier::approved($approvedAssignment);
         }
-        $request->attributes->set('audit_description', "Bulk approved {$approved} submitted grade record(s).");
+        $approvedSubjects = $approvedAssignments->count();
+        if ($approvedSubjects > 0) {
+            PrincipalGradeReleaseNotifier::sync();
+        }
+        $request->attributes->set('audit_description', "Bulk approved {$approvedSubjects} subject(s), covering {$approved} submitted grade record(s).");
 
         return redirect()->route('registrar.grade-approvals', array_map(fn ($value) => $value ?? '', $request->only([
             'search', 'status', 'subject_id', 'grade_level', 'academic_year_id', 'term_id', 'semester',
-        ])))->with($approved ? 'status' : 'error', $approved
-            ? "{$approved} grade record(s) approved and sent to the principal for release."
-            : 'No submitted grades were available to approve.');
+        ])))->with($approvedSubjects ? 'status' : 'error', $approvedSubjects
+            ? $approvedSubjects.' '.str('subject')->plural($approvedSubjects).' approved and sent to the principal for release.'
+            : 'No submitted subjects were available to approve.');
     }
 
     public function approveGrades(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse
@@ -474,15 +479,18 @@ class RegistrarDashboardController extends Controller
                 'reviewed_at' => now(),
             ]);
 
-        $request->attributes->set('audit_description', "Approved {$approved} submitted grade record(s).");
+        $request->attributes->set('audit_description', "Approved 1 subject covering {$approved} submitted grade record(s).");
 
         if ($approved > 0) {
-            TeacherGradeNotifier::approved($assignment, $approved);
+            TeacherGradeNotifier::approved($assignment);
+            PrincipalGradeReleaseNotifier::sync();
         }
 
         return redirect()
             ->route('registrar.grade-approvals')
-            ->with('status', 'Grades approved and sent to the principal for release.');
+            ->with($approved > 0 ? 'status' : 'error', $approved > 0
+                ? '1 subject approved and sent to the principal for release.'
+                : 'No submitted subject was available to approve.');
     }
 
     public function rejectGrades(Request $request, TeacherSubjectAssignment $assignment): RedirectResponse

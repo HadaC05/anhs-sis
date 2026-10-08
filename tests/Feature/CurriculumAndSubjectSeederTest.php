@@ -78,6 +78,7 @@ test('effective communication is automatically configured as one subject with tw
 
     $configuration = \App\Models\MapehConfiguration::query()
         ->with(['parentSubject.subject', 'components.curriculumSubject.subject'])
+        ->whereHas('parentSubject.subject', fn ($query) => $query->where('code', 'EFFCOM'))
         ->firstOrFail();
 
     expect($configuration->parentSubject->subject->title)->toBe('Effective Communication & Mabisang Communication')
@@ -109,4 +110,27 @@ test('effective communication is automatically configured as one subject with tw
         ->assertOk()
         ->assertSee('Effective Communication &amp; Mabisang Communication Components', false)
         ->assertSee('Mabisang Communication');
+});
+
+test('junior high MAPEH is automatically configured by pair', function () {
+    $this->seed([
+        ClusterSeeder::class,
+        SubjectSeeder::class,
+        CurriculumSeeder::class,
+        \Database\Seeders\CurriculumSubjectSeeder::class,
+        \Database\Seeders\AcademicYearSeeder::class,
+        CombinedSubjectConfigurationSeeder::class,
+    ]);
+
+    $configurations = \App\Models\MapehConfiguration::query()
+        ->with(['parentSubject.subject', 'components.curriculumSubject.subject'])
+        ->whereHas('parentSubject.subject', fn ($query) => $query->where('code', 'like', 'MAPEH%'))
+        ->get();
+
+    expect($configurations)->toHaveCount(12)
+        ->and($configurations->every(fn ($configuration): bool => $configuration->mode === 'paired'))->toBeTrue()
+        ->and($configurations->every(fn ($configuration): bool => $configuration->components->pluck('key')->sort()->values()->all() === [
+            'music_arts',
+            'pe_health',
+        ]))->toBeTrue();
 });

@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
 
@@ -54,7 +54,7 @@ Artisan::command('database:reset-once', function () {
 
 Artisan::command('registrar:grade-digest', function () {
     $count = \App\Support\RegistrarGradeDigest::sendWhenDue();
-    $this->info("{$count} new grade submission(s) included in the registrar digest.");
+    $this->info("{$count} new subject submission(s) included in the registrar digest.");
 })->purpose('Send grouped grade submission notifications when the two-hour interval is due');
 
 Schedule::command('registrar:grade-digest')->everyMinute()->withoutOverlapping();

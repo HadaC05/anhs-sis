@@ -31,6 +31,7 @@ use App\Support\EnrollmentDocumentCompletion;
 use App\Support\PlacementAssessmentAdvisor;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
+use App\Support\RetainedEnrollmentRegistrar;
 use App\Support\StudentAccountProvisioner;
 use App\Support\StudentEnrollmentNotifier;
 use App\Support\StudentPlacementTestNotifier;
@@ -49,15 +50,28 @@ class GuidanceDashboardController extends Controller
 {
     public function promotions(Request $request): View
     {
-        [$query, $eligibility] = $this->promotionQuery($request);
+        [$query, $eligibility, $tab] = $this->promotionQuery($request);
         $isPrincipal = $request->routeIs('principal.*');
+        $enrollments = $query->latest('SY_ID')->orderBy('enrollment_ID')->paginate(15)->withQueryString();
+        $activeAcademicYear = AcademicYear::query()->where('status', true)->first();
+        $activeYearEnrollmentStudentIds = $activeAcademicYear
+            ? Enrollment::query()
+                ->where('SY_ID', $activeAcademicYear->SY_ID)
+                ->whereIn('student_ID', $enrollments->pluck('student_ID'))
+                ->pluck('student_ID')
+                ->map(fn (mixed $studentId): int => (int) $studentId)
+                ->all()
+            : [];
 
         return view('users.guidance.promotions.index', [
             'isPrincipal' => $isPrincipal,
-            'enrollments' => $query->latest('SY_ID')->orderBy('enrollment_ID')->paginate(15)->withQueryString(),
+            'enrollments' => $enrollments,
             'gradeLevels' => GradeLevel::query()->orderBy('grade_ID')->get(),
             'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(),
+            'activeAcademicYear' => $activeAcademicYear,
+            'activeYearEnrollmentStudentIds' => $activeYearEnrollmentStudentIds,
             'eligibility' => $eligibility,
+            'tab' => $tab,
         ]);
     }
 
@@ -68,12 +82,17 @@ class GuidanceDashboardController extends Controller
             'grade_level' => ['nullable', 'integer', Rule::exists(GradeLevel::class, 'grade_ID')],
             'eligibility' => ['nullable', Rule::in(['all', ...array_column(PromotionStatus::definitions(), 'slug')])],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,SY_ID'],
+            'tab' => ['nullable', Rule::in(['promotions', 'remediation'])],
         ]);
+        $tab = $request->routeIs('principal.*') && ($filters['tab'] ?? null) === 'remediation'
+            ? 'remediation'
+            : 'promotions';
         $eligibility = $filters['eligibility'] ?? ($request->routeIs('principal.*') ? 'all' : PromotionStatus::ELIGIBLE);
         $query = Enrollment::query()
-            ->with(['student.application', 'gradeLevel', 'academicYear', 'promotionStatus'])
+            ->with(['student.application', 'gradeLevel', 'academicYear', 'promotionStatus', 'remediationCase.subjects'])
             ->when($filters['grade_level'] ?? null, fn ($query, $grade) => $query->whereHas('curriculumGradeLevel', fn ($query) => $query->where('grade_ID', $grade)))
-            ->when($filters['academic_year_id'] ?? null, fn ($query, $year) => $query->where('SY_ID', $year));
+            ->when($filters['academic_year_id'] ?? null, fn ($query, $year) => $query->where('SY_ID', $year))
+            ->when($tab === 'remediation', fn ($query) => $query->whereHas('remediationCase'));
 
         foreach (preg_split('/[\s,]+/', trim($filters['search'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $term) {
             $query->whereHas('student', function ($query) use ($term): void {
@@ -97,7 +116,7 @@ class GuidanceDashboardController extends Controller
             ->chunkById(250, fn ($enrollments) => PromotionEligibility::synchronizeMany($enrollments), 'enrollment_ID');
         $query->when($eligibility !== 'all', fn ($query) => $query->where('promotion_status_ID', PromotionStatus::idFor($eligibility)));
 
-        return [$query, $eligibility];
+        return [$query, $eligibility, $tab];
     }
 
     public function downloadPromotionSf5(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse
@@ -114,11 +133,14 @@ class GuidanceDashboardController extends Controller
             'enrollment_ids.*' => ['required', 'integer', 'distinct', 'exists:enrollments,enrollment_ID'],
         ]);
         $enrollments = Enrollment::query()->whereIn('enrollment_ID', $validated['enrollment_ids'])->get();
+        $completed = 0;
 
-        DB::transaction(function () use ($enrollments): void {
+        DB::transaction(function () use ($enrollments, &$completed): void {
             foreach ($enrollments as $enrollment) {
                 try {
-                    PromotionRegistrar::promote($enrollment, requireActiveYear: true);
+                    if (PromotionRegistrar::promote($enrollment, requireActiveYear: true) === null) {
+                        $completed++;
+                    }
                 } catch (ValidationException $exception) {
                     throw ValidationException::withMessages([
                         'promotion' => 'No learners were promoted. '.($exception->errors()['promotion'][0] ?? 'A selected learner could not be promoted.').' Review your selection and try again.',
@@ -127,18 +149,42 @@ class GuidanceDashboardController extends Controller
             }
         });
 
-        return back()->with('status', $enrollments->count().' selected learner(s) promoted to the next active school year.');
+        $promoted = $enrollments->count() - $completed;
+        $message = match (true) {
+            $completed === 0 => "{$promoted} selected learner(s) promoted to the next active school year.",
+            $promoted === 0 => "{$completed} selected Grade 10 learner(s) marked as having completed Junior High School; no Grade 11 enrollments were created.",
+            default => "{$promoted} learner(s) promoted and {$completed} Grade 10 learner(s) marked as having completed Junior High School.",
+        };
+
+        return back()->with('status', $message);
     }
 
     public function confirmPromotion(Enrollment $enrollment): RedirectResponse
     {
         $nextEnrollment = DB::transaction(
-            fn (): Enrollment => PromotionRegistrar::promote($enrollment, requireActiveYear: true),
+            fn (): ?Enrollment => PromotionRegistrar::promote($enrollment, requireActiveYear: true),
         );
+
+        if (! $nextEnrollment) {
+            return redirect()->route(\App\Support\AcademicPortal::routeName('guidance.promotions.index'))
+                ->with('success', 'Junior High School completion confirmed. No Grade 11 enrollment was created.');
+        }
+
         $nextGradeLabel = $nextEnrollment->gradeLevel()->value('grade_label') ?? 'next-grade';
 
         return redirect()->route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $nextEnrollment)
             ->with('success', "Promotion confirmed. A pending {$nextGradeLabel} enrollment was created for {$nextEnrollment->academicYear?->school_year}; assign the learner to a section to finish enrollment.");
+    }
+
+    public function reenrollRetained(Enrollment $enrollment): RedirectResponse
+    {
+        $repeatEnrollment = DB::transaction(
+            fn (): Enrollment => RetainedEnrollmentRegistrar::enroll($enrollment),
+        );
+        $gradeLabel = $repeatEnrollment->gradeLevel()->value('grade_label') ?? 'same-grade';
+
+        return redirect()->route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $repeatEnrollment)
+            ->with('success', "A pending {$gradeLabel} repeat enrollment was created for {$repeatEnrollment->academicYear?->school_year}. The learner remains retained in the prior school year.");
     }
 
     public function index(Request $request): View

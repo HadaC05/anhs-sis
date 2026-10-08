@@ -103,7 +103,10 @@ test('incomplete student profiles show a completion prompt and cannot open other
         ->get(route('student.dashboard'))
         ->assertOk()
         ->assertSee('Complete your student profile')
-        ->assertSee('Update Student Profile');
+        ->assertSee('Update Student Profile')
+        ->assertSee('data-test="profile-completion-modal"', false)
+        ->assertSee('fixed inset-0 z-[200]', false)
+        ->assertDontSee('profile-completion-backdrop', false);
 
     $this->actingAs($student)
         ->get(route('student.documents'))

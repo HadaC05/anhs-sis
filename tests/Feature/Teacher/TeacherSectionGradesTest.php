@@ -211,6 +211,20 @@ test('class record import reports invalid blank duplicate and unmatched learner 
     'unmatched' => [[['Unknown, Learner', '88']], 'no matching learner'],
 ]);
 
+test('class record import identifies a file with no students from the assigned section', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+
+    $this->actingAs($teacher)->postJson(route('teacher.sections.grades.import', $assignment), [
+        'period' => 'shs_sem1_term_1',
+        'class_record' => \Tests\Support\EClassRecordFixture::upload(['TERM 1' => [
+            ['Unknown, Learner', '88'],
+            ['Different, Student', '91'],
+        ]]),
+    ])->assertOk()
+        ->assertJsonCount(0, 'grades')
+        ->assertJsonPath('no_matching_students', true);
+});
+
 test('class record import refuses names shared by multiple enrolled learners', function () {
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
     $student = $enrollment->student->replicate();
@@ -640,8 +654,8 @@ test('registrar digest groups subject terms and sends only one alert to each act
     foreach ([$registrar, $otherRegistrar] as $recipient) {
         expect($recipient->notifications()->count())->toBe(1);
         $data = $recipient->notifications()->first()->data;
-        expect($data['submission_count'])->toBe(3)
-            ->and($data['message'])->toBe('There are 3 new grade submissions awaiting review.');
+        expect($data['submission_count'])->toBe(1)
+            ->and($data['message'])->toBe('There is 1 new subject submission awaiting review.');
         $this->actingAs($recipient)->get($data['url'])->assertOk();
     }
     expect($inactive->notifications()->count())->toBe(0)
@@ -649,7 +663,7 @@ test('registrar digest groups subject terms and sends only one alert to each act
     expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
     expect($registrar->notifications()->count())->toBe(1);
     $this->actingAs($registrar)->get(route('registrar.dashboard'))->assertOk()
-        ->assertSee('data-test="notification-bell"', false)->assertSee('There are 3 new grade submissions awaiting review.');
+        ->assertSee('data-test="notification-bell"', false)->assertSee('There is 1 new subject submission awaiting review.');
 });
 
 test('registrar digest waits two hours and retains overnight and weekend submissions', function () {
@@ -666,7 +680,7 @@ test('registrar digest waits two hours and retains overnight and weekend submiss
     expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);
     $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-05 08:00:00', 'Asia/Manila'));
     expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(1);
-    expect($registrar->notifications()->first()->data['message'])->toBe('There is 1 new grade submission awaiting review.');
+    expect($registrar->notifications()->first()->data['message'])->toBe('There is 1 new subject submission awaiting review.');
     \App\Support\RegistrarGradeDigest::record($assignment->assignment_ID, [StudentSubjectGrade::termIdForPeriodKey('shs_sem1_term_1')]);
     $this->travel(119)->minutes();
     expect(\App\Support\RegistrarGradeDigest::sendWhenDue())->toBe(0);

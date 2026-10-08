@@ -528,6 +528,9 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                 const details = document.getElementById('classRecordImportDetails');
                 const issues = document.getElementById('classRecordImportIssues');
                 let message;
+                let showImportResult = false;
+                result.classList.add('hidden');
+                summary.textContent = '';
                 issues.replaceChildren();
                 details.classList.add('hidden');
                 details.open = false;
@@ -551,29 +554,31 @@ $termIsOpen = $editablePeriodKey !== null && (\App\Models\GradingTerm::isSeniorH
                         }
                     });
                     const periodLabel = document.getElementById('classRecordPeriod').selectedOptions[0].text;
-                    message = imported
-                        ? `${imported} grades filled for ${periodLabel}. Review and save, or submit from Grade Summary.`
-                        : `No grades were imported for ${periodLabel}. Existing inputs were kept.`;
-                    const allNamesUnmatched = imported === 0 && data.issues.length > 0
-                        && data.issues.every(issue => issue.includes('no matching learner in this class.'));
-                    summary.textContent = `${message} ${data.unchanged} learner inputs unchanged.`
-                        + (allNamesUnmatched ? ' Check that the workbook names match students enrolled in this section and school year.' : '');
-                    data.issues.forEach(issue => {
-                        const item = document.createElement('li');
-                        item.textContent = issue;
-                        issues.appendChild(item);
-                    });
-                    details.classList.toggle('hidden', data.issues.length === 0);
-                    details.open = imported === 0 && data.issues.length > 0;
+                    if (data.no_matching_students) {
+                        message = 'The file data does not match this section or any enrolled students. No grades were imported.';
+                    } else {
+                        message = imported
+                            ? `${imported} grades filled for ${periodLabel}. Review and save, or submit from Grade Summary.`
+                            : `No grades were imported for ${periodLabel}. Existing inputs were kept.`;
+                        summary.textContent = `${message} ${data.unchanged} learner inputs unchanged.`;
+                        data.issues.forEach(issue => {
+                            const item = document.createElement('li');
+                            item.textContent = issue;
+                            issues.appendChild(item);
+                        });
+                        details.classList.toggle('hidden', data.issues.length === 0);
+                        details.open = imported === 0 && data.issues.length > 0;
+                        showImportResult = true;
+                    }
                     importBusy = false;
                     closeImportModal();
                 } catch (error) {
                     message = error.message || 'The upload failed. Please try again.';
-                    summary.textContent = message;
-                    document.getElementById('classRecordFileError').textContent = message;
+                    importBusy = false;
+                    closeImportModal();
                 } finally {
                     importBusy = false;
-                    result.classList.remove('hidden');
+                    result.classList.toggle('hidden', !showImportResult);
                     controls.forEach((control, index) => control.disabled = controlStates[index]);
                     gradeInputs.forEach((input, index) => input.readOnly = inputStates[index]);
                     button.textContent = 'Import Class Record';

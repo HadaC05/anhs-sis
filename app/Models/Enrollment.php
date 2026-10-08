@@ -203,6 +203,11 @@ class Enrollment extends Model
         return $this->belongsTo(PromotionStatus::class, 'promotion_status_ID', 'promotion_status_ID');
     }
 
+    public function remediationCase(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(RemediationCase::class, 'enrollment_ID', 'enrollment_ID');
+    }
+
     public function getPromotionStatusAttribute(): string
     {
         if ($this->relationLoaded('promotionStatus')) {

@@ -16,6 +16,7 @@ use App\Models\TeacherSubjectAssignment;
 use App\Support\EnrollmentDashboardData;
 use App\Support\GradeRecordPeriodFilters;
 use App\Support\PlacementAssessmentAdvisor;
+use App\Support\PrincipalGradeReleaseNotifier;
 use App\Support\StudentGradeNotifier;
 use App\Support\TeacherGradeNotifier;
 use Illuminate\Http\Request;
@@ -71,7 +72,7 @@ class PrincipalDashboardController extends Controller
             'term_ids' => $periods['term_ids'],
             'semester' => $periods['semester'],
             'search' => trim($validated['search'] ?? ''),
-            'status' => $validated['status'] ?? 'all',
+            'status' => $validated['status'] ?? GradeStatus::APPROVED,
         ];
 
         return view('users.principal.grade-releases', [
@@ -500,16 +501,17 @@ class PrincipalDashboardController extends Controller
             ->whereStatus(GradeStatus::APPROVED)
             ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::RELEASED)]);
 
-        request()->attributes->set('audit_description', "Released {$released} approved grade record(s) to students.");
+        request()->attributes->set('audit_description', "Released 1 subject covering {$released} approved grade record(s) to students.");
 
         if ($released === 0) {
             return back()->with('error', 'No approved grades were found for release.');
         }
 
-        TeacherGradeNotifier::released($assignment, $released);
+        TeacherGradeNotifier::released($assignment);
         StudentGradeNotifier::released($assignment, $students);
+        PrincipalGradeReleaseNotifier::sync();
 
-        return redirect()->route('principal.grade-releases')->with('status', "{$released} grade record(s) released to students.");
+        return redirect()->route('principal.grade-releases')->with('status', '1 subject released to students.');
     }
 
     public function bulkReleaseGrades(Request $request)
@@ -519,29 +521,30 @@ class PrincipalDashboardController extends Controller
             'assignment_ids.*' => ['integer', 'exists:teacher_subject_assignments,assignment_ID'],
         ]);
 
-        $gradeCountsByAssignment = StudentSubjectGrade::query()
+        $releasableAssignmentIds = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
             ->whereStatus(GradeStatus::APPROVED)
-            ->select('assignment_ID')
-            ->selectRaw('COUNT(*) as grade_count')
-            ->groupBy('assignment_ID')
-            ->get()
-            ->pluck('grade_count', 'assignment_ID');
+            ->distinct()
+            ->pluck('assignment_ID');
 
         $released = StudentSubjectGrade::query()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
             ->whereStatus(GradeStatus::APPROVED)
             ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::RELEASED)]);
 
-        $request->attributes->set('audit_description', "Released {$released} approved grade record(s) to students in bulk.");
+        $releasedSubjects = $releasableAssignmentIds->count();
+        $request->attributes->set('audit_description', "Released {$releasedSubjects} subject(s), covering {$released} approved grade record(s), to students in bulk.");
 
         if ($released > 0) {
-            foreach ($gradeCountsByAssignment as $assignmentId => $gradeCount) {
-                NotifyReleasedGrades::dispatch((int) $assignmentId, (int) $gradeCount);
+            foreach ($releasableAssignmentIds as $assignmentId) {
+                NotifyReleasedGrades::dispatch((int) $assignmentId, 1);
             }
+            PrincipalGradeReleaseNotifier::sync();
         }
 
-        return back()->with('status', "{$released} grade record(s) released to students.");
+        return back()->with($releasedSubjects ? 'status' : 'error', $releasedSubjects
+            ? $releasedSubjects.' '.str('subject')->plural($releasedSubjects).' released to students.'
+            : 'No approved subjects were available to release.');
     }
 
     /**
@@ -564,7 +567,7 @@ class PrincipalDashboardController extends Controller
     /**
      * @param  array{subject_id: ?int, academic_year_id: ?int, grade_level: ?int, term_id: int|string|null, term_ids: ?array, semester: ?string, search: string, status: string}  $filters
      */
-    private function gradeReleaseAssignments(array $filters): Collection
+    private function gradeReleaseAssignments(array $filters): LengthAwarePaginator
     {
         return TeacherSubjectAssignment::query()
             ->withoutMapehParents()
@@ -603,7 +606,8 @@ class PrincipalDashboardController extends Controller
             }], 'updated_at')
             ->orderByDesc('latest_grade_at')
             ->orderByDesc('assignment_ID')
-            ->get();
+            ->paginate(15)
+            ->withQueryString();
     }
 
     private function proficiencyScale(): array

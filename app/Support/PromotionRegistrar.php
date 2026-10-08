@@ -15,12 +15,17 @@ use Illuminate\Validation\ValidationException;
 class PromotionRegistrar
 {
     /**
-     * Create the learner's pending enrollment for the next grade and school year.
+     * Complete Grade 10 or create the learner's pending next-grade enrollment.
      * Existing future enrollments are returned unchanged, making promotion idempotent.
      */
-    public static function promote(Enrollment $enrollment, bool $requireActiveYear = false): Enrollment
+    public static function promote(Enrollment $enrollment, bool $requireActiveYear = false): ?Enrollment
     {
-        $enrollment->loadMissing(['academicYear', 'section.gradeLevel', 'curriculumGradeLevel']);
+        $enrollment->loadMissing(['academicYear', 'section.gradeLevel', 'curriculumGradeLevel.gradeLevel']);
+
+        if ($enrollment->promotion_status === PromotionStatus::COMPLETED_JUNIOR_HIGH) {
+            return null;
+        }
+
         $evaluation = PromotionEligibility::evaluate($enrollment);
         if ($enrollment->promotion_status !== PromotionStatus::PROMOTED) {
             $enrollment->update(['promotion_status' => $evaluation['status']]);
@@ -30,6 +35,14 @@ class PromotionRegistrar
             throw ValidationException::withMessages([
                 'promotion' => $evaluation['reason'] ?: 'This learner is not eligible for promotion.',
             ]);
+        }
+
+        $currentGradeLabel = $enrollment->section?->getRelation('gradeLevel')?->grade_label
+            ?: $enrollment->curriculumGradeLevel?->getRelation('gradeLevel')?->grade_label;
+        if ($currentGradeLabel === 'Grade 10') {
+            $enrollment->update(['promotion_status' => PromotionStatus::COMPLETED_JUNIOR_HIGH]);
+
+            return null;
         }
 
         $currentGradeId = (int) ($enrollment->section?->grade_ID ?: $enrollment->curriculumGradeLevel?->grade_ID);

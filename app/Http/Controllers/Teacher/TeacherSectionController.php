@@ -426,25 +426,31 @@ class TeacherSectionController extends Controller
             ->whereIn('enrollment_ID', $validated['enrollment_ids'])
             ->get();
         $promoted = 0;
+        $completed = 0;
         $blocked = [];
 
         foreach ($enrollments as $enrollment) {
             try {
-                DB::transaction(function () use ($enrollment): void {
-                    PromotionRegistrar::promote($enrollment);
+                $nextEnrollment = DB::transaction(function () use ($enrollment): ?Enrollment {
+                    return PromotionRegistrar::promote($enrollment);
                 });
-                $promoted++;
+                $nextEnrollment ? $promoted++ : $completed++;
             } catch (ValidationException $exception) {
                 $blocked[] = $exception->errors()['promotion'][0] ?? 'This learner could not be promoted.';
             }
         }
 
-        $message = "Bulk promotion completed for {$promoted} learner(s).";
+        $message = match (true) {
+            $completed === 0 => "Bulk promotion completed for {$promoted} learner(s).",
+            $promoted === 0 => "Junior High School completion recorded for {$completed} Grade 10 learner(s); no Grade 11 enrollments were created.",
+            default => "Bulk processing completed: {$promoted} learner(s) promoted and {$completed} Grade 10 learner(s) marked as Junior High School completers.",
+        };
         if ($blocked !== []) {
             $message .= ' '.count($blocked).' learner(s) were skipped: '.$blocked[0];
         }
 
-        $noticeType = $blocked === [] ? 'status' : ($promoted > 0 ? 'warning' : 'error');
+        $processed = $promoted + $completed;
+        $noticeType = $blocked === [] ? 'status' : ($processed > 0 ? 'warning' : 'error');
 
         return back()->with($noticeType, $message);
     }
@@ -459,7 +465,11 @@ class TeacherSectionController extends Controller
             404,
         );
 
-        $nextEnrollment = DB::transaction(fn (): Enrollment => PromotionRegistrar::promote($enrollment));
+        $nextEnrollment = DB::transaction(fn (): ?Enrollment => PromotionRegistrar::promote($enrollment));
+
+        if (! $nextEnrollment) {
+            return back()->with('status', 'Learner marked as having completed Junior High School. No Grade 11 enrollment was created.');
+        }
 
         $nextGradeLabel = $nextEnrollment->gradeLevel()->value('grade_label') ?? 'next-grade';
 
@@ -471,7 +481,7 @@ class TeacherSectionController extends Controller
         $this->authorizeAdvisorySection($request, $section);
         $section->load(['academicYear', 'cluster', 'gradeLevel']);
 
-        [$enrollments, $evaluations] = $this->filteredAdvisoryPromotions($request, $section);
+        [$enrollments, $evaluations, $tab] = $this->filteredAdvisoryPromotions($request, $section);
 
         $nextAcademicYear = AcademicYear::query()
             ->whereDate('start_date', '>', $section->academicYear?->start_date)
@@ -492,6 +502,7 @@ class TeacherSectionController extends Controller
             'evaluations',
             'nextAcademicYear',
             'alreadyPromotedStudentIds',
+            'tab',
         ));
     }
 
@@ -500,9 +511,11 @@ class TeacherSectionController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:200'],
             'eligibility' => ['nullable', \Illuminate\Validation\Rule::in(['all', ...array_column(\App\Models\PromotionStatus::definitions(), 'slug')])],
+            'tab' => ['nullable', \Illuminate\Validation\Rule::in(['promotions', 'remediation'])],
         ]);
+        $tab = ($filters['tab'] ?? null) === 'remediation' ? 'remediation' : 'promotions';
         $enrollments = Enrollment::query()
-            ->with(['student.application', 'promotionStatus', 'gradingSemester.status'])
+            ->with(['student.application', 'promotionStatus', 'gradingSemester.status', 'remediationCase.subjects'])
             ->where('section_ID', $section->section_ID)
             ->where('SY_ID', $section->SY_ID)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
@@ -512,7 +525,10 @@ class TeacherSectionController extends Controller
 
         $evaluations = PromotionEligibility::synchronizeMany($enrollments);
 
-        $enrollments = $enrollments->filter(function ($enrollment) use ($filters, $evaluations) {
+        $enrollments = $enrollments->filter(function ($enrollment) use ($filters, $evaluations, $tab) {
+            if ($tab === 'remediation' && ! $enrollment->remediationCase) {
+                return false;
+            }
             $status = $filters['eligibility'] ?? 'all';
             if ($status !== 'all' && $evaluations[$enrollment->enrollment_ID]['status'] !== $status) {
                 return false;
@@ -531,7 +547,7 @@ class TeacherSectionController extends Controller
             return true;
         })->values();
 
-        return [$enrollments, $evaluations];
+        return [$enrollments, $evaluations, $tab];
     }
 
     public function downloadSf5(Request $request, Section $section): \Symfony\Component\HttpFoundation\BinaryFileResponse

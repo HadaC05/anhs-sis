@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
 use App\Models\GradingTerm;
+use App\Models\RemediationCase;
 use App\Models\Section;
 use App\Models\Student;
 use App\Models\TeacherSubjectAssignment;
@@ -214,6 +215,7 @@ class LearnerPermanentRecordBuilder
             'is_empty' => false,
             'is_senior_high' => false,
             'periods' => $periods,
+            'remediation' => self::remediationFor($enrollment),
         ];
     }
 
@@ -290,6 +292,7 @@ class LearnerPermanentRecordBuilder
             'is_empty' => false,
             'is_senior_high' => true,
             'periods' => $periods,
+            'remediation' => self::remediationFor($enrollment),
         ];
     }
 
@@ -324,6 +327,7 @@ class LearnerPermanentRecordBuilder
             'is_empty' => true,
             'is_senior_high' => false,
             'periods' => $periods,
+            'remediation' => null,
         ];
     }
 
@@ -460,7 +464,7 @@ class LearnerPermanentRecordBuilder
         $studentIds = $selectedEnrollments->pluck('student_ID')->unique()->values();
 
         $allEnrollments = Enrollment::query()
-            ->with(['student', 'section.academicYear', 'section.adviser', 'section.gradeLevel', 'academicYear', 'gradeLevel', 'studentSubjects'])
+            ->with(['student', 'section.academicYear', 'section.adviser', 'section.gradeLevel', 'academicYear', 'gradeLevel', 'studentSubjects', 'remediationCase.subjects.subject'])
             ->whereIn('student_ID', $studentIds)
             ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
             ->get();
@@ -525,5 +529,42 @@ class LearnerPermanentRecordBuilder
         return $assignments
             ->whereIn('subject_ID', $subjectIds->map(fn (mixed $id): int => (int) $id)->all())
             ->values();
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function remediationFor(Enrollment $enrollment): ?array
+    {
+        $case = $enrollment->relationLoaded('remediationCase')
+            ? $enrollment->getRelation('remediationCase')
+            : ($enrollment->exists ? $enrollment->remediationCase()->with('subjects.subject')->first() : null);
+
+        if (! $case || ! in_array($case->status, [RemediationCase::APPROVED_PASSED, RemediationCase::NEEDS_INTERVENTION], true)) {
+            return null;
+        }
+
+        $case->loadMissing('subjects.subject');
+
+        return [
+            'start_date' => $case->start_date?->format('m/d/Y') ?? '',
+            'end_date' => $case->end_date?->format('m/d/Y') ?? '',
+            'subjects' => $case->subjects->map(fn ($subject): array => [
+                'label' => $subject->subject?->title ?? $subject->subject?->code ?? 'Learning Area',
+                'final_rating' => self::displayGrade($subject->original_final_grade),
+                'remedial_class_mark' => self::displayGrade($subject->remedial_class_mark),
+                'recomputed_final_grade' => self::displayGrade($subject->recomputed_final_grade),
+                'remarks' => (float) $subject->recomputed_final_grade >= 75 ? 'Passed' : 'Needs Intervention',
+            ])->all(),
+        ];
+    }
+
+    private static function displayGrade(mixed $grade): int|float|string
+    {
+        if ($grade === null || $grade === '') {
+            return '';
+        }
+
+        $value = round((float) $grade, 2);
+
+        return (int) $value == $value ? (int) $value : $value;
     }
 }

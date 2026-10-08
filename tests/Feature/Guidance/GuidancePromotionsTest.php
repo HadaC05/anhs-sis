@@ -12,6 +12,7 @@ use App\Models\GradingPeriodStatus;
 use App\Models\GradingSemester;
 use App\Models\GradingTerm;
 use App\Models\PromotionStatus;
+use App\Models\RemediationCase;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\Staff;
@@ -22,6 +23,7 @@ use App\Models\StudentSubjectGrade;
 use App\Models\Subject;
 use App\Models\TeacherSubjectAssignment;
 use App\Models\User;
+use App\Support\LearnerPermanentRecordBuilder;
 use App\Support\PromotionEligibility;
 use App\Support\PromotionRegistrar;
 use App\Support\Sf9ReportCardBuilder;
@@ -229,6 +231,57 @@ function guidancePromotionFixtures(): array
     return compact('user', 'enrollment', 'year', 'offerings', 'teacher');
 }
 
+function setGuidanceFailedLearningAreas(Enrollment $enrollment, int $count): void
+{
+    if ($count === 0) {
+        return;
+    }
+
+    $original = TeacherSubjectAssignment::query()->where('section_ID', $enrollment->section_ID)->firstOrFail();
+    $assignments = collect([$original]);
+    for ($index = 1; $index < $count; $index++) {
+        $subject = Subject::query()->create([
+            'code' => 'FAIL'.$index,
+            'title' => 'Failed Learning Area '.$index,
+            'type' => 'core',
+            'status' => 'active',
+        ]);
+        CurriculumSubject::query()->create([
+            'curriculum_grade_level_ID' => $enrollment->curriculum_grade_level_ID,
+            'subject_ID' => $subject->subject_ID,
+        ]);
+        $assignment = TeacherSubjectAssignment::query()->create([
+            'section_ID' => $enrollment->section_ID,
+            'subject_ID' => $subject->subject_ID,
+            'staff_ID' => $original->staff_ID,
+            'SY_ID' => $enrollment->SY_ID,
+        ]);
+        StudentSubject::query()->firstOrCreate([
+            'enrollment_ID' => $enrollment->enrollment_ID,
+            'subject_ID' => $subject->subject_ID,
+        ]);
+        $assignments->push($assignment);
+    }
+
+    foreach ($assignments as $assignment) {
+        $studentSubject = StudentSubject::query()
+            ->where('enrollment_ID', $enrollment->enrollment_ID)
+            ->where('subject_ID', $assignment->subject_ID)
+            ->firstOrFail();
+        foreach (GradingTerm::configuredPeriods() as $period) {
+            StudentSubjectGrade::query()->updateOrCreate([
+                'student_subject_ID' => $studentSubject->student_subject_ID,
+                'assignment_ID' => $assignment->assignment_ID,
+                'term_ID' => StudentSubjectGrade::termIdForPeriodKey($period['key']),
+            ], [
+                'numeric_grade' => 70,
+                'status' => GradeStatus::RELEASED,
+                'posted_by' => $original->staff_ID,
+            ]);
+        }
+    }
+}
+
 test('guidance promotion automatically uses the later active year and ignores submitted year selection', function (bool $submitYear) {
     ['user' => $user, 'enrollment' => $enrollment, 'offerings' => $offerings] = guidancePromotionFixtures();
     $inactiveYear = AcademicYear::query()->create([
@@ -295,6 +348,83 @@ test('default promotion year selection still permits the next configured inactiv
     ]);
     $next = PromotionRegistrar::promote($enrollment);
     expect($next->SY_ID)->toBe($nextYear->SY_ID);
+});
+
+test('eligible Grade 10 learners complete junior high without a Grade 11 enrollment', function () {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    $gradeTen = GradeLevel::query()->where('grade_label', 'Grade 10')->firstOrFail();
+    $offering = Curriculum::query()->create([
+        'name' => 'Grade 10 Curriculum',
+        'curricula_ID' => Curricula::query()->firstOrFail()->curricula_ID,
+        'grade_ID' => $gradeTen->grade_ID,
+        'semester_ID' => GradingSemester::idFor(GradingSemester::FULL_YEAR),
+    ]);
+    $enrollment->section()->update([
+        'grade_ID' => $gradeTen->grade_ID,
+        'curriculum_grade_level_ID' => $offering->curriculum_ID,
+    ]);
+    $enrollment->update(['curriculum_grade_level_ID' => $offering->curriculum_ID]);
+
+    $response = $this->actingAs($user)->post(route('guidance.promotions.confirm', $enrollment));
+
+    $response->assertRedirect(route('guidance.promotions.index'))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success', 'Junior High School completion confirmed. No Grade 11 enrollment was created.');
+    expect($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::COMPLETED_JUNIOR_HIGH)
+        ->and(Enrollment::query()->where('student_ID', $enrollment->student_ID)->count())->toBe(1)
+        ->and(PromotionEligibility::synchronize($enrollment->fresh())['status'])->toBe(PromotionStatus::COMPLETED_JUNIOR_HIGH)
+        ->and(PromotionRegistrar::promote($enrollment->fresh(), requireActiveYear: true))->toBeNull();
+});
+
+test('guidance reenrolls a retained learner in the same grade for the later active school year', function () {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    setGuidanceFailedLearningAreas($enrollment, 3);
+    $activeYear = AcademicYear::query()->create([
+        'school_year' => '2027-2028', 'start_date' => '2027-06-01',
+        'end_date' => '2028-03-31', 'status' => true,
+    ]);
+
+    $this->actingAs($user)->get(route('guidance.promotions.index', ['eligibility' => PromotionStatus::RETAINED]))
+        ->assertOk()
+        ->assertSee('Enroll Same Grade')
+        ->assertSee('data-confirm-title="Enroll retained learner?"', false);
+
+    $response = $this->post(route('guidance.promotions.reenroll-retained', $enrollment));
+    $repeat = Enrollment::query()
+        ->where('student_ID', $enrollment->student_ID)
+        ->where('SY_ID', $activeYear->SY_ID)
+        ->firstOrFail();
+
+    $response->assertSessionHasNoErrors()
+        ->assertRedirect(route('guidance.enrollments.show', $repeat));
+    expect($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::RETAINED)
+        ->and($repeat->curriculum_grade_level_ID)->toBe($enrollment->curriculum_grade_level_ID)
+        ->and($repeat->section_ID)->toBeNull()
+        ->and($repeat->enrollment_status)->toBe('pending')
+        ->and($repeat->promotion_status)->toBe(PromotionStatus::PENDING);
+
+    $this->post(route('guidance.promotions.reenroll-retained', $enrollment))
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('guidance.enrollments.show', $repeat));
+    expect(Enrollment::query()->where('student_ID', $enrollment->student_ID)->count())->toBe(2);
+});
+
+test('retained learner reenrollment requires a later active school year and guidance access', function () {
+    ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    setGuidanceFailedLearningAreas($enrollment, 3);
+    PromotionEligibility::synchronize($enrollment->fresh());
+    $principal = User::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'principal'])->id,
+        'username' => 'principal.retained', 'password' => 'password',
+        'first_name' => 'Principal', 'last_name' => 'Reviewer', 'status' => 'active',
+    ]);
+
+    $this->actingAs($principal)->post(route('guidance.promotions.reenroll-retained', $enrollment))
+        ->assertForbidden();
+    $this->actingAs($user)->post(route('guidance.promotions.reenroll-retained', $enrollment))
+        ->assertSessionHasErrors('retention');
+    expect(Enrollment::query()->where('student_ID', $enrollment->student_ID)->count())->toBe(1)
+        ->and($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::RETAINED);
 });
 
 test('guidance promotion filters combine search grade eligibility and source school year', function () {
@@ -382,8 +512,7 @@ test('guidance bulk promotion validates its selection', function (array $payload
 
 test('promotion pages automatically persist failing grade tags without advancing learners', function (int $failures, string $status) {
     ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
-    StudentSubjectGrade::query()->orderBy('grade_ID')->take($failures)->get()
-        ->each(fn ($grade) => $grade->update(['numeric_grade' => 74]));
+    setGuidanceFailedLearningAreas($enrollment, $failures);
 
     $this->actingAs($user)->get(route('guidance.promotions.index', ['eligibility' => $status]))
         ->assertOk()
@@ -399,8 +528,7 @@ test('promotion pages automatically persist failing grade tags without advancing
 
 test('conditional promotion blocks individual and bulk grade advancement', function (int $failures, bool $bulk) {
     ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
-    StudentSubjectGrade::query()->orderBy('grade_ID')->take($failures)->get()
-        ->each(fn ($grade) => $grade->update(['numeric_grade' => 74]));
+    setGuidanceFailedLearningAreas($enrollment, $failures);
     AcademicYear::query()->create([
         'school_year' => '2027-2028', 'start_date' => '2027-06-01',
         'end_date' => '2028-03-31', 'status' => true,
@@ -418,13 +546,124 @@ test('conditional promotion blocks individual and bulk grade advancement', funct
 
 test('incomplete grades stay pending and corrected failing grades become eligible', function () {
     ['enrollment' => $enrollment] = guidancePromotionFixtures();
+    setGuidanceFailedLearningAreas($enrollment, 1);
     $grade = StudentSubjectGrade::query()->firstOrFail();
-    $grade->update(['numeric_grade' => 74, 'status' => GradeStatus::DRAFT]);
+    $grade->update(['status' => GradeStatus::DRAFT]);
     expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::PENDING);
     $grade->update(['status' => GradeStatus::RELEASED]);
     expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::CONDITIONALLY_PROMOTED);
-    $grade->update(['numeric_grade' => 75]);
+    StudentSubjectGrade::query()->update(['numeric_grade' => 75]);
     expect(PromotionEligibility::synchronize($enrollment)['status'])->toBe(PromotionStatus::ELIGIBLE);
+});
+
+test('an adviser can conduct remediation and principal approval records it in SF10', function () {
+    ['enrollment' => $enrollment, 'teacher' => $teacher] = guidancePromotionFixtures();
+    setGuidanceFailedLearningAreas($enrollment, 1);
+    $enrollment->section->update(['staff_ID' => $teacher->staff_id]);
+
+    $response = $this->actingAs($teacher)->post(route('teacher.advisory.remediations.start', [
+        $enrollment->section,
+        $enrollment,
+    ]));
+    $case = RemediationCase::query()->with('subjects')->firstOrFail();
+    $response->assertRedirect(route('teacher.advisory.remediations.show', [$enrollment->section, $case]));
+    $this->get(route('teacher.advisory.remediations.show', [$enrollment->section, $case]))
+        ->assertOk()
+        ->assertSee('Remediation Case')
+        ->assertSee('English 7');
+    $this->get(route('teacher.advisory.promotions.index', [
+        'section' => $enrollment->section,
+        'tab' => 'remediation',
+    ]))->assertOk()
+        ->assertSee('Students Under Remediation')
+        ->assertSee('Review Remediation')
+        ->assertSee('Reyes, Ana');
+    expect($case->subjects)->toHaveCount(1)
+        ->and((float) $case->subjects->first()->original_final_grade)->toBe(70.0);
+
+    $remedialSubject = $case->subjects->first();
+    $this->patch(route('teacher.advisory.remediations.update', [$enrollment->section, $case]), [
+        'start_date' => '2027-04-01',
+        'end_date' => '2027-04-15',
+        'subjects' => [
+            $remedialSubject->remediation_subject_ID => ['remedial_class_mark' => 80],
+        ],
+        'action' => 'submit',
+    ])->assertSessionHasNoErrors();
+    expect($case->fresh()->status)->toBe(RemediationCase::AWAITING_APPROVAL)
+        ->and((float) $remedialSubject->fresh()->recomputed_final_grade)->toBe(75.0);
+
+    $principal = Staff::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'principal'])->id,
+        'username' => 'remediation.principal', 'password' => 'password',
+        'first_name' => 'School', 'last_name' => 'Principal', 'status' => 'active',
+    ]);
+    $this->actingAs($principal)->withSession(['success' => 'Remediation updated.'])->get(route('principal.remediations.show', $case))
+        ->assertOk()
+        ->assertSee('Approve Results')
+        ->assertSee('top-24', false);
+    $this->get(route('principal.promotions.index', ['tab' => 'remediation']))
+        ->assertOk()
+        ->assertSee('Students Under Remediation')
+        ->assertSee('Review Remediation')
+        ->assertSee('Reyes, Ana');
+    $this->actingAs($principal)->post(route('principal.remediations.approve', $case))
+        ->assertSessionHasNoErrors();
+
+    expect($case->fresh()->status)->toBe(RemediationCase::APPROVED_PASSED)
+        ->and($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::ELIGIBLE)
+        ->and(PromotionEligibility::synchronize($enrollment->fresh())['status'])->toBe(PromotionStatus::ELIGIBLE);
+
+    $record = LearnerPermanentRecordBuilder::buildCardsForStudents(collect([$enrollment->fresh()]))
+        ->first()['scholastic_records'][0];
+    $html = view('users.teacher.advisory.partials.sf10-scholastic-record', [
+        'record' => $record,
+        'periods' => $record['periods'],
+    ])->render();
+    expect($record['remediation']['start_date'])->toBe('04/01/2027')
+        ->and($record['remediation']['end_date'])->toBe('04/15/2027')
+        ->and($record['remediation']['subjects'][0])->toMatchArray([
+            'label' => 'English 7',
+            'final_rating' => 70,
+            'remedial_class_mark' => 80,
+            'recomputed_final_grade' => 75,
+            'remarks' => 'Passed',
+        ])
+        ->and($html)->toContain('English 7', '04/01/2027', '04/15/2027', '>75<');
+});
+
+test('guidance can start remediation and an unsuccessful result does not allow advancement', function () {
+    ['user' => $guidance, 'enrollment' => $enrollment] = guidancePromotionFixtures();
+    setGuidanceFailedLearningAreas($enrollment, 1);
+
+    $this->actingAs($guidance)->post(route('guidance.remediations.start', $enrollment))
+        ->assertSessionHasNoErrors();
+    $case = RemediationCase::query()->with('subjects')->firstOrFail();
+    $this->get(route('guidance.remediations.show', $case))
+        ->assertOk()
+        ->assertSee('Remediation Case');
+    $subject = $case->subjects->firstOrFail();
+    $this->patch(route('guidance.remediations.update', $case), [
+        'start_date' => '2027-04-01',
+        'end_date' => '2027-04-15',
+        'subjects' => [
+            $subject->remediation_subject_ID => ['remedial_class_mark' => 70],
+        ],
+        'action' => 'submit',
+    ])->assertSessionHasNoErrors();
+
+    $principal = Staff::query()->create([
+        'role_id' => Role::query()->firstOrCreate(['role_name' => 'principal'])->id,
+        'username' => 'intervention.principal', 'password' => 'password',
+        'first_name' => 'School', 'last_name' => 'Principal', 'status' => 'active',
+    ]);
+    $this->actingAs($principal)->post(route('principal.remediations.approve', $case))
+        ->assertSessionHasNoErrors();
+
+    expect($case->fresh()->status)->toBe(RemediationCase::NEEDS_INTERVENTION)
+        ->and((float) $subject->fresh()->recomputed_final_grade)->toBe(70.0)
+        ->and($enrollment->fresh()->promotion_status)->toBe(PromotionStatus::CONDITIONALLY_PROMOTED)
+        ->and(PromotionEligibility::synchronize($enrollment->fresh())['status'])->toBe(PromotionStatus::CONDITIONALLY_PROMOTED);
 });
 
 test('promotion stays pending until observed values and attendance records are complete', function () {

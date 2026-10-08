@@ -246,3 +246,28 @@ test('student grades page keeps collapsible subject rows when no grades are rele
     $response->assertDontSee('No Released Grades');
     $response->assertDontSee('PASSED');
 });
+
+test('student grades page keeps unreleased terms visible without exposing their grades', function () {
+    $fixtures = createStudentGradesFixtures();
+    $term = \App\Models\GradingTerm::query()
+        ->seniorHigh()
+        ->where('key', 'term_2')
+        ->firstOrFail();
+
+    StudentSubjectGrade::query()->create([
+        'student_subject_ID' => $fixtures['enrollment']->studentSubjects()->firstOrFail()->getKey(),
+        'assignment_ID' => $fixtures['assignment']->assignment_ID,
+        'term_ID' => $term->term_ID,
+        'numeric_grade' => 67,
+        'status' => 'submitted',
+        'posted_by' => $fixtures['teacher']->staff_id,
+    ]);
+
+    $response = $this->actingAs($fixtures['student'])->get(route('student.grades'));
+
+    $response->assertOk()
+        ->assertSee('data-test="grade-period-shs_sem1_term_2"', false)
+        ->assertSee('data-test="mobile-grade-period-shs_sem1_term_2"', false)
+        ->assertSee('Not released')
+        ->assertDontSee('>67<', false);
+});

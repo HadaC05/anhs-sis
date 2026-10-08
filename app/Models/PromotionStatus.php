@@ -18,6 +18,8 @@ class PromotionStatus extends Model
 
     public const PROMOTED = 'promoted';
 
+    public const COMPLETED_JUNIOR_HIGH = 'completed_junior_high';
+
     protected $table = 'promotion_statuses';
 
     protected $primaryKey = 'promotion_status_ID';
@@ -34,6 +36,7 @@ class PromotionStatus extends Model
             ['slug' => self::RETAINED, 'name' => 'Retained', 'sort_order' => 3],
             ['slug' => self::CONDITIONALLY_PROMOTED, 'name' => 'Conditionally Promoted', 'sort_order' => 4],
             ['slug' => self::PROMOTED, 'name' => 'Promoted', 'sort_order' => 5],
+            ['slug' => self::COMPLETED_JUNIOR_HIGH, 'name' => 'Completed Junior High School', 'sort_order' => 6],
         ];
     }
 

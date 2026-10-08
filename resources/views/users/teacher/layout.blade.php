@@ -73,15 +73,15 @@
 
 <body class="teacher-layout min-h-screen flex flex-col bg-gray-100">
     <header class="fixed top-0 left-0 right-0 w-full backdrop-blur-sm shadow-sm border-b border-white/20 z-50" style="background-color: #296374;">
-        <div class="container mx-auto h-20 px-4 flex items-center justify-between gap-3">
-            <div class="flex min-w-0 items-center sm:pl-6">
+        <div class="mx-auto flex h-20 w-full items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6" data-test="teacher-header">
+            <div class="flex min-w-0 flex-1 items-center overflow-hidden" data-test="teacher-header-brand">
                 <button type="button" id="sidebar-toggle" class="sidebar-toggle shrink-0" aria-controls="teacher-sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-12 w-auto">
+                <img src="{{ asset('images/school-logo-dark.png') }}" alt="School Logo" class="h-auto max-h-12 min-w-0 max-w-[calc(100%-3.25rem)] object-contain object-left">
             </div>
 
-            <nav class="flex shrink-0 items-center gap-2 sm:gap-6 sm:pr-6">
+            <nav class="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-2" aria-label="Account and notifications" data-test="teacher-header-actions">
                 <livewire:notification-dropdown />
                 @include('users.teacher.partials.profile-menu')
             </nav>

@@ -122,10 +122,12 @@
                         <div id="{{ $mobileRowId }}" class="hidden">
                         @if ($availableGrades->isNotEmpty())
                             <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 text-sm">
-                                @foreach ($availableGrades as $periodKey => $periodValue)
-                                    <div class="rounded bg-slate-50 px-3 py-2">
+                                @foreach ($periodValues as $periodKey => $periodValue)
+                                    <div class="rounded bg-slate-50 px-3 py-2" data-test="mobile-grade-period-{{ $periodKey }}">
                                         <dt class="text-xs text-gray-500">{{ $gradingPeriods[$periodKey] ?? $periodKey }}</dt>
-                                        <dd class="mt-1 font-bold text-gray-800">{{ $formatGrade($periodValue) }}</dd>
+                                        <dd class="mt-1 font-bold {{ $periodValue === null || $periodValue === '' ? 'text-gray-500' : 'text-gray-800' }}">
+                                            {{ $periodValue === null || $periodValue === '' ? 'Not released' : $formatGrade($periodValue) }}
+                                        </dd>
                                     </div>
                                 @endforeach
                             </dl>
@@ -199,10 +201,12 @@
                                         <p class="text-center text-sm text-gray-500">There are no grades yet.</p>
                                     @else
                                         <dl class="mx-auto max-w-lg divide-y divide-gray-200 overflow-hidden rounded-md border border-gray-200 bg-white text-sm">
-                                            @foreach ($availableGrades as $periodKey => $periodValue)
-                                                <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+                                            @foreach ($periodValues as $periodKey => $periodValue)
+                                                <div class="flex items-center justify-between gap-4 px-3 py-2.5" data-test="grade-period-{{ $periodKey }}">
                                                     <dt class="font-medium text-gray-600">{{ $gradingPeriods[$periodKey] ?? $periodKey }}</dt>
-                                                    <dd class="font-bold text-gray-800">{{ $formatGrade($periodValue) }}</dd>
+                                                    <dd class="font-bold {{ $periodValue === null || $periodValue === '' ? 'text-gray-500' : 'text-gray-800' }}">
+                                                        {{ $periodValue === null || $periodValue === '' ? 'Not released' : $formatGrade($periodValue) }}
+                                                    </dd>
                                                 </div>
                                             @endforeach
                                         </dl>

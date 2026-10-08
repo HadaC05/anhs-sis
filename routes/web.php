@@ -8,6 +8,7 @@ use App\Http\Controllers\Guidance\GuidanceDashboardController;
 use App\Http\Controllers\Guidance\GuidanceEnrollmentController;
 use App\Http\Controllers\Principal\PrincipalDashboardController;
 use App\Http\Controllers\Registrar\RegistrarDashboardController;
+use App\Http\Controllers\RemediationController;
 use App\Http\Controllers\StaffAccountController;
 use App\Http\Controllers\Student\SecondSemesterEnrollmentController;
 use App\Http\Controllers\Student\StudentAccountController;
@@ -191,6 +192,12 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/teacher/advisory/{section}/promotions/{enrollment}', [TeacherSectionController::class, 'promote'])
         ->middleware('teacher')
         ->name('teacher.advisory.promotions.promote');
+    Route::post('/teacher/advisory/{section}/promotions/{enrollment}/remediation', [RemediationController::class, 'startTeacher'])
+        ->middleware('teacher')->name('teacher.advisory.remediations.start');
+    Route::get('/teacher/advisory/{section}/remediations/{remediationCase}', [RemediationController::class, 'showTeacher'])
+        ->middleware('teacher')->name('teacher.advisory.remediations.show');
+    Route::patch('/teacher/advisory/{section}/remediations/{remediationCase}', [RemediationController::class, 'updateTeacher'])
+        ->middleware('teacher')->name('teacher.advisory.remediations.update');
     Route::get('/teacher/sections/{assignment}', [TeacherSectionController::class, 'show'])
         ->middleware('teacher')
         ->name('teacher.sections.show');
@@ -280,6 +287,10 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/principal/promotions/sf5', [GuidanceDashboardController::class, 'downloadPromotionSf5'])
         ->middleware('principal')
         ->name('principal.promotions.sf5');
+    Route::get('/principal/remediations/{remediationCase}', [RemediationController::class, 'showPrincipal'])
+        ->middleware('principal')->name('principal.remediations.show');
+    Route::post('/principal/remediations/{remediationCase}/approve', [RemediationController::class, 'approve'])
+        ->middleware('principal')->name('principal.remediations.approve');
     Route::get('/principal/reports/age-for-grade', [PrincipalDashboardController::class, 'ageForGradeReport'])
         ->middleware('principal')
         ->name('principal.reports.age-for-grade');
@@ -314,6 +325,15 @@ Route::middleware(['auth', 'verified', 'force_password'])->group(function () {
     Route::post('/guidance/promotions/{enrollment}/confirm', [GuidanceDashboardController::class, 'confirmPromotion'])
         ->middleware('guidance')
         ->name('guidance.promotions.confirm');
+    Route::post('/guidance/promotions/{enrollment}/reenroll-retained', [GuidanceDashboardController::class, 'reenrollRetained'])
+        ->middleware('guidance')
+        ->name('guidance.promotions.reenroll-retained');
+    Route::post('/guidance/promotions/{enrollment}/remediation', [RemediationController::class, 'startGuidance'])
+        ->middleware('guidance')->name('guidance.remediations.start');
+    Route::get('/guidance/remediations/{remediationCase}', [RemediationController::class, 'showGuidance'])
+        ->middleware('guidance')->name('guidance.remediations.show');
+    Route::patch('/guidance/remediations/{remediationCase}', [RemediationController::class, 'updateGuidance'])
+        ->middleware('guidance')->name('guidance.remediations.update');
     Route::get('/guidance/enrollments/create', [GuidanceEnrollmentController::class, 'create'])
         ->middleware('guidance')
         ->name('guidance.enrollments.create');

@@ -46,3 +46,35 @@ test('LIS Excel reads an explicit report year without guessing from school year'
     $cells[2][26] = 'September';
     expect(fn () => (new Sf2AttendanceXls)->parseRows($cells))->toThrow(Sf2ImportException::class, 'Include the report year');
 });
+
+test('LIS Excel appends validated learner rows from a continuation sheet', function () {
+    $reader = new Sf2AttendanceXls;
+    $report = $reader->read(base_path('tests/Fixtures/sf2-lis-september-2026.xls'), 2026);
+    $cells = array_fill(0, 11, []);
+    $cells[0][0] = 'SCHOOL FORM 2 - DAILY ATTENDANCE / CONTINUATION';
+    $cells[1][0] = 'Sample School | School ID 123456 | SY 2026-2027 | Grade 7 Einstein | September 2026';
+    $cells[4] = [0 => 'No.', 1 => 'Learner name', 2 => 'Sex', 28 => 'Absent', 29 => 'Present'];
+    $cells[5][1] = 'Date';
+    $cells[6][1] = 'Day';
+    foreach ($report['class_dates'] as $offset => $date) {
+        $column = $offset + 3;
+        $cells[5][$column] = (string) (int) substr($date, -2);
+        $cells[6][$column] = ['M', 'T', 'W', 'TH', 'F', 'S', 'SU'][(int) date('N', strtotime($date)) - 1];
+    }
+    $cells[7] = [0 => '3', 1 => 'Cruz, Ana M.', 2 => 'F', 3 => 'X', 28 => '1', 29 => '3'];
+    $cells[8] = [1 => 'Class present (all 3)'];
+    $cells[10] = [1 => '3 learners: 2 male, 1 female.'];
+
+    $continuation = $reader->parseContinuationRows($cells, $report);
+
+    expect($continuation['rows'])->toHaveCount(1)
+        ->and($continuation['rows'][0])->toMatchArray([
+            'name' => 'Cruz, Ana M.',
+            'days_absent' => 1,
+            'days_present' => 3,
+            'page' => 2,
+            'row_number' => 3,
+        ])
+        ->and($continuation['layout_rows']['2-3']['sex'])->toBe('Female')
+        ->and($continuation['layout_rows']['2-3']['daily'][$report['class_dates'][0]])->toBe('X');
+});

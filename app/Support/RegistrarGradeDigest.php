@@ -52,7 +52,9 @@ class RegistrarGradeDigest
                         ->whereColumn('grades.assignment_ID', 'pending.assignment_ID')
                         ->whereColumn('grades.term_ID', 'pending.term_ID')
                         ->where('grades.grade_status_ID', GradeStatus::idFor(GradeStatus::SUBMITTED));
-                })->count();
+                })
+                ->distinct()
+                ->count('pending.assignment_ID');
 
             if ($count > 0) {
                 foreach ($recipients as $registrar) {
