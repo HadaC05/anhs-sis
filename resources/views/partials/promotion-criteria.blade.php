@@ -1,4 +1,4 @@
-<p class="mt-1 text-xs text-gray-500">Closed terms/semester, complete released grades, observed values, and attendance records are required.</p>
+<p class="mt-1 text-xs text-gray-500">Closed terms/semester, complete released grades, the required learner assessment (observed values or teacher remarks), and attendance records are required.</p>
 <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
     <li><strong>Eligible:</strong> all grades 75+</li>
     <li><strong>Conditional:</strong> 1&ndash;2 failed final learning areas; remediation is required before advancement</li>

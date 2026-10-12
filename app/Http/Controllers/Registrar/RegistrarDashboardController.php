@@ -293,6 +293,7 @@ class RegistrarDashboardController extends Controller
         $status = in_array($status, $statuses, true) ? $status : null;
 
         return TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->withoutMapehParents()
             ->with([
                 'section.gradeLevel',
@@ -539,6 +540,7 @@ class RegistrarDashboardController extends Controller
         }
 
         $sections = Section::query()
+            ->active()
             ->with([
                 'gradeLevel',
                 'academicYear',

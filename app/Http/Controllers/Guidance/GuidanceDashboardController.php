@@ -266,6 +266,7 @@ class GuidanceDashboardController extends Controller
         $enrollments = $enrollmentsQuery->paginate($perPage)->withQueryString();
 
         $sections = Section::query()
+            ->active()
             ->with('cluster')
             ->withCount(['enrollments as active_enrollments_count' => function ($query) {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
@@ -790,6 +791,7 @@ class GuidanceDashboardController extends Controller
         $perPage = (int) $request->integer('per_page', 16);
 
         $sectionsQuery = Section::query()
+            ->active()
             ->with(['cluster', 'gradeLevel', 'adviser'])
             ->withCount(['enrollments as enrollments_count' => function ($query) {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
@@ -866,6 +868,7 @@ class GuidanceDashboardController extends Controller
         ]);
 
         $targetSections = Section::query()
+            ->active()
             ->with('cluster')
             ->withCount(['enrollments as active_enrollments_count' => function ($query) {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
@@ -988,6 +991,7 @@ class GuidanceDashboardController extends Controller
         ]);
 
         $targetSection = Section::query()
+            ->active()
             ->withCount(['enrollments as active_enrollments_count' => function ($query) {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
             }])
@@ -1065,6 +1069,7 @@ class GuidanceDashboardController extends Controller
         $clusterId = $request->string('cluster_id')->toString();
 
         $sections = Section::query()
+            ->active()
             ->with([
                 'cluster',
                 'gradeLevel',
@@ -1119,6 +1124,7 @@ class GuidanceDashboardController extends Controller
 
         $syId = $enrollment->SY_ID;
         $sections = Section::query()
+            ->active()
             ->with('cluster')
             ->withCount(['enrollments as active_enrollments_count' => function ($query) {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
@@ -1138,7 +1144,7 @@ class GuidanceDashboardController extends Controller
 
         $returnSection = null;
         if ($request->filled('from_section')) {
-            $returnSection = Section::query()->find($request->integer('from_section'));
+            $returnSection = Section::query()->active()->find($request->integer('from_section'));
         }
 
         return view('users.guidance.enrollments.show', [

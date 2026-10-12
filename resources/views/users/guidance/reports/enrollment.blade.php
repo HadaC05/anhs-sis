@@ -77,7 +77,7 @@
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
                 <h3 class="text-sm font-bold text-gray-800">{{ $heading }}</h3>
-                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'chart', 'chart' => $key])) }}" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($heading) }} as SVG">Download SVG</a>
+                <button type="button" data-download-enrollment-chart data-filename="enrollment-{{ $key }}-{{ now()->format('Y-m-d') }}.png" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($heading) }} as PNG">Download PNG</button>
             </div>
             <div class="overflow-x-auto"><div class="min-w-[640px]">
                 @if($key === 'year-trend')
@@ -109,14 +109,14 @@
 </section>
 <div class="mb-6">
     <h2 class="text-lg font-bold text-gray-800">Enrollment charts</h2>
-    <p class="mt-1 text-sm text-gray-600">Compare counts and shares for the applied filters. Download each chart as an SVG image for printing or sharing.</p>
+    <p class="mt-1 text-sm text-gray-600">Compare counts and shares for the applied filters. Download each chart as a PNG image for printing or sharing.</p>
 </div>
 <div class="mb-6 grid gap-5 xl:grid-cols-2">
     @foreach($chartTitles as $chartKey => $chartTitle)
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
                 <h3 class="text-sm font-bold text-gray-800">{{ $chartTitle }}</h3>
-                <a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.reports.enrollment'), array_merge($filters, ['download' => 'chart', 'chart' => $chartKey])) }}" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($chartTitle) }} chart as SVG">Download SVG</a>
+                <button type="button" data-download-enrollment-chart data-filename="enrollment-{{ $chartKey }}-{{ now()->format('Y-m-d') }}.png" class="rounded-lg border border-[#296374]/30 px-3 py-2 text-xs font-semibold text-[#296374] hover:bg-gray-50" aria-label="Download {{ strtolower($chartTitle) }} chart as PNG">Download PNG</button>
             </div>
             <div class="overflow-x-auto">
                 <div class="min-w-[540px]">
@@ -150,37 +150,50 @@
     @endforeach
 </div>
 
-<section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-    <div class="border-b border-gray-100 px-5 py-4">
-        <h2 class="font-bold text-gray-800">Detailed enrollment records</h2>
-        <p class="mt-1 text-xs text-gray-500">{{ number_format($records->total()) }} matching records. Download CSV includes all matching records.</p>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full whitespace-nowrap text-left text-sm">
-            <thead class="bg-gray-50 text-xs text-gray-500"><tr>
-                @foreach(['Learner / LRN', 'School year', 'Grade / cluster', 'Section', 'Sex', 'Learner type', 'Status', 'Registered', 'Details'] as $heading)
-                    <th scope="col" class="px-4 py-3">{{ $heading }}</th>
-                @endforeach
-            </tr></thead>
-            <tbody class="divide-y divide-gray-100">
-                @forelse($records as $record)
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3"><p class="font-semibold text-gray-800">{{ $record->last_name }}, {{ $record->first_name }} {{ $record->middle_name }} {{ $record->suffix }}</p><p class="text-xs text-gray-500">{{ $record->lrn ?: 'No LRN' }}</p></td>
-                        <td class="px-4 py-3">{{ $record->school_year ?? 'Unspecified' }}</td>
-                        <td class="px-4 py-3">{{ $record->grade_label ?? 'Unspecified' }}<p class="text-xs text-gray-500">{{ $record->cluster_name ?? 'No cluster / not applicable' }}</p></td>
-                        <td class="px-4 py-3">{{ $record->section_name ?? 'Unassigned' }}</td>
-                        <td class="px-4 py-3">{{ ucfirst($record->sex ?: 'Unspecified') }}</td>
-                        <td class="px-4 py-3">{{ $record->learner_type_name ?? 'Unspecified' }}</td>
-                        <td class="px-4 py-3"><span class="rounded-full bg-[#296374]/10 px-2 py-1 text-xs font-semibold text-[#296374]">{{ $record->status_name ?? 'Unspecified' }}</span></td>
-                        <td class="px-4 py-3">{{ $record->created_at ? \Illuminate\Support\Carbon::parse($record->created_at)->format('M d, Y') : 'Unavailable' }}</td>
-                        <td class="px-4 py-3"><a href="{{ route(\App\Support\AcademicPortal::routeName('guidance.enrollments.show'), $record->enrollment_ID) }}" class="font-semibold text-[#296374] hover:underline" aria-label="View enrollment for {{ $record->first_name }} {{ $record->last_name }}">View</a></td>
-                    </tr>
-                @empty
-                    <tr><td colspan="9" class="px-5 py-10 text-center text-gray-500">No enrollment records match these filters. Try another school year or reset the filters.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-    <div class="border-t border-gray-100 px-5 py-4">{{ $records->links() }}</div>
-</section>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-download-enrollment-chart]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var svg = button.closest('section')?.querySelector('svg');
+                if (!svg) return;
+
+                var viewBox = svg.viewBox.baseVal;
+                var width = Math.max(1, viewBox.width || svg.clientWidth);
+                var height = Math.max(1, viewBox.height || svg.clientHeight);
+                var scale = 2;
+                var source = new XMLSerializer().serializeToString(svg);
+                var sourceUrl = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }));
+                var image = new Image();
+
+                image.onload = function () {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = Math.round(width * scale);
+                    canvas.height = Math.round(height * scale);
+                    var context = canvas.getContext('2d');
+                    context.scale(scale, scale);
+                    context.fillStyle = '#ffffff';
+                    context.fillRect(0, 0, width, height);
+                    context.drawImage(image, 0, 0, width, height);
+                    URL.revokeObjectURL(sourceUrl);
+
+                    canvas.toBlob(function (blob) {
+                        if (!blob) return;
+                        var pngUrl = URL.createObjectURL(blob);
+                        var link = document.createElement('a');
+                        link.href = pngUrl;
+                        link.download = button.dataset.filename || 'enrollment-chart.png';
+                        link.click();
+                        setTimeout(function () { URL.revokeObjectURL(pngUrl); }, 1000);
+                    }, 'image/png');
+                };
+
+                image.onerror = function () {
+                    URL.revokeObjectURL(sourceUrl);
+                };
+                image.src = sourceUrl;
+            });
+        });
+    });
+</script>
+
 @endsection

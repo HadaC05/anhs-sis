@@ -473,6 +473,7 @@ class StudentDashboardController extends Controller
         $semesterKey = $semester ?? $enrollment->semester;
 
         return TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->with(['subject', 'section.curriculum.gradingSemester', 'academicYear', 'staff'])
             ->where('section_ID', $enrollment->section_ID)
             ->where('SY_ID', $enrollment->SY_ID)

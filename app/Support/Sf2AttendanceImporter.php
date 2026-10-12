@@ -35,7 +35,7 @@ class Sf2AttendanceImporter
             ]);
 
             DB::transaction(function () use ($upload, $report): void {
-                $section = Section::query()->with(['academicYear', 'gradeLevel'])->lockForUpdate()->findOrFail($upload->section_ID);
+                $section = Section::query()->active()->with(['academicYear', 'gradeLevel'])->lockForUpdate()->findOrFail($upload->section_ID);
                 $this->validateReport($section, $upload, $report);
 
                 $enrollments = Enrollment::query()->with('student')
@@ -102,10 +102,13 @@ class Sf2AttendanceImporter
                 );
                 $unmatched = count($rows) - count($matchedIds);
                 $missing = $enrollments->count() - count($matchedIds);
+                $detailsNote = ($report['monthly_totals_only'] ?? false)
+                    ? ' Monthly totals only: printed totals were used; daily marks and continuation dates were skipped.'
+                    : ' Present = '.$report['school_days'].' class days minus absences. Tardy is recorded separately.';
                 $upload->update([
                     'status' => $unmatched > 0 || $missing > 0 ? 'partial' : 'imported',
                     'imported_at' => now(),
-                    'parse_notes' => count($matchedIds).' learner records imported. '.$unmatched.' SF2 names could not be matched; '.$missing.' enrolled learners were not included. Unmatched or omitted learners were not changed. Present = '.$report['school_days'].' class days minus absences. Tardy is recorded separately.',
+                    'parse_notes' => count($matchedIds).' learner records imported. '.$unmatched.' SF2 names could not be matched; '.$missing.' enrolled learners were not included. Unmatched or omitted learners were not changed.'.$detailsNote,
                 ]);
             });
         } catch (Sf2ImportException $exception) {
@@ -118,7 +121,7 @@ class Sf2AttendanceImporter
 
     private function reportYear(SectionSf2Upload $upload): ?int
     {
-        $academicYear = Section::query()->findOrFail($upload->section_ID)->academicYear;
+        $academicYear = Section::query()->active()->findOrFail($upload->section_ID)->academicYear;
         $years = [];
         for ($year = (int) $academicYear->start_date->format('Y'); $year <= (int) $academicYear->end_date->format('Y'); $year++) {
             $month = sprintf('%04d-%02d', $year, $upload->report_month);

@@ -36,7 +36,7 @@ class PromotionReportController extends Controller
             ->leftJoin('sections as sec', 'sec.section_ID', '=', 'e.section_ID')
             ->leftJoin('promotion_statuses as ps', 'ps.promotion_status_ID', '=', 'e.promotion_status_ID')
             ->leftJoin('enrollment_statuses as es', 'es.enrollment_status_ID', '=', 'e.enrollment_status_ID');
-        foreach (['academic_year_id' => 'e.SY_ID', 'grade_id' => 'c.grade_ID', 'status' => 'ps.slug', 'enrollment_status' => 'es.slug'] as $key => $column) {
+        foreach (['grade_id' => 'c.grade_ID', 'enrollment_status' => 'es.slug'] as $key => $column) {
             if (filled($filters[$key] ?? null)) {
                 $query->where($column, $filters[$key]);
             }
@@ -48,6 +48,49 @@ class PromotionReportController extends Controller
                 }
             });
         }
+        $promotionRateQuery = clone $query;
+        if (filled($filters['academic_year_id'] ?? null)) {
+            $query->where('e.SY_ID', $filters['academic_year_id']);
+        }
+        if (filled($filters['status'] ?? null)) {
+            $query->where('ps.slug', $filters['status']);
+        }
+
+        $currentComparisonYear = filled($filters['academic_year_id'] ?? null)
+            ? $years->firstWhere('SY_ID', $filters['academic_year_id'])
+            : ($years->firstWhere('status', true) ?? $years->first());
+        $previousComparisonYear = $currentComparisonYear
+            ? $years->first(fn (AcademicYear $year) => $year->start_date->lt($currentComparisonYear->start_date))
+            : null;
+        $comparisonYears = collect([$previousComparisonYear, $currentComparisonYear])->filter()->values();
+        $comparisonOutcomes = $comparisonYears->isEmpty()
+            ? collect()
+            : (clone $promotionRateQuery)
+                ->whereIn('e.SY_ID', $comparisonYears->pluck('SY_ID'))
+                ->select('e.SY_ID', 'ps.slug')
+                ->selectRaw('COUNT(*) as total')
+                ->groupBy('e.SY_ID', 'ps.slug')
+                ->get()
+                ->groupBy('SY_ID');
+        $successfulStatuses = [
+            PromotionStatus::PROMOTED,
+            PromotionStatus::COMPLETED_JUNIOR_HIGH,
+            PromotionStatus::COMPLETED_SENIOR_HIGH,
+        ];
+        $promotionRateComparison = [
+            'years' => $comparisonYears->map(function (AcademicYear $year) use ($comparisonOutcomes, $successfulStatuses) {
+                $outcomes = $comparisonOutcomes->get($year->SY_ID, collect());
+                $total = (int) $outcomes->sum('total');
+                $successful = (int) $outcomes->whereIn('slug', $successfulStatuses)->sum('total');
+
+                return [
+                    'label' => $year->school_year,
+                    'total' => $total,
+                    'successful' => $successful,
+                    'rate' => $total ? round($successful / $total * 100, 1) : 0,
+                ];
+            })->values(),
+        ];
         $details = (clone $query)->select('e.enrollment_ID', 's.lrn', 's.last_name', 's.first_name', 's.middle_name', 's.suffix', 'y.school_year', 'g.grade_label', 'sec.name as section_name', 'es.name as enrollment_status', 'ps.name as promotion_status')
             ->orderBy('s.last_name')->orderBy('s.first_name')->orderBy('e.enrollment_ID');
         if (($filters['download'] ?? '') === 'records') {
@@ -76,6 +119,19 @@ class PromotionReportController extends Controller
                 'label' => $label, 'counts' => $group->pluck('total', 'slug')->all(), 'total' => (int) $group->sum('total'),
             ])->sortBy('label', SORT_NATURAL)->values();
         }
+        $statusSlugs = array_keys($statuses);
+        $promotionRatioChart = [
+            'labels' => array_values($statuses),
+            'colors' => ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0891b2', '#db2777'],
+            'overall' => [
+                'label' => 'All grade levels',
+                'counts' => array_map(fn ($slug) => (int) ($counts[$slug] ?? 0), $statusSlugs),
+            ],
+            'grades' => $matrices['Grade level']->map(fn ($grade) => [
+                'label' => $grade['label'],
+                'counts' => array_map(fn ($slug) => (int) ($grade['counts'][$slug] ?? 0), $statusSlugs),
+            ])->values(),
+        ];
         $reportContext = [
             'School year: '.($years->firstWhere('SY_ID', $filters['academic_year_id'])?->school_year ?? 'All school years'),
             'Grade: '.($grades->firstWhere('grade_ID', $filters['grade_id'] ?? null)?->grade_label ?? 'All'),
@@ -120,6 +176,8 @@ class PromotionReportController extends Controller
             'filters' => $filters, 'years' => $years, 'grades' => $grades, 'statuses' => $statuses,
             'enrollmentStatuses' => EnrollmentStatus::options(), 'total' => $total, 'rows' => $rows,
             'matrices' => $matrices, 'reportContext' => $reportContext, 'generatedAt' => $generatedAt,
+            'promotionRatioChart' => $promotionRatioChart,
+            'promotionRateComparison' => $promotionRateComparison,
             'records' => $details->paginate(25)->withQueryString(),
         ]);
     }

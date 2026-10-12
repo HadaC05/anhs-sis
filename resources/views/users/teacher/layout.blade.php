@@ -103,6 +103,10 @@
                         <p class="sidebar-user-label">Signed in</p>
                         <h2 class="truncate text-sm font-bold text-[#296374]">{{ trim(implode(' ', array_filter([Auth::user()?->first_name, Auth::user()?->middle_name, Auth::user()?->last_name, Auth::user()?->suffix]))) ?: (Auth::user()?->username ?? 'Teacher') }}</h2>
                         <p class="text-xs text-gray-500">Teacher</p>
+                        @if (Auth::user()?->major_specialization)
+                            <p class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Specialization</p>
+                            <p class="truncate text-xs text-gray-600" title="{{ Auth::user()->major_specialization }}">{{ Auth::user()->major_specialization }}</p>
+                        @endif
                     </div>
                 </div>
             </div>

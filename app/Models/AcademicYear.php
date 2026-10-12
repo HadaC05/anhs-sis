@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\PromotedEnrollmentActivator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class AcademicYear extends Model
 {
@@ -86,13 +88,17 @@ class AcademicYear extends Model
         return $startDate->format('Y').'-'.$endDate->format('Y');
     }
 
-    public function makeActive(): void
+    public function makeActive(): int
     {
-        static::query()
-            ->where('SY_ID', '!=', $this->SY_ID)
-            ->where('status', true)
-            ->update(['status' => false]);
+        return DB::transaction(function (): int {
+            static::query()
+                ->where('SY_ID', '!=', $this->SY_ID)
+                ->where('status', true)
+                ->update(['status' => false]);
 
-        $this->update(['status' => true]);
+            $this->update(['status' => true]);
+
+            return PromotedEnrollmentActivator::activateFor($this->fresh() ?? $this);
+        });
     }
 }

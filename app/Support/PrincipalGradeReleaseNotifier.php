@@ -12,6 +12,7 @@ class PrincipalGradeReleaseNotifier
     public static function sync(): void
     {
         $assignmentIds = TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->withoutMapehParents()
             ->whereHas('grades', fn ($query) => $query->whereStatus(GradeStatus::APPROVED))
             ->orderBy('assignment_ID')

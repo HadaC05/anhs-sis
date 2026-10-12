@@ -44,6 +44,17 @@ class TeacherSubjectAssignment extends Model
         });
     }
 
+    /**
+     * Limit assignments to sections that are still available for use.
+     *
+     * @param  Builder<TeacherSubjectAssignment>  $query
+     * @return Builder<TeacherSubjectAssignment>
+     */
+    public function scopeInActiveSections(Builder $query): Builder
+    {
+        return $query->whereHas('section', fn (Builder $sectionQuery) => $sectionQuery->active());
+    }
+
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class, 'section_ID', 'section_ID');

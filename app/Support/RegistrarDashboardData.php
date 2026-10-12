@@ -24,7 +24,7 @@ class RegistrarDashboardData
             ? $academicYears->firstWhere('SY_ID', $request->integer('academic_year_id'))
             : ($academicYears->firstWhere('status', true) ?? $academicYears->first());
         $yearId = $selectedYear?->SY_ID;
-        $assignments = TeacherSubjectAssignment::query()->where('SY_ID', $yearId);
+        $assignments = TeacherSubjectAssignment::query()->inActiveSections()->where('SY_ID', $yearId);
         $pending = (clone $assignments)->whereHas('grades', fn ($query) => $query->whereStatus(GradeStatus::SUBMITTED));
         $counts = StudentSubjectGrade::query()
             ->whereHas('assignment', fn ($query) => $query->where('SY_ID', $yearId))
@@ -41,7 +41,7 @@ class RegistrarDashboardData
             'gradeCounts' => $gradeCounts,
             'pendingSubjects' => (clone $pending)->count(),
             'subjectCount' => (clone $assignments)->count(),
-            'sectionCount' => Section::query()->where('SY_ID', $yearId)->count(),
+            'sectionCount' => Section::query()->active()->where('SY_ID', $yearId)->count(),
             'studentCount' => Enrollment::query()->where('SY_ID', $yearId)
                 ->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds())
                 ->distinct()->count('student_ID'),

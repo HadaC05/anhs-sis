@@ -33,7 +33,7 @@ class AttendanceReportController extends Controller
             validator(['month' => $month], ['month' => [Rule::in(array_keys($months))]])->validate();
         }
         $filters = ['academic_year_id' => $year?->SY_ID, 'month' => $month ?: null, 'grade_id' => $filters['grade_id'] ?? null];
-        $sections = Section::query()->where('SY_ID', $year?->SY_ID ?? 0)
+        $sections = Section::query()->active()->where('SY_ID', $year?->SY_ID ?? 0)
             ->when($filters['grade_id'], fn ($query, $id) => $query->where('grade_ID', $id))
             ->with(['gradeLevel', 'adviser', 'enrollments' => fn ($query) => $query->where('SY_ID', $year?->SY_ID ?? 0)
                 ->with(['student', 'enrollmentStatus', 'learnerType'])])

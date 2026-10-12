@@ -141,6 +141,7 @@ class PrincipalDashboardController extends Controller
 
         if ($selectedSubject) {
             $assignments = TeacherSubjectAssignment::query()
+                ->inActiveSections()
                 ->with([
                     'section.cluster',
                     'section.gradeLevel',
@@ -521,14 +522,19 @@ class PrincipalDashboardController extends Controller
             'assignment_ids.*' => ['integer', 'exists:teacher_subject_assignments,assignment_ID'],
         ]);
 
-        $releasableAssignmentIds = StudentSubjectGrade::query()
+        $activeAssignmentIds = TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->whereIn('assignment_ID', $validated['assignment_ids'])
+            ->pluck('assignment_ID');
+
+        $releasableAssignmentIds = StudentSubjectGrade::query()
+            ->whereIn('assignment_ID', $activeAssignmentIds)
             ->whereStatus(GradeStatus::APPROVED)
             ->distinct()
             ->pluck('assignment_ID');
 
         $released = StudentSubjectGrade::query()
-            ->whereIn('assignment_ID', $validated['assignment_ids'])
+            ->whereIn('assignment_ID', $activeAssignmentIds)
             ->whereStatus(GradeStatus::APPROVED)
             ->update(['grade_status_ID' => GradeStatus::idFor(GradeStatus::RELEASED)]);
 
@@ -570,6 +576,7 @@ class PrincipalDashboardController extends Controller
     private function gradeReleaseAssignments(array $filters): LengthAwarePaginator
     {
         return TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->withoutMapehParents()
             ->with([
                 'section.gradeLevel',

@@ -35,9 +35,11 @@ class Sf2AttendanceXls
             throw new Sf2ImportException('Upload an Excel workbook containing exactly one SF2 attendance sheet.');
         }
 
-        $report = $this->parseRows($sheets[0], $calendarYear);
+        $monthlyTotalsOnly = collect($continuations)->contains(fn (array $cells) => $this->hasStaleContinuationYear($sheets[0], $cells));
+        $report = $this->parseRows($sheets[0], $calendarYear, $monthlyTotalsOnly);
+        $report['monthly_totals_only'] = $monthlyTotalsOnly;
         foreach ($continuations as $index => $cells) {
-            $continuation = $this->parseContinuationRows($cells, $report, $index + 2);
+            $continuation = $this->parseContinuationRows($cells, $report, $index + 2, $monthlyTotalsOnly);
             $report['rows'] = array_merge($report['rows'], $continuation['rows']);
             $report['layout']['rows'] = array_merge($report['layout']['rows'], $continuation['layout_rows']);
         }
@@ -46,7 +48,7 @@ class Sf2AttendanceXls
     }
 
     /** Read the LIS SF2 layout with ABSENT / PRESENT monthly totals. */
-    public function parseRows(array $cells, ?int $calendarYear = null): array
+    public function parseRows(array $cells, ?int $calendarYear = null, bool $monthlyTotalsOnly = false): array
     {
         $value = fn (int $row, int $column) => trim((string) ($cells[$row][$column] ?? ''));
         $after = function (int $row, string $label) use ($cells, $value): string {
@@ -92,7 +94,7 @@ class Sf2AttendanceXls
                 throw new Sf2ImportException('The SF2 class dates are invalid, duplicated, or out of order.');
             }
             $dateString = sprintf('%04d-%02d-%02d', $year, $month, $day);
-            if ($value(6, $column) !== $weekdays[(int) (new DateTimeImmutable($dateString))->format('N')]) {
+            if (! $monthlyTotalsOnly && $value(6, $column) !== $weekdays[(int) (new DateTimeImmutable($dateString))->format('N')]) {
                 throw new Sf2ImportException('The SF2 class dates do not agree with the report month and year.');
             }
             $dates[$column] = $dateString;
@@ -121,8 +123,19 @@ class Sf2AttendanceXls
                 }
                 break;
             }
+            // Some SF2 workbooks place the learner count in both the No. and
+            // Learner Name cells on a male/female summary row instead of
+            // labeling it "Combined Total". Skip this row; learner rows for
+            // the next sex group may follow it on the same sheet.
+            if (ctype_digit($name)
+                && ($value($r, 0) === '' || ctype_digit($value($r, 0)))) {
+                continue;
+            }
             if ($name === '') {
                 if ($value($r, 0) !== '') {
+                    if (! ctype_digit($value($r, 0))) {
+                        break;
+                    }
                     throw new Sf2ImportException('A numbered SF2 learner row has no name.');
                 }
 
@@ -132,17 +145,20 @@ class Sf2AttendanceXls
                 throw new Sf2ImportException('An Excel learner row could not be read. Check the learner names and row numbers.');
             }
             $absent = $this->total($value($r, 38), $name);
-            $secondTotal = $this->total($value($r, 40), $name);
-            $present = $isPresent ? $secondTotal : $schoolDays - $absent;
-            if ($absent > $schoolDays || $secondTotal > $schoolDays || $absent + $present !== $schoolDays) {
+            $secondTotal = $isPresent && ! $monthlyTotalsOnly ? null : $this->total($value($r, 40), $name);
+            if (! $monthlyTotalsOnly && $absent > $schoolDays) {
                 throw new Sf2ImportException('Absent and present totals must equal the number of class dates for '.$name.'.');
             }
+            // LIS Present formulas can be stale. Totals-only fallback keeps
+            // the printed monthly totals; normal imports derive Present from
+            // the calendar and verified Absent count.
+            $present = $monthlyTotalsOnly && $isPresent ? $secondTotal : $schoolDays - $absent;
             $remarks = $value($r, 42);
             if (preg_match('/transfer|drop.?out|dropped|late enrol|\bNLS\b/i', $remarks)) {
                 throw new Sf2ImportException('The attendance period for '.$name.' needs review because of a transfer, dropout or late enrollment.');
             }
             $daily = [];
-            for ($column = 5; $column < 38; $column++) {
+            for ($column = 5; ! $monthlyTotalsOnly && $column < 38; $column++) {
                 $mark = strtoupper($value($r, $column));
                 if (! isset($dates[$column])) {
                     if ($mark !== '') {
@@ -151,20 +167,23 @@ class Sf2AttendanceXls
 
                     continue;
                 }
-                if (! in_array($mark, ['', 'X', 'T', 'L', 'C'], true)) {
+                if (! $monthlyTotalsOnly && ! in_array($mark, ['', 'X', 'T', 'L', 'C'], true)) {
                     throw new Sf2ImportException('Unsupported attendance mark for '.$name.'. Use blank, X, T, L, or C.');
                 }
                 $daily[$dates[$column]] = $mark;
             }
-            if (count(array_filter($daily, fn ($mark) => $mark === 'X')) !== $absent) {
+            if (! $monthlyTotalsOnly && count(array_filter($daily, fn ($mark) => $mark === 'X')) !== $absent) {
                 throw new Sf2ImportException('The absence marks and printed total disagree for '.$name.'.');
             }
             $tardy = count(array_filter($daily, fn ($mark) => in_array($mark, ['T', 'L', 'C'], true)));
-            if (! $isPresent && $tardy > $secondTotal) {
+            if (! $monthlyTotalsOnly && ! $isPresent && $tardy > $secondTotal) {
                 throw new Sf2ImportException('The tardy marks and printed total disagree for '.$name.'.');
             }
-            $tardyComplete = $isPresent || $tardy === $secondTotal;
+            $tardyComplete = ! $monthlyTotalsOnly && ($isPresent || $tardy === $secondTotal);
             $tardy = $isPresent ? $tardy : $secondTotal;
+            if ($monthlyTotalsOnly) {
+                $daily = [];
+            }
             // Keep row keys unique when numbering restarts for female learners.
             $rows[] = ['name' => $name, 'days_absent' => $absent, 'days_present' => $present, 'days_tardy' => $tardy, 'remarks' => $remarks, 'page' => 1, 'row_number' => count($rows) + 1, 'raw_text' => implode(' ', $cells[$r])];
             $layoutRows['1-'.count($rows)] = ['sex' => 'Unspecified', 'daily' => $daily, 'tardy_dates_complete' => $tardyComplete];
@@ -190,7 +209,7 @@ class Sf2AttendanceXls
     }
 
     /** Read learner rows from an SF2 continuation worksheet. */
-    public function parseContinuationRows(array $cells, array $report, int $page = 2): array
+    public function parseContinuationRows(array $cells, array $report, int $page = 2, bool $monthlyTotalsOnly = false): array
     {
         $value = fn (int $row, int $column) => trim((string) ($cells[$row][$column] ?? ''));
         $title = strtoupper(implode(' ', $cells[0] ?? []));
@@ -200,12 +219,22 @@ class Sf2AttendanceXls
 
         $metadata = implode(' ', $cells[1] ?? []);
         $monthName = (new DateTimeImmutable(sprintf('%04d-%02d-01', $report['year'], $report['month'])))->format('F');
-        if (! preg_match('/\bSY\s*(20\d{2})\s*-\s*(20\d{2})\b/i', $metadata, $schoolYear)
-            || $report['school_year'] !== $schoolYear[1].'-'.$schoolYear[2]
-            || ! preg_match('/\bGrade\s*(\d{1,2})\s+([^|]+)/i', $metadata, $gradeSection)
-            || (int) $gradeSection[1] !== $report['grade']
-            || $this->textKey($gradeSection[2]) !== $this->textKey($report['section'])
-            || ! preg_match('/\b'.preg_quote($monthName, '/').'\s+'.$report['year'].'\b/i', $metadata)) {
+        $hasGradeSection = preg_match('/\bGrade\s*(\d{1,2})\s+([^|]+)/i', $metadata, $gradeSection) === 1
+            && (int) $gradeSection[1] === $report['grade']
+            && $this->textKey($gradeSection[2]) === $this->textKey($report['section']);
+        $hasMonth = preg_match('/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})\b/i', $metadata, $continuationDate) === 1
+            && strcasecmp($continuationDate[1], $monthName) === 0;
+        $hasSchoolYear = preg_match('/\b(?:SY\s*)?(20\d{2})\s*-\s*(20\d{2})\b/i', $metadata, $schoolYear) === 1
+            && $report['school_year'] === $schoolYear[1].'-'.$schoolYear[2]
+            && (int) ($continuationDate[2] ?? 0) === $report['year'];
+        if (! $hasGradeSection || ! $hasMonth || (! $monthlyTotalsOnly && ! $hasSchoolYear)) {
+            // Senior-high sections can use a one-learner workbook copied from a
+            // junior-high template that still contains the template's unrelated
+            // continuation tab. It is not part of the senior-high report.
+            if ($report['grade'] >= 11 && count($report['rows']) === 1) {
+                return ['rows' => [], 'layout_rows' => []];
+            }
+
             throw new Sf2ImportException('The Excel continuation sheet does not match the month, school year, grade, or section on the main SF2 sheet.');
         }
 
@@ -243,22 +272,24 @@ class Sf2AttendanceXls
         $dateRow = $headerRow + 1;
         $dayRow = $headerRow + 2;
         $weekdays = [1 => 'M', 2 => 'T', 3 => 'W', 4 => 'TH', 5 => 'F', 6 => 'S', 7 => 'SU'];
-        for ($column = $columns['sex'] + 1; $column < $columns['absent']; $column++) {
-            $day = $value($dateRow, $column);
-            if (in_array($day, ['', '-'], true)) {
-                continue;
+        if (! $monthlyTotalsOnly) {
+            for ($column = $columns['sex'] + 1; $column < $columns['absent']; $column++) {
+                $day = $value($dateRow, $column);
+                if (in_array($day, ['', '-'], true)) {
+                    continue;
+                }
+                if (! ctype_digit($day) || ! checkdate($report['month'], (int) $day, $report['year'])) {
+                    throw new Sf2ImportException('The SF2 continuation class dates are invalid.');
+                }
+                $date = sprintf('%04d-%02d-%02d', $report['year'], $report['month'], $day);
+                if ($value($dayRow, $column) !== $weekdays[(int) (new DateTimeImmutable($date))->format('N')]) {
+                    throw new Sf2ImportException('The SF2 continuation class dates do not agree with the report month and year.');
+                }
+                $dates[$column] = $date;
             }
-            if (! ctype_digit($day) || ! checkdate($report['month'], (int) $day, $report['year'])) {
-                throw new Sf2ImportException('The SF2 continuation class dates are invalid.');
+            if (array_values($dates) !== $report['class_dates']) {
+                throw new Sf2ImportException('The class dates on the SF2 continuation sheet do not match the main sheet.');
             }
-            $date = sprintf('%04d-%02d-%02d', $report['year'], $report['month'], $day);
-            if ($value($dayRow, $column) !== $weekdays[(int) (new DateTimeImmutable($date))->format('N')]) {
-                throw new Sf2ImportException('The SF2 continuation class dates do not agree with the report month and year.');
-            }
-            $dates[$column] = $date;
-        }
-        if (array_values($dates) !== $report['class_dates']) {
-            throw new Sf2ImportException('The class dates on the SF2 continuation sheet do not match the main sheet.');
         }
 
         $rows = [];
@@ -273,7 +304,7 @@ class Sf2AttendanceXls
             if ($number === '' && preg_match('/^(?:class\s+present|\d+\s+learners\b)/i', $name)) {
                 continue;
             }
-            if (! ctype_digit($number) || (int) $number !== $nextNumber || $name === '' || ! str_contains($name, ',')) {
+            if (! ctype_digit($number) || (int) $number < 1 || $name === '' || ! str_contains($name, ',')) {
                 throw new Sf2ImportException('An Excel continuation learner row could not be read. Check the learner names and row numbers.');
             }
             $sex = strtoupper($value($rowIndex, $columns['sex']));
@@ -282,13 +313,13 @@ class Sf2AttendanceXls
             }
             $absent = $this->total($value($rowIndex, $columns['absent']), $name);
             $secondTotal = $this->total($value($rowIndex, $columns[$secondKey]), $name);
-            $present = $report['format'] === 'lis' ? $secondTotal : $report['school_days'] - $absent;
-            if ($absent + $present !== $report['school_days']) {
+            if (! $monthlyTotalsOnly && $absent > $report['school_days']) {
                 throw new Sf2ImportException('Absent and present totals must equal the number of class dates for '.$name.'.');
             }
+            $present = $monthlyTotalsOnly && $report['format'] === 'lis' ? $secondTotal : $report['school_days'] - $absent;
 
             $daily = [];
-            foreach (range($columns['sex'] + 1, $columns['absent'] - 1) as $column) {
+            foreach ($monthlyTotalsOnly ? [] : range($columns['sex'] + 1, $columns['absent'] - 1) as $column) {
                 $mark = strtoupper($value($rowIndex, $column));
                 if (! isset($dates[$column])) {
                     if ($mark !== '') {
@@ -302,17 +333,17 @@ class Sf2AttendanceXls
                 }
                 $daily[$dates[$column]] = $mark;
             }
-            if (count(array_filter($daily, fn ($mark) => $mark === 'X')) !== $absent) {
+            if (! $monthlyTotalsOnly && count(array_filter($daily, fn ($mark) => $mark === 'X')) !== $absent) {
                 throw new Sf2ImportException('The absence marks and printed total disagree for '.$name.'.');
             }
             $markedTardy = count(array_filter($daily, fn ($mark) => in_array($mark, ['T', 'L', 'C'], true)));
-            if ($report['format'] === 'legacy' && $markedTardy !== $secondTotal) {
+            if (! $monthlyTotalsOnly && $report['format'] === 'legacy' && $markedTardy !== $secondTotal) {
                 throw new Sf2ImportException('The tardy marks and printed total disagree for '.$name.'.');
             }
 
             $row = ['name' => $name, 'days_absent' => $absent, 'days_present' => $present, 'days_tardy' => $report['format'] === 'lis' ? $markedTardy : $secondTotal, 'remarks' => '', 'page' => $page, 'row_number' => $nextNumber, 'raw_text' => implode(' ', $cells[$rowIndex])];
             $rows[] = $row;
-            $layoutRows[$page.'-'.$nextNumber] = ['sex' => str_starts_with($sex, 'M') ? 'Male' : 'Female', 'daily' => $daily, 'tardy_dates_complete' => true];
+            $layoutRows[$page.'-'.$nextNumber] = ['sex' => str_starts_with($sex, 'M') ? 'Male' : 'Female', 'daily' => $daily, 'tardy_dates_complete' => ! $monthlyTotalsOnly];
             $nextNumber++;
         }
         if ($rows === []) {
@@ -325,6 +356,52 @@ class Sf2AttendanceXls
     private function textKey(string $value): string
     {
         return preg_replace('/[^a-z0-9]/', '', strtolower($value));
+    }
+
+    private function hasStaleContinuationYear(array $main, array $continuation): bool
+    {
+        $monthText = $this->valueAfterLabel($main, 2, 'Report for the Month of');
+        $schoolYearText = $this->valueAfterLabel($main, 2, 'School Year');
+        $gradeText = $this->valueAfterLabel($main, 3, 'Grade Level');
+        $section = $this->valueAfterLabel($main, 3, 'Section');
+        if (! preg_match('/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})$/i', $monthText, $mainDate)
+            || ! preg_match('/^(20\d{2})\s*[-–]\s*(20\d{2})$/u', $schoolYearText, $mainSchoolYear)
+            || ! preg_match('/^(?:Grade\s*)?(\d{1,2})\b/i', $gradeText, $mainGrade)
+            || $section === '') {
+            return false;
+        }
+
+        $metadata = implode(' ', $continuation[1] ?? []);
+        if (! preg_match('/\bGrade\s*(\d{1,2})\s+([^|]+)/i', $metadata, $continuationGrade)
+            || (int) $continuationGrade[1] !== (int) $mainGrade[1]
+            || $this->textKey($continuationGrade[2]) !== $this->textKey($section)
+            || ! preg_match('/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})\b/i', $metadata, $continuationDate)
+            || strcasecmp($continuationDate[1], $mainDate[1]) !== 0) {
+            return false;
+        }
+
+        $continuationYear = (int) $continuationDate[2];
+        $hasSchoolYear = preg_match('/\b(?:SY\s*)?(20\d{2})\s*-\s*(20\d{2})\b/i', $metadata, $continuationSchoolYear) === 1;
+
+        return $continuationYear !== (int) $mainDate[2]
+            || ! $hasSchoolYear
+            || $continuationSchoolYear[1].'-'.$continuationSchoolYear[2] !== $mainSchoolYear[1].'-'.$mainSchoolYear[2];
+    }
+
+    private function valueAfterLabel(array $cells, int $row, string $label): string
+    {
+        foreach ($cells[$row] ?? [] as $column => $cell) {
+            if (strcasecmp(trim((string) $cell), $label) !== 0) {
+                continue;
+            }
+            foreach (array_keys($cells[$row]) as $next) {
+                if ($next > $column && trim((string) ($cells[$row][$next] ?? '')) !== '') {
+                    return trim((string) $cells[$row][$next]);
+                }
+            }
+        }
+
+        return '';
     }
 
     private function total(string $value, string $name): int

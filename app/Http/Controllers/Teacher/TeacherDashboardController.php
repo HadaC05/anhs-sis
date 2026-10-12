@@ -22,6 +22,7 @@ class TeacherDashboardController extends Controller
         // Never present historical assignments as current work without an active year.
         $assignments = $activeYear
             ? TeacherSubjectAssignment::query()
+                ->inActiveSections()
                 ->withoutMapehParents()
                 ->where('staff_ID', $staff->staff_id)
                 ->where('SY_ID', $activeYear->SY_ID)
@@ -32,6 +33,7 @@ class TeacherDashboardController extends Controller
 
         $advisorySections = $activeYear
             ? Section::query()
+                ->active()
                 ->where('staff_ID', $staff->staff_id)
                 ->where('SY_ID', $activeYear->SY_ID)
                 ->with('gradeLevel')

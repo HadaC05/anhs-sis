@@ -93,6 +93,7 @@ class TeacherSectionController extends Controller
             };
 
             $sections = Section::query()
+                ->active()
                 ->with([
                     'academicYear',
                     'cluster',
@@ -168,6 +169,7 @@ class TeacherSectionController extends Controller
             : (string) AcademicYear::query()->where('status', true)->value('SY_ID');
 
         $sections = Section::query()
+            ->active()
             ->with(['academicYear', 'cluster', 'gradeLevel'])
             ->withCount(['enrollments as active_enrollments_count' => function ($query): void {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());

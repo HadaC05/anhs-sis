@@ -47,6 +47,28 @@ test('LIS Excel reads an explicit report year without guessing from school year'
     expect(fn () => (new Sf2AttendanceXls)->parseRows($cells))->toThrow(Sf2ImportException::class, 'Include the report year');
 });
 
+test('senior high derives present days from class dates when the printed present formula is stale', function () {
+    $cells = lisSf2Cells();
+    foreach ($cells[3] as $column => $cell) {
+        if (trim((string) $cell) !== 'Grade Level') {
+            continue;
+        }
+        foreach (array_keys($cells[3]) as $nextColumn) {
+            if ($nextColumn > $column && trim((string) $cells[3][$nextColumn]) !== '') {
+                $cells[3][$nextColumn] = 'Grade 11';
+                break 2;
+            }
+        }
+    }
+    $cells[7][40] = '4';
+
+    $report = (new Sf2AttendanceXls)->parseRows($cells, 2026);
+
+    expect($report['grade'])->toBe(11)
+        ->and($report['rows'][0]['days_absent'])->toBe(1)
+        ->and($report['rows'][0]['days_present'])->toBe(3);
+});
+
 test('LIS Excel appends validated learner rows from a continuation sheet', function () {
     $reader = new Sf2AttendanceXls;
     $report = $reader->read(base_path('tests/Fixtures/sf2-lis-september-2026.xls'), 2026);
@@ -77,4 +99,33 @@ test('LIS Excel appends validated learner rows from a continuation sheet', funct
         ])
         ->and($continuation['layout_rows']['2-3']['sex'])->toBe('Female')
         ->and($continuation['layout_rows']['2-3']['daily'][$report['class_dates'][0]])->toBe('X');
+});
+
+test('senior high ignores an unrelated junior high continuation worksheet', function () {
+    $reader = new Sf2AttendanceXls;
+    $report = $reader->read(base_path('tests/Fixtures/sf2-lis-september-2026.xls'), 2026);
+    $report['grade'] = 11;
+    $report['section'] = 'G11-HOSP-1ST';
+    $report['rows'] = [$report['rows'][0]];
+
+    $cells = array_fill(0, 2, []);
+    $cells[0][0] = 'SCHOOL FORM 2 - DAILY ATTENDANCE / CONTINUATION';
+    $cells[1][0] = 'Sample School | School ID 123456 | SY 2026-2027 | Grade 7 Aster | September 2026';
+
+    expect($reader->parseContinuationRows($cells, $report))->toBe([
+        'rows' => [],
+        'layout_rows' => [],
+    ]);
+});
+
+test('junior high still rejects an unrelated continuation worksheet', function () {
+    $reader = new Sf2AttendanceXls;
+    $report = $reader->read(base_path('tests/Fixtures/sf2-lis-september-2026.xls'), 2026);
+
+    $cells = array_fill(0, 2, []);
+    $cells[0][0] = 'SCHOOL FORM 2 - DAILY ATTENDANCE / CONTINUATION';
+    $cells[1][0] = 'Sample School | School ID 123456 | SY 2026-2027 | Grade 8 Aster | September 2026';
+
+    expect(fn () => $reader->parseContinuationRows($cells, $report))
+        ->toThrow(Sf2ImportException::class, 'does not match the month, school year, grade, or section');
 });

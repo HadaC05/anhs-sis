@@ -168,12 +168,14 @@
                                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3" stroke-width="1.8"/></svg>
                                     </a>
                                 @else
-                                <button type="button" onclick='openSectionModal(@json($sectionPayload))'
-                                    class="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                    </svg>
-                                </button>
+                                @if ($section->status)
+                                    <button type="button" onclick='openSectionModal(@json($sectionPayload))'
+                                        class="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-[#296374]" title="Edit">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                    </button>
+                                @endif
                                 <form action="{{ route($managementRoutePrefix.'section-config.toggle-status', $section) }}" method="POST" class="inline" data-confirm-action="{{ $section->status ? 'Archive' : 'Activate' }}" data-confirm-message="{{ $section->status ? 'Archive this section?' : 'Activate this section?' }}">
                                     @csrf
                                     @method('PATCH')

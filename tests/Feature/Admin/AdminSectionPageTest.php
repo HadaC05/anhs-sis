@@ -214,6 +214,29 @@ test('admin can archive and activate a section without deleting it', function ()
     expect($section->fresh()->status)->toBeTrue();
 });
 
+test('archived sections cannot be edited and only expose the restore action', function () {
+    ['admin' => $admin, 'section' => $section, 'academicYear' => $year, 'curriculum' => $curriculum] = createSectionPageFixtures('admin.sections.archived-actions');
+    $section->update(['status' => false]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.section-config.index', ['status' => 'inactive']))
+        ->assertOk()
+        ->assertSee('Einstein')
+        ->assertSee('title="Activate"', false)
+        ->assertDontSee('title="Edit"', false);
+
+    $this->put(route('admin.section-config.update', $section), [
+        'name' => 'Changed archived section',
+        'grade_level' => 'grade_7',
+        'SY_ID' => $year->SY_ID,
+        'curriculum_grade_level_ID' => $curriculum->curriculum_ID,
+        'capacity' => 40,
+        'room' => 'Room 201',
+    ])->assertNotFound();
+
+    expect($section->fresh()->name)->toBe('Einstein');
+});
+
 test('section capacity must be a number from 1 to 100', function (mixed $capacity, bool $passes) {
     [
         'admin' => $admin,
@@ -277,7 +300,6 @@ test('management can copy sections into a previous year with optional advisers',
     $previous = AcademicYear::query()->create([
         'school_year' => '2025-2026', 'start_date' => '2025-06-01', 'end_date' => '2026-03-31', 'status' => false,
     ]);
-    $source->update(['status' => false]);
     $otherGrade = $source->replicate();
     $otherGrade->fill(['name' => 'Newton', 'grade_ID' => GradeLevel::idForValue('grade_8')])->save();
 
@@ -295,7 +317,7 @@ test('management can copy sections into a previous year with optional advisers',
     }
     expect($copy->staff_ID)->toBe($mode === 'keep' ? $source->staff_ID : null)
         ->and($copy->status)->toBeTrue()
-        ->and($source->fresh()->status)->toBeFalse()
+        ->and($source->fresh()->status)->toBeTrue()
         ->and($current->fresh()->status)->toBeTrue()
         ->and($previous->fresh()->status)->toBeFalse();
 

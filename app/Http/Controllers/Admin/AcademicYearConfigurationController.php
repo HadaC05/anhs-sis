@@ -86,8 +86,13 @@ class AcademicYearConfigurationController extends Controller
             return back()->with('success', 'Academic year archived successfully.');
         }
 
-        $academicYear->makeActive();
+        $activatedEnrollments = $academicYear->makeActive();
 
-        return back()->with('success', 'Academic year activated successfully.');
+        $message = 'Academic year activated successfully.';
+        if ($activatedEnrollments > 0) {
+            $message .= " {$activatedEnrollments} promoted learner enrollment(s) were automatically marked as enrolled.";
+        }
+
+        return back()->with('success', $message);
     }
 }

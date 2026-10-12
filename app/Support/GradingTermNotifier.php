@@ -11,6 +11,7 @@ class GradingTermNotifier
     public static function opened(string $label, bool $seniorHigh): void
     {
         $teacherIds = TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->whereHas('section.gradeLevel', fn ($query) => $seniorHigh
                 ? $query->whereIn('grade_label', ['Grade 11', 'Grade 12'])
                 : $query->whereNotIn('grade_label', ['Grade 11', 'Grade 12']))

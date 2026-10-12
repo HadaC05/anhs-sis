@@ -82,12 +82,13 @@
                         $status = $evaluation['status'];
                         $subjectAverages = collect($evaluation['subject_averages'])->map(fn ($average) => round($average));
                         $generalAverage = $subjectAverages->isNotEmpty() ? round($subjectAverages->avg()) : null;
-                        $badge = match ($status) { 'eligible', 'promoted', 'completed_junior_high' => 'bg-emerald-100 text-emerald-800', 'retained' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' };
-                        $label = match ($status) { 'eligible' => 'Eligible for Promotion', 'promoted' => 'Promoted', 'completed_junior_high' => 'Completed Junior High School', 'conditionally_promoted' => 'Conditionally Promoted', 'retained' => 'Retained', default => 'Pending Requirements' };
+                        $badge = match ($status) { 'eligible', 'promoted', 'completed_junior_high', 'completed_senior_high' => 'bg-emerald-100 text-emerald-800', 'retained' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' };
+                        $label = match ($status) { 'eligible' => 'Eligible for Promotion', 'promoted' => 'Promoted', 'completed_junior_high' => 'Completed Junior High School', 'completed_senior_high' => 'Completed Senior High School', 'conditionally_promoted' => 'Conditionally Promoted', 'retained' => 'Retained', default => 'Pending Requirements' };
                         $isGradeTen = $section->getRelation('gradeLevel')?->grade_label === 'Grade 10';
                         $isGradeTwelve = $section->getRelation('gradeLevel')?->grade_label === 'Grade 12';
+                        $isSeniorHigh = in_array($section->getRelation('gradeLevel')?->grade_label, ['Grade 11', 'Grade 12'], true);
                         $alreadyPromoted = in_array((int) $enrollment->student_ID, $alreadyPromotedStudentIds, true);
-                        $canPromote = $status === 'eligible' && ! $isGradeTwelve && ! $alreadyPromoted && ($isGradeTen || $nextAcademicYear);
+                        $canPromote = $status === 'eligible' && ! $isSeniorHigh && ! $alreadyPromoted && ($isGradeTen || $nextAcademicYear);
                         $remediationCase = $enrollment->remediationCase;
                     @endphp
                     <tr class="hover:bg-gray-50">
@@ -115,6 +116,10 @@
                                 <span class="text-xs font-medium text-gray-500">Grade 12 completed</span>
                             @elseif ($status === 'completed_junior_high')
                                 <span class="text-xs font-medium text-emerald-700">Junior High School completed</span>
+                            @elseif ($status === 'completed_senior_high')
+                                <span class="text-xs font-medium text-emerald-700">Senior High School completed</span>
+                            @elseif ($isSeniorHigh && $status === 'eligible')
+                                <span class="text-xs font-medium text-gray-500">Ready to continue through the student portal</span>
                             @elseif ($alreadyPromoted || $status === 'promoted')
                                 <span class="text-xs font-medium text-emerald-700">Already promoted{{ $nextAcademicYear ? ' to '.$nextAcademicYear->school_year : '' }}</span>
                             @elseif ($status === 'eligible' && ! $nextAcademicYear)

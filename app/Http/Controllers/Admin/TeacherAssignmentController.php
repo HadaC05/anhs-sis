@@ -46,6 +46,7 @@ class TeacherAssignmentController extends Controller
         $advisorySearch = trim($request->string('advisory_search')->toString());
 
         $assignments = TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->withoutMapehParents()
             ->with(['section.cluster', 'section.gradeLevel', 'section.academicYear', 'section.curriculum.gradingSemester', 'subject', 'staff.role'])
             ->withCount([
@@ -74,12 +75,14 @@ class TeacherAssignmentController extends Controller
             ->withQueryString();
 
         $sections = Section::query()
+            ->active()
             ->with(['cluster', 'gradeLevel', 'academicYear', 'adviser'])
             ->orderBy('grade_ID')
             ->orderBy('name')
             ->get();
 
         $advisorySections = Section::query()
+            ->active()
             ->with(['cluster', 'gradeLevel', 'academicYear', 'adviser'])
             ->withCount(['enrollments as active_enrollments_count' => function ($query): void {
                 $query->whereIn('enrollment_status_ID', EnrollmentStatus::activeIds());
@@ -111,6 +114,7 @@ class TeacherAssignmentController extends Controller
             ->get();
 
         $subjectAssignmentRows = TeacherSubjectAssignment::query()
+            ->inActiveSections()
             ->withoutMapehParents()
             ->with(['section.gradeLevel', 'section.academicYear', 'section.curriculum.gradingSemester', 'subject', 'staff'])
             ->when($search !== '', function ($query) use ($search): void {
@@ -204,9 +208,9 @@ class TeacherAssignmentController extends Controller
             'gradeLevels' => GradeLevel::options(),
             'perPage' => $perPage,
             'advisoryPerPage' => $advisoryPerPage,
-            'advisoryCount' => Section::query()->whereNotNull('staff_ID')->count(),
-            'unassignedSectionCount' => Section::query()->whereNull('staff_ID')->count(),
-            'assignmentCount' => TeacherSubjectAssignment::query()->withoutMapehParents()->count(),
+            'advisoryCount' => Section::query()->active()->whereNotNull('staff_ID')->count(),
+            'unassignedSectionCount' => Section::query()->active()->whereNull('staff_ID')->count(),
+            'assignmentCount' => TeacherSubjectAssignment::query()->inActiveSections()->withoutMapehParents()->count(),
             'teacherCount' => $teachers->count(),
             'advisoryGradeLevel' => $advisoryGradeLevel,
             'advisorySchoolYearId' => $advisorySchoolYearId,
@@ -230,6 +234,7 @@ class TeacherAssignmentController extends Controller
             AcademicYear::query()->whereKey($data['target_SY_ID'])->lockForUpdate()->firstOrFail();
 
             $sources = TeacherSubjectAssignment::query()
+                ->inActiveSections()
                 ->with(['section', 'subject', 'staff.role'])
                 ->where('SY_ID', $data['source_SY_ID'])
                 ->whereHas('section', function ($query) use ($data): void {
@@ -248,6 +253,7 @@ class TeacherAssignmentController extends Controller
             $counts = ['copied' => 0, 'existing' => 0, 'section' => 0, 'teacher' => 0];
             foreach ($sources as $source) {
                 $destination = Section::query()
+                    ->active()
                     ->where('SY_ID', $data['target_SY_ID'])
                     ->where('name', $source->section->name)
                     ->where('grade_ID', $source->section->grade_ID)
@@ -314,7 +320,7 @@ class TeacherAssignmentController extends Controller
             'staff_ID' => ['required', 'integer', 'exists:staffs,staff_id'],
         ]);
 
-        $section = Section::query()->findOrFail($validated['section_ID']);
+        $section = Section::query()->active()->findOrFail($validated['section_ID']);
         $curriculumSubject = CurriculumSubject::query()->findOrFail($validated['curr_subj_ID']);
         $mapeh = \App\Models\MapehConfiguration::forSection($section);
         if ($mapeh && ((int) $mapeh->parent_curr_subj_ID === (int) $curriculumSubject->curr_subj_ID || in_array($curriculumSubject->curr_subj_ID, $mapeh->inactiveComponentIds()))) {
@@ -375,6 +381,7 @@ class TeacherAssignmentController extends Controller
         }
 
         $sections = Section::query()
+            ->active()
             ->whereIn('section_ID', $validated['section_ids'])
             ->get()
             ->keyBy('section_ID');
@@ -478,7 +485,7 @@ class TeacherAssignmentController extends Controller
             'staff_ID' => ['required', 'integer', 'exists:staffs,staff_id'],
         ]);
 
-        $section = Section::query()->findOrFail($validated['section_ID']);
+        $section = Section::query()->active()->findOrFail($validated['section_ID']);
         $teacher = Staff::query()
             ->where('staff_id', $validated['staff_ID'])
             ->whereHas('role', fn ($q) => $q->where('role_name', 'teacher'))
@@ -491,6 +498,7 @@ class TeacherAssignmentController extends Controller
         }
 
         $existingAdvisory = Section::query()
+            ->active()
             ->where('staff_ID', $teacher->staff_id)
             ->where('SY_ID', $section->SY_ID)
             ->where('section_ID', '!=', $section->section_ID)
@@ -524,7 +532,7 @@ class TeacherAssignmentController extends Controller
             return back()->with('status', $targetSectionId ? 'Advisory assignment updated successfully.' : 'Teacher is no longer assigned as an adviser.');
         }
 
-        $targetSection = Section::query()->findOrFail($targetSectionId);
+        $targetSection = Section::query()->active()->findOrFail($targetSectionId);
 
         if ($targetSection->staff_ID) {
             throw ValidationException::withMessages([
@@ -533,6 +541,7 @@ class TeacherAssignmentController extends Controller
         }
 
         $existingAdvisory = Section::query()
+            ->active()
             ->where('staff_ID', $teacher?->staff_id)
             ->where('SY_ID', $targetSection->SY_ID)
             ->where('section_ID', '!=', $section->section_ID)

@@ -446,6 +446,19 @@ test('teacher subject list displays the configured grade status from its status 
         ->assertSee('Grade status: Submitted');
 });
 
+test('archived sections disappear from teacher lists and reject direct assignment actions', function () {
+    ['teacher' => $teacher, 'assignment' => $assignment] = createTeacherSectionGradeFixtures();
+    $assignment->section->update(['status' => false]);
+
+    $this->actingAs($teacher)
+        ->get(route('teacher.sections.index'))
+        ->assertOk()
+        ->assertDontSee('Newton');
+
+    $this->get(route('teacher.sections.show', $assignment))->assertNotFound();
+    $this->post(route('teacher.sections.grades.submit', $assignment))->assertNotFound();
+});
+
 test('teacher subject status follows the displayed term after it changes', function (bool $seniorHigh) {
     ['teacher' => $teacher, 'assignment' => $assignment, 'enrollment' => $enrollment] = createTeacherSectionGradeFixtures();
     if (! $seniorHigh) {

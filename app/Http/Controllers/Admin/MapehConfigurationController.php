@@ -24,7 +24,7 @@ class MapehConfigurationController extends Controller
             ->where('curriculum_grade_level_ID', $curriculum->curriculum_ID)->where('SY_ID', $year?->SY_ID)->first();
         $parents = $curriculum->curriculumSubjects()->with('subject')->get()->filter(fn ($row) => MapehSetup::isParentSubject($row->subject));
         $subjects = Subject::query()->where('school_level', $curriculum->gradeLevel->category)->where('status', 'active')->orderBy('title')->get();
-        $sections = Section::query()->where('curriculum_grade_level_ID', $curriculum->curriculum_ID)->where('SY_ID', $year?->SY_ID)->orderBy('name')->get();
+        $sections = Section::query()->active()->where('curriculum_grade_level_ID', $curriculum->curriculum_ID)->where('SY_ID', $year?->SY_ID)->orderBy('name')->get();
         $assignments = TeacherSubjectAssignment::query()->with('staff')->whereIn('section_ID', $sections->pluck('section_ID'))
             ->where('SY_ID', $year?->SY_ID)->get()->groupBy('section_ID');
 

@@ -41,7 +41,7 @@ class RegistrarReportController extends Controller
 
         if ($report === 'grades') {
             $headers = ['Grade level', 'Section', 'Subject', 'Teacher', ...array_column(GradeStatus::definitions(), 'name'), 'Total records'];
-            $query = TeacherSubjectAssignment::query()->withoutMapehParents()
+            $query = TeacherSubjectAssignment::query()->inActiveSections()->withoutMapehParents()
                 ->where('SY_ID', $selectedYear?->SY_ID ?? 0)
                 ->when($gradeId, fn ($q) => $q->whereHas('section', fn ($s) => $s->where('grade_ID', $gradeId)))
                 ->with(['section.gradeLevel', 'subject', 'staff'])

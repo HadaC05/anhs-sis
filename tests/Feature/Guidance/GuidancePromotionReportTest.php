@@ -29,8 +29,16 @@ test('promotion report includes every saved outcome without changing statuses', 
     $before = Enrollment::query()->pluck('promotion_status_ID', 'enrollment_ID')->all();
     $this->actingAs($this->counselor)->get(route('guidance.reports.promotion'))->assertOk()
         ->assertSee('Promotion Reports')->assertSee('Outcomes by school year')
+        ->assertSee('Promotion outcome ratio')->assertSee('Download PNG')
         ->assertViewHas('total', 6)
-        ->assertViewHas('rows', fn ($rows) => $rows->count() === 6 && $rows->every(fn ($row) => $row->total === 1));
+        ->assertViewHas('rows', fn ($rows) => $rows->count() === 6 && $rows->every(fn ($row) => $row->total === 1))
+        ->assertViewHas('promotionRatioChart', fn ($chart) => $chart['overall']['counts'] === [1, 1, 1, 1, 1, 1]
+            && $chart['grades']->count() === 1
+            && $chart['grades']->first()['label'] === 'Grade 7')
+        ->assertSee('Previous vs. current promotion rate')
+        ->assertViewHas('promotionRateComparison', fn ($chart) => $chart['years']->pluck('label')->all() === ['2025-2026', '2026-2027']
+            && $chart['years']->pluck('rate')->all() === [100.0, 33.3]
+            && $chart['years']->pluck('successful')->all() === [1, 2]);
     expect(Enrollment::query()->pluck('promotion_status_ID', 'enrollment_ID')->all())->toBe($before);
     $this->get(route('guidance.reports.promotion', ['academic_year_id' => '']))->assertOk()->assertViewHas('total', 7)
         ->assertViewHas('matrices', fn ($matrices) => $matrices['School year']->count() === 2);

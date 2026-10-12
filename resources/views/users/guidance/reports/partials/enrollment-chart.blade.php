@@ -4,6 +4,7 @@
     $chartHeight = max(1, $rows->count()) * 58;
     $height = $chartTop + $chartHeight + 60;
     $maximum = max(1, $rows->max('total') ?? 0);
+    $barColors = ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0891b2', '#db2777', '#4f46e5'];
 @endphp
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 {{ $height }}" role="img" aria-label="{{ $title }}: {{ $total }} enrollment records" style="display:block;width:100%;height:auto;font-family:Arial,sans-serif">
     <title>{{ $title }} — {{ $reportName ?? 'Enrollment report' }}</title>
@@ -15,12 +16,15 @@
         <text x="28" y="{{ 82 + $loop->index * 18 }}" fill="#4b5563" font-size="12">{{ $line }}</text>
     @endforeach
     @forelse($rows as $row)
-        @php($y = $chartTop + $loop->index * 58)
+        @php
+            $y = $chartTop + $loop->index * 58;
+            $barColor = $barColors[$loop->index % count($barColors)];
+        @endphp
         <g>
             <title>{{ $row->label }}: {{ $row->total }} records ({{ number_format($total ? $row->total / $total * 100 : 0, 1) }}%)</title>
             <text x="28" y="{{ $y + 23 }}" fill="#374151" font-size="14">{{ $row->label }}</text>
             <rect x="225" y="{{ $y }}" width="490" height="34" rx="5" fill="#f1f5f9"/>
-            <rect x="225" y="{{ $y }}" width="{{ round($row->total / $maximum * 490, 2) }}" height="34" rx="5" fill="#296374"/>
+            <rect x="225" y="{{ $y }}" width="{{ round($row->total / $maximum * 490, 2) }}" height="34" rx="5" fill="{{ $barColor }}"/>
             <text x="735" y="{{ $y + 23 }}" fill="#1f2937" font-size="14" font-weight="700">{{ number_format($row->total) }} ({{ number_format($total ? $row->total / $total * 100 : 0, 1) }}%)</text>
         </g>
     @empty

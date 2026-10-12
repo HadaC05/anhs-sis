@@ -30,10 +30,22 @@ class SecondSemesterEnrollmentController extends Controller
         $student = $request->user();
         abort_unless($student->isSeniorHighStudent(), 404);
 
-        SecondSemesterEnrollment::enroll($student, $request->validated('elective_ids'));
+        $context = SecondSemesterEnrollment::context($student);
+
+        if ($context['canComplete']) {
+            SecondSemesterEnrollment::complete($student);
+
+            return redirect()
+                ->route('student.second-semester-enrollment.create')
+                ->with('status', 'Congratulations! Your Grade 12 and Senior High School completion has been recorded.');
+        }
+
+        $enrollment = SecondSemesterEnrollment::enroll($student, $request->validated('elective_ids', []));
+        $grade = $enrollment->getRelation('gradeLevel')?->grade_label ?? 'Senior High School';
+        $semester = SecondSemesterEnrollment::semesterLabel($enrollment->gradingSemester?->key);
 
         return redirect()
             ->route('student.second-semester-enrollment.create')
-            ->with('status', 'Your Grade 11 second-semester enrollment was completed successfully.');
+            ->with('status', "Your {$grade} {$semester} enrollment was completed successfully.");
     }
 }

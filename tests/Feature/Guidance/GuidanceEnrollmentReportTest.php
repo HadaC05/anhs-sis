@@ -37,7 +37,8 @@ beforeEach(function () {
 
 test('enrollment report defaults to active year and distinguishes records from learners', function () {
     $this->actingAs($this->counselor)->get(route('guidance.reports.enrollment'))
-        ->assertOk()->assertSee('Enrollment Reports')->assertSee('Learner, Report')
+        ->assertOk()->assertSee('Enrollment Reports')->assertSee('Download PNG')->assertDontSee('Download SVG')
+        ->assertDontSee('Detailed enrollment records')
         ->assertViewHas('total', 2)
         ->assertViewHas('summary', fn ($summary) => $summary['Unique learners'] === 2 && $summary['Pending'] === 1 && $summary['Officially enrolled'] === 1)
         ->assertViewHas('breakdowns', fn ($rows) => $rows['Enrollment status']->sum('total') === 2);
@@ -46,11 +47,10 @@ test('enrollment report defaults to active year and distinguishes records from l
         ->assertViewHas('summary', fn ($summary) => $summary['Unique learners'] === 2);
 });
 
-test('enrollment report applies filters to details summaries and downloads', function () {
+test('enrollment report applies filters to summaries and downloads', function () {
     $filters = ['academic_year_id' => '', 'status' => 'withdrawn', 'learner_type' => 'regular', 'section' => 'unassigned', 'search' => '123456789012'];
     $this->actingAs($this->counselor)->get(route('guidance.reports.enrollment', $filters))
-        ->assertOk()->assertViewHas('total', 1)
-        ->assertViewHas('records', fn ($rows) => $rows->total() === 1 && $rows->first()->school_year === '2025-2026');
+        ->assertOk()->assertViewHas('total', 1)->assertDontSee('Detailed enrollment records');
     $response = $this->get(route('guidance.reports.enrollment', [...$filters, 'download' => 'csv']));
     $response->assertOk()->assertDownload()->assertHeader('content-type', 'text/csv; charset=UTF-8');
     expect($response->streamedContent())->toContain('2025-2026')->toContain('Withdrawn')->not->toContain('2026-2027');
@@ -58,7 +58,7 @@ test('enrollment report applies filters to details summaries and downloads', fun
 
 test('enrollment report shows an empty state and validates filters', function () {
     $this->actingAs($this->counselor)->get(route('guidance.reports.enrollment', ['search' => 'DoesNotExist']))
-        ->assertOk()->assertViewHas('total', 0)->assertSee('No enrollment records match these filters.');
+        ->assertOk()->assertViewHas('total', 0)->assertSee('No matching enrollment records.');
     $this->getJson(route('guidance.reports.enrollment', ['status' => 'invalid']))->assertUnprocessable();
 });
 

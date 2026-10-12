@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureGuidanceCounselor;
 use App\Http\Middleware\EnsureLoginCaptcha;
 use App\Http\Middleware\EnsurePrincipal;
 use App\Http\Middleware\EnsureRegistrar;
+use App\Http\Middleware\EnsureSectionIsActive;
 use App\Http\Middleware\EnsureStudent;
 use App\Http\Middleware\EnsureTeacher;
 use App\Http\Middleware\ForcePasswordChange;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             PreventBackHistory::class,
             EnsureAccountIsActive::class,
+            EnsureSectionIsActive::class,
             \App\Http\Middleware\RecordAuditTrail::class,
         ]);
 

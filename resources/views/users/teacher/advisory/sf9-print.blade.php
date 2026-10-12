@@ -408,6 +408,14 @@
             vertical-align: top;
         }
 
+        .shs-comment-text {
+            min-height: 6mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
         .shs-sign p {
             margin: 0 0 2.5mm;
             font-size: 11px;
@@ -456,9 +464,7 @@
             $observedPeriods = $card['observed_periods'] ?? $periods;
             $observedPeriodCount = count($observedPeriods);
         @endphp
-        @if ($isSeniorHigh || ($sf9Formats['junior_high'] ?? 'jhs_legacy') === 'jhs_2026')
-            @include('users.teacher.advisory.sf9-jhs-2026')
-        @elseif ($isSeniorHigh)
+        @if ($isSeniorHigh)
             @php
                 $attendance = $card['attendance'] ?? \App\Support\Sf9AttendanceSummary::empty();
                 $attendanceMonths = $card['attendance_months'] ?? \App\Support\Sf9ReportCardBuilder::seniorHighAttendanceMonthKeys();
@@ -609,9 +615,9 @@
                         <div class="shs-section-title">Teacher's Comments/ Remarks</div>
                         <table class="shs-comments">
                             <tbody>
-                                <tr><td>Term 1</td></tr>
-                                <tr><td>Term 2</td></tr>
-                                <tr><td>Term 3</td></tr>
+                                @foreach (collect(\App\Models\GradingTerm::seniorHighPeriods())->where('semester', 'first') as $period)
+                                    <tr><td><div>{{ $period['label'] }}</div><div class="shs-comment-text">{{ $card['teacher_comments'][$period['key']] ?? '' }}</div></td></tr>
+                                @endforeach
                             </tbody>
                         </table>
 
@@ -645,6 +651,8 @@
                     </div>
                 </div>
             </section>
+        @elseif (($sf9Formats['junior_high'] ?? 'jhs_legacy') === 'jhs_2026')
+            @include('users.teacher.advisory.sf9-jhs-2026')
         @else
         <section class="sheet">
             <div class="front-grid">

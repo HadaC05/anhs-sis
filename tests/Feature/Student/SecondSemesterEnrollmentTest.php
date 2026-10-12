@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AcademicYear;
 use App\Models\Cluster;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatus;
@@ -160,4 +161,84 @@ test('grade 11 student cannot continue before school confirms eligibility', func
         ->assertSessionHasErrors('enrollment');
 
     expect(Enrollment::query()->where('student_ID', $enrollment->student_ID)->count())->toBe(1);
+});
+
+test('student advances through grade 12 semesters and records senior high completion', function () {
+    $track = Track::query()->where('name', 'Academic Track')->firstOrFail();
+    $stem = Cluster::query()->where('name', 'Science, Technology, Engineering and Mathematics')->firstOrFail();
+    $electiveIds = Subject::query()
+        ->where('status', 'active')
+        ->whereHas('subjectType', fn ($query) => $query->where('key', 'elective'))
+        ->whereHas('cluster', fn ($query) => $query->where('track_ID', $track->track_ID))
+        ->orderBy('subject_ID')
+        ->take(2)
+        ->pluck('subject_ID')
+        ->all();
+
+    $this->post(route('register.store'), secondSemesterRegistrationPayload([
+        'LRN' => '998877665522',
+        'email' => 'grade.twelve.progression@example.com',
+        'track_ID' => $track->track_ID,
+        'cluster_ID' => $stem->cluster_ID,
+        'elective_ids' => $electiveIds,
+    ]))->assertSessionHasNoErrors();
+
+    $student = Enrollment::query()->latest('enrollment_ID')->firstOrFail()->student;
+    $student->update(['change_password' => false]);
+    $acting = $this->actingAs($student);
+
+    $advance = function () use ($student, $electiveIds, $acting): Enrollment {
+        $current = Enrollment::query()->where('student_ID', $student->id)->latest('enrollment_ID')->firstOrFail();
+        $current->update([
+            'enrollment_status' => EnrollmentStatus::ENROLLED,
+            'promotion_status' => PromotionStatus::ELIGIBLE,
+        ]);
+
+        $acting->post(route('student.second-semester-enrollment.store'), ['elective_ids' => $electiveIds])
+            ->assertRedirect(route('student.second-semester-enrollment.create'))
+            ->assertSessionHasNoErrors();
+
+        expect($current->fresh()->promotion_status)->toBe(PromotionStatus::PROMOTED);
+
+        return Enrollment::query()->where('student_ID', $student->id)->latest('enrollment_ID')->firstOrFail();
+    };
+
+    $gradeElevenSecond = $advance();
+    expect($gradeElevenSecond->grade_level)->toBe('grade_11')
+        ->and($gradeElevenSecond->semester)->toBe(GradingSemester::SECOND);
+
+    AcademicYear::query()->where('school_year', '2027-2028')->firstOrFail()->makeActive();
+
+    $gradeTwelveFirst = $advance();
+    expect($gradeTwelveFirst->grade_level)->toBe('grade_12')
+        ->and($gradeTwelveFirst->semester)->toBe(GradingSemester::FIRST)
+        ->and($gradeTwelveFirst->last_grade_level_completed)->toBe('Grade 11')
+        ->and($gradeTwelveFirst->last_school_year_completed)->toBe('2026-2027');
+
+    $gradeTwelveSecond = $advance();
+    expect($gradeTwelveSecond->grade_level)->toBe('grade_12')
+        ->and($gradeTwelveSecond->semester)->toBe(GradingSemester::SECOND);
+
+    $gradeTwelveSecond->update([
+        'enrollment_status' => EnrollmentStatus::ENROLLED,
+        'promotion_status' => PromotionStatus::ELIGIBLE,
+    ]);
+
+    $acting->get(route('student.second-semester-enrollment.create'))
+        ->assertOk()
+        ->assertSee('Complete Grade 12')
+        ->assertSee('Confirm Grade 12 Completion');
+
+    $acting->post(route('student.second-semester-enrollment.store'), [])
+        ->assertRedirect(route('student.second-semester-enrollment.create'))
+        ->assertSessionHasNoErrors();
+
+    expect($gradeTwelveSecond->fresh()->promotion_status)->toBe(PromotionStatus::COMPLETED_SENIOR_HIGH)
+        ->and(Enrollment::query()->where('student_ID', $student->id)->count())->toBe(4)
+        ->and(\App\Support\PromotionEligibility::synchronize($gradeTwelveSecond->fresh())['status'])
+        ->toBe(PromotionStatus::COMPLETED_SENIOR_HIGH);
+
+    $acting->get(route('student.second-semester-enrollment.create'))
+        ->assertOk()
+        ->assertSee('Completed Senior High School');
 });

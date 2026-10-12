@@ -54,6 +54,7 @@ class PromotionEligibility
             $terminalStatus = in_array($enrollment->promotion_status, [
                 PromotionStatus::PROMOTED,
                 PromotionStatus::COMPLETED_JUNIOR_HIGH,
+                PromotionStatus::COMPLETED_SENIOR_HIGH,
             ], true) ? $enrollment->promotion_status : null;
             $promoted = $terminalStatus === PromotionStatus::PROMOTED
                 || ($gradeId && $enrollment->academicYear?->start_date && $laterEnrollments->get($enrollment->student_ID, collect())->contains(
@@ -65,8 +66,8 @@ class PromotionEligibility
                 $keys = collect($key === 'jhs' ? GradingTerm::configuredPeriods() : GradingTerm::seniorHighPeriods($enrollment->semester))->pluck('key');
                 $periods[$key] = ['keys' => $keys, 'ids' => $keys->map(fn ($key) => StudentSubjectGrade::termIdForPeriodKey($key))];
             }
-            $evaluation = $terminalStatus === PromotionStatus::COMPLETED_JUNIOR_HIGH
-                ? ['status' => PromotionStatus::COMPLETED_JUNIOR_HIGH, 'reason' => 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []]
+            $evaluation = in_array($terminalStatus, [PromotionStatus::COMPLETED_JUNIOR_HIGH, PromotionStatus::COMPLETED_SENIOR_HIGH], true)
+                ? ['status' => $terminalStatus, 'reason' => $terminalStatus === PromotionStatus::COMPLETED_SENIOR_HIGH ? 'Senior High School already completed.' : 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []]
                 : ($promoted
                 ? ['status' => PromotionStatus::PROMOTED, 'reason' => 'Already promoted.', 'subject_averages' => [], 'failed_subjects' => []]
                 : self::evaluate($enrollment, [
@@ -121,6 +122,10 @@ class PromotionEligibility
             return ['status' => PromotionStatus::COMPLETED_JUNIOR_HIGH, 'reason' => 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []];
         }
 
+        if ($enrollment->promotion_status === PromotionStatus::COMPLETED_SENIOR_HIGH) {
+            return ['status' => PromotionStatus::COMPLETED_SENIOR_HIGH, 'reason' => 'Senior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []];
+        }
+
         $evaluation = self::evaluate($enrollment);
         $enrollment->promotion_status = $evaluation['status'];
         if ($enrollment->isDirty('promotion_status_ID')) {
@@ -136,6 +141,10 @@ class PromotionEligibility
     {
         if ($enrollment->promotion_status === PromotionStatus::COMPLETED_JUNIOR_HIGH) {
             return ['status' => PromotionStatus::COMPLETED_JUNIOR_HIGH, 'reason' => 'Junior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []];
+        }
+
+        if ($enrollment->promotion_status === PromotionStatus::COMPLETED_SENIOR_HIGH) {
+            return ['status' => PromotionStatus::COMPLETED_SENIOR_HIGH, 'reason' => 'Senior High School already completed.', 'subject_averages' => [], 'failed_subjects' => []];
         }
 
         $enrollment->loadMissing(['section.gradeLevel', 'gradingSemester.status', 'remediationCase.subjects']);

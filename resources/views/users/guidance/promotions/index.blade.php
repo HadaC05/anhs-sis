@@ -39,7 +39,7 @@
         <div>
             <label for="promotion-eligibility" class="mb-1 block text-xs font-semibold text-gray-600">Eligibility</label>
             <select id="promotion-eligibility" name="eligibility" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                @foreach (['all' => 'All eligibility', 'eligible' => 'Eligible for Promotion', 'pending' => 'Pending Evaluation', 'retained' => 'Retained', 'conditionally_promoted' => 'Conditionally Promoted', 'promoted' => 'Promoted', 'completed_junior_high' => 'Completed Junior High School'] as $value => $label)
+                @foreach (['all' => 'All eligibility', 'eligible' => 'Eligible for Promotion', 'pending' => 'Pending Evaluation', 'retained' => 'Retained', 'conditionally_promoted' => 'Conditionally Promoted', 'promoted' => 'Promoted', 'completed_junior_high' => 'Completed Junior High School', 'completed_senior_high' => 'Completed Senior High School'] as $value => $label)
                     <option value="{{ $value }}" @selected($eligibility === $value)>{{ $label }}</option>
                 @endforeach
             </select>
@@ -115,7 +115,7 @@
                         $status = $enrollment->promotion_status;
                         $badge = match ($status) {
                             'eligible' => 'bg-emerald-100 text-emerald-800',
-                            'promoted', 'completed_junior_high' => 'bg-emerald-100 text-emerald-800',
+                            'promoted', 'completed_junior_high', 'completed_senior_high' => 'bg-emerald-100 text-emerald-800',
                             'retained' => 'bg-red-100 text-red-800',
                             default => 'bg-amber-100 text-amber-800',
                         };
@@ -124,13 +124,14 @@
                             'conditionally_promoted' => 'Conditionally Promoted',
                             'promoted' => 'Promoted',
                             'completed_junior_high' => 'Completed Junior High School',
+                            'completed_senior_high' => 'Completed Senior High School',
                             'retained' => 'Retained',
                             default => 'Pending Evaluation',
                         };
                         $gradeLabel = $enrollment->getRelation('gradeLevel')?->grade_label;
                         $isGradeTen = $gradeLabel === 'Grade 10';
-                        $isGradeTwelve = $gradeLabel === 'Grade 12';
-                        $canPromote = $status === 'eligible' && ! $isGradeTwelve;
+                        $isSeniorHigh = in_array($gradeLabel, ['Grade 11', 'Grade 12'], true);
+                        $canPromote = $status === 'eligible' && ! $isSeniorHigh;
                         $alreadyEnrolledInActiveYear = in_array((int) $enrollment->student_ID, $activeYearEnrollmentStudentIds, true);
                         $hasLaterActiveYear = $activeAcademicYear
                             && $enrollment->academicYear?->start_date
@@ -178,7 +179,7 @@
                                 <button type="submit" class="rounded-lg bg-[#296374] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f4e5c]">Start Remediation</button>
                             </form>
                             @else
-                                <span class="text-xs text-gray-500">{{ match (true) { $status === 'promoted' => 'Already promoted.', $status === 'completed_junior_high' => 'Junior High School completed.', $status === 'conditionally_promoted' => 'Conditional promotion does not permit advancement to the next grade.', $status === 'retained' && $alreadyEnrolledInActiveYear => 'Already enrolled for '.$activeAcademicYear?->school_year.'.', $status === 'retained' && ! $hasLaterActiveYear => 'A later active school year is required before repeating this grade.', $status === 'retained' => 'Guidance may enroll this learner to repeat the same grade.', $isGradeTwelve && $status === 'eligible' => 'Grade 12 completed', $canPromote => 'Eligible for promotion.', default => 'Promotion requirements are not yet complete.' } }}</span>
+                                <span class="text-xs text-gray-500">{{ match (true) { $status === 'promoted' => 'Already promoted.', $status === 'completed_junior_high' => 'Junior High School completed.', $status === 'completed_senior_high' => 'Senior High School completed.', $status === 'conditionally_promoted' => 'Conditional promotion does not permit advancement to the next grade.', $status === 'retained' && $alreadyEnrolledInActiveYear => 'Already enrolled for '.$activeAcademicYear?->school_year.'.', $status === 'retained' && ! $hasLaterActiveYear => 'A later active school year is required before repeating this grade.', $status === 'retained' => 'Guidance may enroll this learner to repeat the same grade.', $isSeniorHigh && $status === 'eligible' => 'Ready to continue through the student portal.', $canPromote => 'Eligible for promotion.', default => 'Promotion requirements are not yet complete.' } }}</span>
                             @endif
                         </td>
                     </tr>

@@ -15,14 +15,15 @@ use Illuminate\Validation\ValidationException;
 class PromotionRegistrar
 {
     /**
-     * Complete Grade 10 or create the learner's pending next-grade enrollment.
+     * Complete Grade 10 or create a Junior High learner's pending next-grade enrollment.
+     * Senior High learners use the semester-by-semester student portal flow.
      * Existing future enrollments are returned unchanged, making promotion idempotent.
      */
     public static function promote(Enrollment $enrollment, bool $requireActiveYear = false): ?Enrollment
     {
         $enrollment->loadMissing(['academicYear', 'section.gradeLevel', 'curriculumGradeLevel.gradeLevel']);
 
-        if ($enrollment->promotion_status === PromotionStatus::COMPLETED_JUNIOR_HIGH) {
+        if (in_array($enrollment->promotion_status, [PromotionStatus::COMPLETED_JUNIOR_HIGH, PromotionStatus::COMPLETED_SENIOR_HIGH], true)) {
             return null;
         }
 
@@ -43,6 +44,12 @@ class PromotionRegistrar
             $enrollment->update(['promotion_status' => PromotionStatus::COMPLETED_JUNIOR_HIGH]);
 
             return null;
+        }
+
+        if (in_array($currentGradeLabel, ['Grade 11', 'Grade 12'], true)) {
+            throw ValidationException::withMessages([
+                'promotion' => 'Senior High learners advance one semester at a time through the student portal.',
+            ]);
         }
 
         $currentGradeId = (int) ($enrollment->section?->grade_ID ?: $enrollment->curriculumGradeLevel?->grade_ID);

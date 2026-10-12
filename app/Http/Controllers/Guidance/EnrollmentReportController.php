@@ -220,7 +220,6 @@ class EnrollmentReportController extends Controller
             'generatedAt' => $generatedAt,
             'comparison' => $comparison,
             'comparisonContext' => $comparisonContext,
-            'records' => $details->paginate(25)->withQueryString(),
         ]);
     }
 }

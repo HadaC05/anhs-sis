@@ -23,8 +23,15 @@ class Sf9Configuration extends Model
 
     public static function usesTeacherComments(?Section $section): bool
     {
-        return $section !== null && ! GradingTerm::isSeniorHighSection($section)
-            && self::current()->junior_high === 'jhs_2026';
+        if ($section === null) {
+            return false;
+        }
+
+        if (GradingTerm::isSeniorHighSection($section)) {
+            return true;
+        }
+
+        return self::current()->junior_high === 'jhs_2026';
     }
 
     public static function advisoryTabLabel(Section $section): string

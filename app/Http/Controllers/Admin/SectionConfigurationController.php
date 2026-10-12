@@ -47,6 +47,7 @@ class SectionConfigurationController extends Controller
         $gradeColumn = (new Section)->getConnection()->getQueryGrammar()->wrap('sections.grade_ID');
 
         $sections = Section::query()
+            ->when($detailsTab, fn ($query) => $query->active())
             ->withCount(['enrollments as enrolled_students_count' => fn ($query) => $query
                 ->whereIn('enrollment_status_ID', \App\Models\EnrollmentStatus::activeIds())])
             ->with(['cluster', 'gradeLevel', 'adviser', 'academicYear', 'curriculumGradeLevel.gradeLevel', 'curriculumGradeLevel.gradingSemester'])
@@ -97,7 +98,7 @@ class SectionConfigurationController extends Controller
         $enrollments = collect();
         $latestImport = null;
         if ($detailsTab && $request->integer('section') > 0) {
-            $selectedSection = Section::with(['academicYear', 'gradeLevel', 'adviser'])->findOrFail($request->integer('section'));
+            $selectedSection = Section::query()->active()->with(['academicYear', 'gradeLevel', 'adviser'])->findOrFail($request->integer('section'));
             $enrollments = $selectedSection->enrollments()->with('student')
                 ->whereIn('enrollment_status_ID', \App\Models\EnrollmentStatus::activeIds())->get()
                 ->sortBy(fn ($enrollment) => strtolower(($enrollment->student?->last_name ?? '').' '.($enrollment->student?->first_name ?? '')))->values();
@@ -149,6 +150,7 @@ class SectionConfigurationController extends Controller
             AcademicYear::query()->whereKey($data['target_SY_ID'])->lockForUpdate()->firstOrFail();
 
             $sources = Section::query()
+                ->active()
                 ->where('SY_ID', $data['source_SY_ID'])
                 ->when($data['copy_grade_level'] !== 'all', fn ($query) => $query
                     ->where('grade_ID', GradeLevel::idForValue($data['copy_grade_level'])))

@@ -350,6 +350,36 @@ test('default promotion year selection still permits the next configured inactiv
     expect($next->SY_ID)->toBe($nextYear->SY_ID);
 });
 
+test('opening a school year automatically enrolls promoted learners but not ordinary pending applicants', function () {
+    ['enrollment' => $enrollment, 'offerings' => $offerings] = guidancePromotionFixtures();
+    $nextYear = AcademicYear::query()->create([
+        'school_year' => '2027-2028', 'start_date' => '2027-06-01',
+        'end_date' => '2028-03-31', 'status' => false,
+    ]);
+
+    $promotedEnrollment = PromotionRegistrar::promote($enrollment);
+    expect($promotedEnrollment)->not->toBeNull()
+        ->and($promotedEnrollment->enrollment_status)->toBe('pending')
+        ->and($promotedEnrollment->section_ID)->toBeNull();
+
+    $applicant = Student::query()->create([
+        'lrn' => '777777777779', 'first_name' => 'Pending', 'last_name' => 'Applicant', 'status' => 'active',
+    ]);
+    $ordinaryPending = Enrollment::query()->create([
+        'student_ID' => $applicant->id,
+        'curriculum_grade_level_ID' => $offerings[8]->curriculum_ID,
+        'SY_ID' => $nextYear->SY_ID,
+        'enrollment_status' => 'pending',
+        'promotion_status' => PromotionStatus::PENDING,
+    ]);
+
+    expect($nextYear->makeActive())->toBe(1)
+        ->and($promotedEnrollment->fresh()->enrollment_status)->toBe('enrolled')
+        ->and($promotedEnrollment->fresh()->section_ID)->not->toBeNull()
+        ->and($ordinaryPending->fresh()->enrollment_status)->toBe('pending')
+        ->and($ordinaryPending->fresh()->section_ID)->toBeNull();
+});
+
 test('eligible Grade 10 learners complete junior high without a Grade 11 enrollment', function () {
     ['user' => $user, 'enrollment' => $enrollment] = guidancePromotionFixtures();
     $gradeTen = GradeLevel::query()->where('grade_label', 'Grade 10')->firstOrFail();
